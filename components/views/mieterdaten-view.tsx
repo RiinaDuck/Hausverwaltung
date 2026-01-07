@@ -363,7 +363,10 @@ export function MieterdatenView() {
                     id="new-name"
                     value={newMieter.name}
                     onChange={(e) =>
-                      setNewMieter((prev) => ({ ...prev, name: e.target.value }))
+                      setNewMieter((prev) => ({
+                        ...prev,
+                        name: e.target.value,
+                      }))
                     }
                     placeholder="z.B. Familie Schmidt"
                   />
@@ -431,7 +434,10 @@ export function MieterdatenView() {
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setIsNewMieterOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setIsNewMieterOpen(false)}
+              >
                 Abbrechen
               </Button>
               <Button
