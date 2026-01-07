@@ -315,6 +315,134 @@ export function MieterdatenView() {
             </p>
           )}
         </Card>
+
+        <Dialog open={isNewMieterOpen} onOpenChange={setIsNewMieterOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Neuen Mieter anlegen</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-wohnung">Wohnung</Label>
+                <Select
+                  value={newMieter.wohnungId}
+                  onValueChange={(value) =>
+                    setNewMieter((prev) => ({ ...prev, wohnungId: value }))
+                  }
+                >
+                  <SelectTrigger id="new-wohnung">
+                    <SelectValue placeholder="Wohnung auswählen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableWohnungen.map((w) => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.bezeichnung} ({w.flaeche} m²)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-anrede">Anrede</Label>
+                  <Select defaultValue="familie">
+                    <SelectTrigger id="new-anrede">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="herr">Herr</SelectItem>
+                      <SelectItem value="frau">Frau</SelectItem>
+                      <SelectItem value="familie">Familie</SelectItem>
+                      <SelectItem value="firma">Firma</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-name">Name</Label>
+                  <Input
+                    id="new-name"
+                    value={newMieter.name}
+                    onChange={(e) =>
+                      setNewMieter((prev) => ({ ...prev, name: e.target.value }))
+                    }
+                    placeholder="z.B. Familie Schmidt"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-einzug">Einzugsdatum</Label>
+                  <Input
+                    id="new-einzug"
+                    type="date"
+                    value={newMieter.einzugsDatum}
+                    onChange={(e) =>
+                      setNewMieter((prev) => ({
+                        ...prev,
+                        einzugsDatum: e.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-kaltmiete">Kaltmiete (€)</Label>
+                  <Input
+                    id="new-kaltmiete"
+                    type="number"
+                    value={newMieter.kaltmiete}
+                    onChange={(e) =>
+                      setNewMieter((prev) => ({
+                        ...prev,
+                        kaltmiete: parseFloat(e.target.value) || 0,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-nebenkosten">Nebenkosten (€)</Label>
+                  <Input
+                    id="new-nebenkosten"
+                    type="number"
+                    value={newMieter.nebenkosten}
+                    onChange={(e) =>
+                      setNewMieter((prev) => ({
+                        ...prev,
+                        nebenkosten: parseFloat(e.target.value) || 0,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-kaution">Kaution (€)</Label>
+                  <Input
+                    id="new-kaution"
+                    type="number"
+                    value={newMieter.kaution}
+                    onChange={(e) =>
+                      setNewMieter((prev) => ({
+                        ...prev,
+                        kaution: parseFloat(e.target.value) || 0,
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsNewMieterOpen(false)}>
+                Abbrechen
+              </Button>
+              <Button
+                className="bg-success hover:bg-success/90 text-success-foreground"
+                onClick={handleCreateMieter}
+              >
+                Mieter anlegen
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
