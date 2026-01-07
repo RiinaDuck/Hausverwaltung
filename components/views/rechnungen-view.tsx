@@ -1,11 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -123,12 +130,35 @@ export function RechnungenView() {
     status: "offen",
   });
 
-  const calculatePositionTotal = (pos: RechnungsPosition) =>
-    pos.menge * pos.einzelpreis;
-  const calculateNetto = (positionen: RechnungsPosition[]) =>
-    positionen.reduce((sum, p) => sum + calculatePositionTotal(p), 0);
-  const calculateMwst = (netto: number) => netto * 0.19;
-  const calculateBrutto = (netto: number) => netto * 1.19;
+  // Memoized calculation functions
+  const calculatePositionTotal = useMemo(
+    () => (pos: RechnungsPosition) => pos.menge * pos.einzelpreis,
+    []
+  );
+
+  const calculateNetto = useMemo(
+    () => (positionen: RechnungsPosition[]) =>
+      positionen.reduce((sum, p) => sum + p.menge * p.einzelpreis, 0),
+    []
+  );
+
+  const calculateMwst = useMemo(() => (netto: number) => netto * 0.19, []);
+  const calculateBrutto = useMemo(() => (netto: number) => netto * 1.19, []);
+
+  // Memoized summary statistics
+  const summary = useMemo(() => {
+    const gesamt = rechnungen.reduce((sum, r) => {
+      const netto = calculateNetto(r.positionen);
+      return sum + calculateBrutto(netto);
+    }, 0);
+    const offen = rechnungen
+      .filter((r) => r.status === "offen")
+      .reduce((sum, r) => {
+        const netto = calculateNetto(r.positionen);
+        return sum + calculateBrutto(netto);
+      }, 0);
+    return { gesamt, offen };
+  }, [rechnungen, calculateNetto, calculateBrutto]);
 
   const handleExportPDF = (rechnung: Rechnung) => {
     const netto = calculateNetto(rechnung.positionen);
@@ -193,7 +223,7 @@ export function RechnungenView() {
       empfaengerAdresse: newRechnung.empfaengerAdresse || "",
       positionen: newRechnung.positionen || [],
       bemerkung: newRechnung.bemerkung || "",
-      status: "offen",
+      status: newRechnung.status || "offen",
     };
     setRechnungen((prev) => [...prev, rechnung]);
     setIsCreateOpen(false);
@@ -236,6 +266,7 @@ export function RechnungenView() {
               empfaengerAdresse: newRechnung.empfaengerAdresse || "",
               positionen: newRechnung.positionen || [],
               bemerkung: newRechnung.bemerkung || "",
+              status: newRechnung.status || "offen",
             }
           : r
       )
@@ -446,6 +477,28 @@ export function RechnungenView() {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <Select
+                  value={newRechnung.status || "offen"}
+                  onValueChange={(value) =>
+                    setNewRechnung((prev) => ({
+                      ...prev,
+                      status: value as Rechnung["status"],
+                    }))
+                  }
+                >
+                  <SelectTrigger id="status">
+                    <SelectValue placeholder="Status wählen" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="offen">Offen</SelectItem>
+                    <SelectItem value="bezahlt">Bezahlt</SelectItem>
+                    <SelectItem value="storniert">Storniert</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="bemerkung">Bemerkung</Label>
                 <Textarea
                   id="bemerkung"
@@ -622,6 +675,28 @@ export function RechnungenView() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-status">Status</Label>
+              <Select
+                value={newRechnung.status || "offen"}
+                onValueChange={(value) =>
+                  setNewRechnung((prev) => ({
+                    ...prev,
+                    status: value as Rechnung["status"],
+                  }))
+                }
+              >
+                <SelectTrigger id="edit-status">
+                  <SelectValue placeholder="Status wählen" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="offen">Offen</SelectItem>
+                  <SelectItem value="bezahlt">Bezahlt</SelectItem>
+                  <SelectItem value="storniert">Storniert</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

@@ -1,6 +1,12 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 
 // Types für die Datenstrukturen
 export interface Objekt {
@@ -318,10 +324,79 @@ const initialMieter: Mieter[] = [
 ];
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
-  const [objekte, setObjekte] = useState<Objekt[]>(initialObjekte);
-  const [wohnungen, setWohnungen] = useState<Wohnung[]>(initialWohnungen);
-  const [mieter, setMieter] = useState<Mieter[]>(initialMieter);
-  const [selectedObjektId, setSelectedObjektId] = useState<string | null>("1");
+  // LocalStorage Keys
+  const STORAGE_KEYS = {
+    objekte: "hausverwaltung_objekte",
+    wohnungen: "hausverwaltung_wohnungen",
+    mieter: "hausverwaltung_mieter",
+    selectedObjektId: "hausverwaltung_selectedObjektId",
+  };
+
+  // Helper: Load from localStorage with fallback
+  const loadFromStorage = <T,>(key: string, fallback: T): T => {
+    if (typeof window === "undefined") return fallback;
+    try {
+      const stored = localStorage.getItem(key);
+      return stored ? JSON.parse(stored) : fallback;
+    } catch (error) {
+      console.error(`Error loading ${key} from localStorage:`, error);
+      return fallback;
+    }
+  };
+
+  // Initialize state with localStorage or fallback to initial data
+  const [objekte, setObjekte] = useState<Objekt[]>(() =>
+    loadFromStorage(STORAGE_KEYS.objekte, initialObjekte)
+  );
+  const [wohnungen, setWohnungen] = useState<Wohnung[]>(() =>
+    loadFromStorage(STORAGE_KEYS.wohnungen, initialWohnungen)
+  );
+  const [mieter, setMieter] = useState<Mieter[]>(() =>
+    loadFromStorage(STORAGE_KEYS.mieter, initialMieter)
+  );
+  const [selectedObjektId, setSelectedObjektId] = useState<string | null>(() =>
+    loadFromStorage(STORAGE_KEYS.selectedObjektId, "1")
+  );
+
+  // Auto-save to localStorage whenever data changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.objekte, JSON.stringify(objekte));
+    } catch (error) {
+      console.error("Error saving objekte to localStorage:", error);
+    }
+  }, [objekte]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.wohnungen, JSON.stringify(wohnungen));
+    } catch (error) {
+      console.error("Error saving wohnungen to localStorage:", error);
+    }
+  }, [wohnungen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(STORAGE_KEYS.mieter, JSON.stringify(mieter));
+    } catch (error) {
+      console.error("Error saving mieter to localStorage:", error);
+    }
+  }, [mieter]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(
+        STORAGE_KEYS.selectedObjektId,
+        JSON.stringify(selectedObjektId)
+      );
+    } catch (error) {
+      console.error("Error saving selectedObjektId to localStorage:", error);
+    }
+  }, [selectedObjektId]);
 
   const generateId = () => Math.random().toString(36).substr(2, 9);
 

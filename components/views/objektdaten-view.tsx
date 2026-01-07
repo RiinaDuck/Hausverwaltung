@@ -26,6 +26,8 @@ import { Save, Plus, Building2, Trash2, Edit } from "lucide-react";
 import { useAppData } from "@/context/app-data-context";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { validateRequired, validatePLZ } from "@/lib/validation";
 
 export function ObjektdatenView() {
   const {
@@ -42,6 +44,13 @@ export function ObjektdatenView() {
   const [objektPlz, setObjektPlz] = useState("");
   const [objektOrt, setObjektOrt] = useState("");
   const [editingObjektId, setEditingObjektId] = useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [objektToDelete, setObjektToDelete] = useState<
+    (typeof objekte)[0] | null
+  >(null);
+  const [validationErrors, setValidationErrors] = useState<
+    Record<string, string>
+  >({});
   const { toast } = useToast();
 
   const selectedObjekt =
@@ -56,8 +65,34 @@ export function ObjektdatenView() {
     });
   };
 
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    const nameValidation = validateRequired(objektName, "Objektname");
+    if (!nameValidation.valid) errors.name = nameValidation.error!;
+
+    const strasseValidation = validateRequired(objektStrasse, "Straße");
+    if (!strasseValidation.valid) errors.strasse = strasseValidation.error!;
+
+    const plzValidation = validatePLZ(objektPlz);
+    if (!plzValidation.valid) errors.plz = plzValidation.error!;
+
+    const ortValidation = validateRequired(objektOrt, "Ort");
+    if (!ortValidation.valid) errors.ort = ortValidation.error!;
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleNeuesObjekt = () => {
-    if (!objektName.trim()) return;
+    if (!validateForm()) {
+      toast({
+        title: "Validierungsfehler",
+        description: "Bitte überprüfen Sie Ihre Eingaben.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (editingObjektId) {
       // Bearbeitung
@@ -125,6 +160,7 @@ export function ObjektdatenView() {
     setObjektPlz("");
     setObjektOrt("");
     setEditingObjektId(null);
+    setValidationErrors({});
   };
 
   const handleEditObjekt = (objekt: (typeof objekte)[0]) => {
@@ -141,10 +177,21 @@ export function ObjektdatenView() {
     setIsDialogOpen(true);
   };
 
-  const handleDeleteObjekt = (id: string) => {
-    if (confirm("Möchten Sie dieses Objekt wirklich löschen?")) {
-      deleteObjekt(id);
+  const handleDeleteObjekt = (objekt: (typeof objekte)[0]) => {
+    setObjektToDelete(objekt);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (objektToDelete) {
+      deleteObjekt(objektToDelete.id);
+      toast({
+        title: "Gelöscht",
+        description: `Objekt "${objektToDelete.name}" wurde gelöscht.`,
+      });
+      setObjektToDelete(null);
     }
+    setDeleteConfirmOpen(false);
   };
 
   return (
@@ -192,7 +239,15 @@ export function ObjektdatenView() {
                     placeholder="z.B. Mehrfamilienhaus Mitte"
                     value={objektName}
                     onChange={(e) => setObjektName(e.target.value)}
+                    className={
+                      validationErrors.name ? "border-destructive" : ""
+                    }
                   />
+                  {validationErrors.name && (
+                    <p className="text-sm text-destructive">
+                      {validationErrors.name}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="neues-objekt-strasse">Straße</Label>
@@ -201,7 +256,15 @@ export function ObjektdatenView() {
                     placeholder="z.B. Hauptstraße 15"
                     value={objektStrasse}
                     onChange={(e) => setObjektStrasse(e.target.value)}
+                    className={
+                      validationErrors.strasse ? "border-destructive" : ""
+                    }
                   />
+                  {validationErrors.strasse && (
+                    <p className="text-sm text-destructive">
+                      {validationErrors.strasse}
+                    </p>
+                  )}
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
@@ -211,7 +274,16 @@ export function ObjektdatenView() {
                       placeholder="10115"
                       value={objektPlz}
                       onChange={(e) => setObjektPlz(e.target.value)}
+                      maxLength={5}
+                      className={
+                        validationErrors.plz ? "border-destructive" : ""
+                      }
                     />
+                    {validationErrors.plz && (
+                      <p className="text-sm text-destructive">
+                        {validationErrors.plz}
+                      </p>
+                    )}
                   </div>
                   <div className="col-span-2 space-y-2">
                     <Label htmlFor="neues-objekt-ort">Ort</Label>
@@ -220,7 +292,15 @@ export function ObjektdatenView() {
                       placeholder="Berlin"
                       value={objektOrt}
                       onChange={(e) => setObjektOrt(e.target.value)}
+                      className={
+                        validationErrors.ort ? "border-destructive" : ""
+                      }
                     />
+                    {validationErrors.ort && (
+                      <p className="text-sm text-destructive">
+                        {validationErrors.ort}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -305,7 +385,7 @@ export function ObjektdatenView() {
                     className="h-8 w-8 text-destructive hover:text-destructive"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleDeleteObjekt(objekt.id);
+                      handleDeleteObjekt(objekt);
                     }}
                   >
                     <Trash2 className="h-4 w-4" />
@@ -745,6 +825,22 @@ Nächste Wartung Heizung: März 2026"
           </Card>
         </>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        onOpenChange={setDeleteConfirmOpen}
+        onConfirm={confirmDelete}
+        title="Objekt löschen?"
+        description={
+          objektToDelete
+            ? `Möchten Sie das Objekt "${objektToDelete.name}" wirklich löschen? Alle zugehörigen Wohnungen und Mieter werden ebenfalls gelöscht. Diese Aktion kann nicht rückgängig gemacht werden.`
+            : ""
+        }
+        confirmText="Löschen"
+        cancelText="Abbrechen"
+        variant="destructive"
+      />
     </div>
   );
 }

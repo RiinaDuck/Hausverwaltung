@@ -2,7 +2,7 @@
 
 import type React from "react";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,6 +57,7 @@ import {
   Shield,
   Wrench,
   Scale,
+  Search,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { generateBriefPDF, downloadPDF } from "@/lib/pdf-generator";
@@ -432,6 +433,7 @@ const navSections = [
 
 export function HausmanagerView() {
   const [activeView, setActiveView] = useState("finanzamt");
+  const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
   // State for all data
@@ -518,12 +520,67 @@ export function HausmanagerView() {
     });
   };
 
+  // Memoized filtered lists based on search query
+  const filteredFinanzaemter = useMemo(
+    () =>
+      finanzaemter.filter(
+        (item) =>
+          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.steuernummer.toLowerCase().includes(searchQuery.toLowerCase())
+      ),
+    [finanzaemter, searchQuery]
+  );
+
+  const filteredSteuerberater = useMemo(
+    () =>
+      steuerberater.filter(
+        (item) =>
+          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.ansprechpartner.toLowerCase().includes(searchQuery.toLowerCase())
+      ),
+    [steuerberater, searchQuery]
+  );
+
+  const filteredDienstleister = useMemo(
+    () =>
+      dienstleister.filter(
+        (item) =>
+          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.gewerk?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.kategorie.toLowerCase().includes(searchQuery.toLowerCase())
+      ),
+    [dienstleister, searchQuery]
+  );
+
+  const filteredVersicherungen = useMemo(
+    () =>
+      versicherungen.filter(
+        (item) =>
+          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          item.versicherungsart
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())
+      ),
+    [versicherungen, searchQuery]
+  );
+
   return (
     <div className="flex flex-col md:flex-row h-auto md:h-[calc(100vh-8rem)] gap-0">
       {/* Sub-Navigation Sidebar */}
       <div className="w-full md:w-64 shrink-0 border-b md:border-b-0 md:border-r bg-muted/30">
         <ScrollArea className="h-auto max-h-[200px] md:max-h-full md:h-full">
           <div className="p-3 md:p-4 space-y-3 md:space-y-6">
+            {/* Search Bar */}
+            <div className="relative">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Suchen..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-8 h-9 text-sm"
+              />
+            </div>
+
             <div className="flex md:flex-col gap-2 md:gap-6 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
               {navSections.map((section) => (
                 <div key={section.title} className="min-w-fit md:min-w-0">
@@ -561,7 +618,7 @@ export function HausmanagerView() {
         {activeView === "finanzamt" && (
           <GenericMasterDetail
             title="Finanzämter"
-            items={finanzaemter}
+            items={filteredFinanzaemter}
             setItems={setFinanzaemter}
             columns={[
               { key: "name", label: "Finanzamt" },
@@ -598,7 +655,7 @@ export function HausmanagerView() {
         {activeView === "steuerberater" && (
           <GenericMasterDetail
             title="Steuerberater"
-            items={steuerberater}
+            items={filteredSteuerberater}
             setItems={setSteuerberater}
             columns={[
               { key: "name", label: "Kanzlei" },

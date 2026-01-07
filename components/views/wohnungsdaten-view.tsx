@@ -332,6 +332,7 @@ export function WohnungsdatenView() {
     wohnflaeche: 0,
     nutzflaeche: 0,
     raeume: 2,
+    miete: 0,
     punkte: 0,
     prozent: 0,
     status: "frei",

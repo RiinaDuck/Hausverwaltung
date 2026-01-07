@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -9,6 +9,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -16,6 +18,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -29,14 +46,23 @@ import {
   Calendar,
   Download,
   BarChart3,
-  PieChart,
+  PieChart as PieChartIcon,
   ArrowUpRight,
   ArrowDownRight,
   Building2,
   Wallet,
   Users,
+  Settings,
+  FileText,
+  Save,
+  Zap,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 import {
   BarChart,
   Bar,
@@ -56,7 +82,7 @@ import {
 } from "recharts";
 
 // 12-Monats-Einnahmen-/Ausgaben-Daten
-const monatlicheFinanzDaten = [
+const initialMonatlicheFinanzDaten = [
   { monat: "Jan", einnahmen: 12500, ausgaben: 4200, gewinn: 8300 },
   { monat: "Feb", einnahmen: 12800, ausgaben: 3800, gewinn: 9000 },
   { monat: "Mar", einnahmen: 13200, ausgaben: 5100, gewinn: 8100 },
@@ -72,7 +98,7 @@ const monatlicheFinanzDaten = [
 ];
 
 // Mieteinnahmen pro Objekt
-const einnahmenProObjekt = [
+const initialEinnahmenProObjekt = [
   { name: "Hauptstraße 15", einnahmen: 48000, anteil: 35 },
   { name: "Bergweg 8", einnahmen: 36000, anteil: 26 },
   { name: "Parkalle 22", einnahmen: 32000, anteil: 23 },
@@ -80,7 +106,7 @@ const einnahmenProObjekt = [
 ];
 
 // Kostenverteilung
-const kostenVerteilung = [
+const initialKostenVerteilung = [
   { name: "Instandhaltung", value: 18500, color: "#10B981" },
   { name: "Versicherungen", value: 8200, color: "#3B82F6" },
   { name: "Verwaltung", value: 6800, color: "#8B5CF6" },
@@ -89,7 +115,7 @@ const kostenVerteilung = [
 ];
 
 // Leerstand pro Monat
-const leerstandDaten = [
+const initialLeerstandDaten = [
   { monat: "Jan", quote: 8.5 },
   { monat: "Feb", quote: 7.2 },
   { monat: "Mar", quote: 5.8 },
@@ -105,7 +131,7 @@ const leerstandDaten = [
 ];
 
 // Zahlungsverhalten
-const zahlungsverhalten = [
+const initialZahlungsverhalten = [
   { monat: "Jan", puenktlich: 92, verspaetet: 6, offen: 2 },
   { monat: "Feb", puenktlich: 88, verspaetet: 9, offen: 3 },
   { monat: "Mar", puenktlich: 95, verspaetet: 4, offen: 1 },
@@ -185,14 +211,14 @@ const wartungsKosten = [
 ];
 
 // Mieterstruktur
-const mieterStruktur = [
+const initialMieterStruktur = [
   { name: "Privat", value: 68, color: "#10B981" },
   { name: "Gewerblich", value: 22, color: "#3B82F6" },
   { name: "Sozial", value: 10, color: "#F59E0B" },
 ];
 
 // Vertragslaufzeiten
-const vertragsLaufzeiten = [
+const initialVertragsLaufzeiten = [
   { name: "< 1 Jahr", anzahl: 8 },
   { name: "1-3 Jahre", anzahl: 15 },
   { name: "3-5 Jahre", anzahl: 12 },
@@ -201,7 +227,7 @@ const vertragsLaufzeiten = [
 ];
 
 // Energieverbrauch
-const energieVerbrauch = [
+const initialEnergieVerbrauch = [
   { monat: "Jan", strom: 4200, gas: 8500, wasser: 1200 },
   { monat: "Feb", strom: 3800, gas: 7800, wasser: 1100 },
   { monat: "Mar", strom: 3500, gas: 6200, wasser: 1150 },
@@ -219,51 +245,36 @@ const energieVerbrauch = [
 export function StatistikenView() {
   const [selectedYear, setSelectedYear] = useState("2025");
   const [selectedObjekt, setSelectedObjekt] = useState("alle");
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const { toast } = useToast();
 
-  const handleExport = () => {
-    // Erstelle CSV-Export der Statistiken
-    const csvData = [
-      ["Statistiken Export - " + selectedYear],
-      [""],
-      ["Monat", "Einnahmen", "Ausgaben", "Gewinn"],
-      ...monatlicheFinanzDaten.map((d) => [
-        d.monat,
-        d.einnahmen,
-        d.ausgaben,
-        d.gewinn,
-      ]),
-      [""],
-      ["Gesamt", gesamtEinnahmen, gesamtAusgaben, gesamtGewinn],
-      [""],
-      ["Kostenverteilung"],
-      ["Kategorie", "Betrag"],
-      ...kostenVerteilung.map((k) => [k.name, k.value]),
-      [""],
-      ["Leerstand"],
-      ["Monat", "Quote %"],
-      ...leerstandDaten.map((d) => [d.monat, d.quote]),
-    ];
+  // Refs für Chart-Capture
+  const finanzChartRef = useRef<HTMLDivElement>(null);
+  const objekteChartRef = useRef<HTMLDivElement>(null);
+  const kostenChartRef = useRef<HTMLDivElement>(null);
+  const leerstandChartRef = useRef<HTMLDivElement>(null);
 
-    const csvContent = csvData.map((row) => row.join(";")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `statistiken_${selectedYear}_${selectedObjekt}.csv`
-    );
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    toast({
-      title: "Export erfolgreich",
-      description: `Statistiken für ${selectedYear} wurden als CSV exportiert.`,
-    });
-  };
+  // Editable state for all data
+  const [monatlicheFinanzDaten, setMonatlicheFinanzDaten] = useState(
+    initialMonatlicheFinanzDaten
+  );
+  const [einnahmenProObjekt, setEinnahmenProObjekt] = useState(
+    initialEinnahmenProObjekt
+  );
+  const [kostenVerteilung, setKostenVerteilung] = useState(
+    initialKostenVerteilung
+  );
+  const [leerstandDaten, setLeerstandDaten] = useState(initialLeerstandDaten);
+  const [zahlungsverhalten, setZahlungsverhalten] = useState(
+    initialZahlungsverhalten
+  );
+  const [mieterStruktur, setMieterStruktur] = useState(initialMieterStruktur);
+  const [vertragsLaufzeiten, setVertragsLaufzeiten] = useState(
+    initialVertragsLaufzeiten
+  );
+  const [energieVerbrauch, setEnergieVerbrauch] = useState(
+    initialEnergieVerbrauch
+  );
 
   // Berechnete KPIs
   const gesamtEinnahmen = monatlicheFinanzDaten.reduce(
@@ -281,6 +292,409 @@ export function StatistikenView() {
   const durchschnittZahlungsquote = (
     zahlungsverhalten.reduce((sum, m) => sum + m.puenktlich, 0) / 12
   ).toFixed(1);
+
+  const updateFinanzDaten = (index: number, field: string, value: number) => {
+    setMonatlicheFinanzDaten((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      if (field === "einnahmen" || field === "ausgaben") {
+        updated[index].gewinn =
+          updated[index].einnahmen - updated[index].ausgaben;
+      }
+      return updated;
+    });
+  };
+
+  const updateEinnahmenObjekt = (
+    index: number,
+    field: string,
+    value: number | string
+  ) => {
+    setEinnahmenProObjekt((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const addEinnahmenObjekt = () => {
+    setEinnahmenProObjekt((prev) => [
+      ...prev,
+      { name: "Neues Objekt", einnahmen: 0, anteil: 0, value: 0 },
+    ]);
+  };
+
+  const deleteEinnahmenObjekt = (index: number) => {
+    setEinnahmenProObjekt((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateKosten = (
+    index: number,
+    field: string,
+    value: number | string
+  ) => {
+    setKostenVerteilung((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const addKosten = () => {
+    const colors = [
+      "#10B981",
+      "#3B82F6",
+      "#F59E0B",
+      "#EF4444",
+      "#8B5CF6",
+      "#EC4899",
+    ];
+    setKostenVerteilung((prev) => [
+      ...prev,
+      {
+        name: "Neue Kostenart",
+        value: 0,
+        color: colors[prev.length % colors.length],
+      },
+    ]);
+  };
+
+  const deleteKosten = (index: number) => {
+    setKostenVerteilung((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateLeerstand = (index: number, quote: number) => {
+    setLeerstandDaten((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], quote };
+      return updated;
+    });
+  };
+
+  const updateMieterStruktur = (index: number, value: number) => {
+    setMieterStruktur((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], value };
+      return updated;
+    });
+  };
+
+  const updateVertragsLaufzeiten = (index: number, anzahl: number) => {
+    setVertragsLaufzeiten((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], anzahl };
+      return updated;
+    });
+  };
+
+  const updateEnergieVerbrauch = (
+    index: number,
+    field: string,
+    value: number
+  ) => {
+    setEnergieVerbrauch((prev) => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const handleExport = async () => {
+    // Erstelle Excel Workbook
+    const wb = XLSX.utils.book_new();
+
+    // === DATEN-SHEETS ===
+
+    // Sheet 1: Monatliche Finanzdaten
+    const finanzWsData = [
+      ["═══ MONATLICHE FINANZDATEN ═══"],
+      [""],
+      ["Jahr:", selectedYear],
+      ["Objekt:", selectedObjekt === "alle" ? "Alle Objekte" : selectedObjekt],
+      ["Exportdatum:", new Date().toLocaleDateString("de-DE")],
+      [""],
+      ["Monat", "Einnahmen (€)", "Ausgaben (€)", "Gewinn (€)"],
+      ...monatlicheFinanzDaten.map((d) => [
+        d.monat,
+        d.einnahmen,
+        d.ausgaben,
+        d.gewinn,
+      ]),
+      [""],
+      ["SUMME", gesamtEinnahmen, gesamtAusgaben, gesamtGewinn],
+    ];
+    const finanzWs = XLSX.utils.aoa_to_sheet(finanzWsData);
+    XLSX.utils.book_append_sheet(wb, finanzWs, "Monatliche Finanzen");
+
+    // Sheet 2: Einnahmen pro Objekt
+    const objekteWsData = [
+      ["═══ EINNAHMEN PRO OBJEKT ═══"],
+      [""],
+      ["Objekt", "Einnahmen (€)", "Anteil (%)"],
+      ...einnahmenProObjekt.map((o) => [o.name, o.einnahmen, o.anteil + "%"]),
+      [""],
+      [
+        "SUMME",
+        einnahmenProObjekt.reduce((s, o) => s + o.einnahmen, 0),
+        "100%",
+      ],
+    ];
+    const objekteWs = XLSX.utils.aoa_to_sheet(objekteWsData);
+    XLSX.utils.book_append_sheet(wb, objekteWs, "Einnahmen Objekte");
+
+    // Sheet 3: Kostenverteilung
+    const kostenWsData = [
+      ["═══ KOSTENVERTEILUNG ═══"],
+      [""],
+      ["Kategorie", "Betrag (€)"],
+      ...kostenVerteilung.map((k) => [k.name, k.value]),
+      [""],
+      ["SUMME", kostenVerteilung.reduce((s, k) => s + k.value, 0)],
+    ];
+    const kostenWs = XLSX.utils.aoa_to_sheet(kostenWsData);
+    XLSX.utils.book_append_sheet(wb, kostenWs, "Kostenverteilung");
+
+    // Sheet 4: Leerstandsquote
+    const leerstandWsData = [
+      ["═══ LEERSTANDSQUOTE ═══"],
+      [""],
+      ["Monat", "Quote (%)"],
+      ...leerstandDaten.map((d) => [d.monat, d.quote]),
+      [""],
+      ["Durchschnitt", durchschnittLeerstand + "%"],
+    ];
+    const leerstandWs = XLSX.utils.aoa_to_sheet(leerstandWsData);
+    XLSX.utils.book_append_sheet(wb, leerstandWs, "Leerstand");
+
+    // Sheet 5: Zahlungsverhalten
+    const zahlungWsData = [
+      ["═══ ZAHLUNGSVERHALTEN ═══"],
+      [""],
+      ["Monat", "Pünktlich (%)", "Verspätet (%)", "Offen (%)"],
+      ...zahlungsverhalten.map((z) => [
+        z.monat,
+        z.puenktlich,
+        z.verspaetet,
+        z.offen,
+      ]),
+      [""],
+      ["Durchschnitt pünktlich", durchschnittZahlungsquote + "%"],
+    ];
+    const zahlungWs = XLSX.utils.aoa_to_sheet(zahlungWsData);
+    XLSX.utils.book_append_sheet(wb, zahlungWs, "Zahlungsverhalten");
+
+    // Sheet 6: Mieterstruktur
+    const mieterWsData = [
+      ["═══ MIETERSTRUKTUR ═══"],
+      [""],
+      ["Typ", "Anteil (%)"],
+      ...mieterStruktur.map((m) => [m.name, m.value]),
+    ];
+    const mieterWs = XLSX.utils.aoa_to_sheet(mieterWsData);
+    XLSX.utils.book_append_sheet(wb, mieterWs, "Mieterstruktur");
+
+    // Sheet 7: Vertragslaufzeiten
+    const vertraegeWsData = [
+      ["═══ VERTRAGSLAUFZEITEN ═══"],
+      [""],
+      ["Laufzeit", "Anzahl Verträge"],
+      ...vertragsLaufzeiten.map((v) => [v.name, v.anzahl]),
+      [""],
+      ["Gesamt", vertragsLaufzeiten.reduce((s, v) => s + v.anzahl, 0)],
+    ];
+    const vertraegeWs = XLSX.utils.aoa_to_sheet(vertraegeWsData);
+    XLSX.utils.book_append_sheet(wb, vertraegeWs, "Vertragslaufzeiten");
+
+    // Sheet 8: Energieverbrauch
+    const energieWsData = [
+      ["═══ ENERGIEVERBRAUCH ═══"],
+      [""],
+      ["Monat", "Strom (kWh)", "Gas (kWh)", "Wasser (m³)"],
+      ...energieVerbrauch.map((e) => [e.monat, e.strom, e.gas, e.wasser]),
+      [""],
+      [
+        "Jahressumme",
+        energieVerbrauch.reduce((s, e) => s + e.strom, 0),
+        energieVerbrauch.reduce((s, e) => s + e.gas, 0),
+        energieVerbrauch.reduce((s, e) => s + e.wasser, 0),
+      ],
+    ];
+    const energieWs = XLSX.utils.aoa_to_sheet(energieWsData);
+    XLSX.utils.book_append_sheet(wb, energieWs, "Energieverbrauch");
+
+    // Sheet 9: Zusammenfassung
+    const summaryWsData = [
+      ["═══════════════════════════════════════════"],
+      ["HAUSVERWALTUNG - STATISTIK-EXPORT"],
+      ["═══════════════════════════════════════════"],
+      [""],
+      ["Jahr:", selectedYear],
+      ["Objekt:", selectedObjekt === "alle" ? "Alle Objekte" : selectedObjekt],
+      ["Exportdatum:", new Date().toLocaleDateString("de-DE")],
+      [""],
+      ["═══ ZUSAMMENFASSUNG ═══"],
+      [""],
+      ["Kennzahl", "Wert"],
+      ["Jahreseinnahmen", gesamtEinnahmen.toLocaleString("de-DE") + " €"],
+      ["Jahresausgaben", gesamtAusgaben.toLocaleString("de-DE") + " €"],
+      ["Nettogewinn", gesamtGewinn.toLocaleString("de-DE") + " €"],
+      ["Durchschnittlicher Leerstand", durchschnittLeerstand + "%"],
+      ["Durchschnittliche Zahlungsquote", durchschnittZahlungsquote + "%"],
+      [""],
+      [""],
+      ["═══ CHART-HINWEIS ═══"],
+      [""],
+      ["Die grafischen Auswertungen (Charts/Diagramme) finden Sie"],
+      ["in den anderen Sheets dieser Excel-Datei."],
+      ["Jedes Sheet enthält die zugehörigen Daten im Tabellenformat."],
+    ];
+    const summaryWs = XLSX.utils.aoa_to_sheet(summaryWsData);
+    XLSX.utils.book_append_sheet(wb, summaryWs, "Übersicht");
+
+    // === DOWNLOAD ===
+    XLSX.writeFile(
+      wb,
+      `statistiken_${selectedYear}_${selectedObjekt}_${new Date().toLocaleDateString(
+        "de-DE"
+      )}.xlsx`
+    );
+
+    toast({
+      title: "Export erfolgreich",
+      description: `Statistiken für ${selectedYear} wurden als Excel-Datei exportiert mit allen Daten in separaten Sheets.`,
+    });
+  };
+
+  const handlePDFExport = async () => {
+    try {
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      let yPosition = 20;
+
+      // Titel
+      pdf.setFontSize(20);
+      pdf.text("Hausverwaltung - Statistik-Report", pageWidth / 2, yPosition, {
+        align: "center",
+      });
+      yPosition += 10;
+
+      pdf.setFontSize(12);
+      pdf.text(
+        `Jahr: ${selectedYear} | Objekt: ${
+          selectedObjekt === "alle" ? "Alle Objekte" : selectedObjekt
+        }`,
+        pageWidth / 2,
+        yPosition,
+        { align: "center" }
+      );
+      yPosition += 10;
+
+      pdf.setFontSize(10);
+      pdf.text(
+        `Exportdatum: ${new Date().toLocaleDateString("de-DE")}`,
+        pageWidth / 2,
+        yPosition,
+        { align: "center" }
+      );
+      yPosition += 15;
+
+      // Zusammenfassung
+      pdf.setFontSize(14);
+      pdf.text("Zusammenfassung", 15, yPosition);
+      yPosition += 8;
+
+      pdf.setFontSize(10);
+      const summaryData = [
+        `Jahreseinnahmen: ${gesamtEinnahmen.toLocaleString("de-DE")} €`,
+        `Jahresausgaben: ${gesamtAusgaben.toLocaleString("de-DE")} €`,
+        `Nettogewinn: ${gesamtGewinn.toLocaleString("de-DE")} €`,
+        `Durchschnittlicher Leerstand: ${durchschnittLeerstand}%`,
+        `Durchschnittliche Zahlungsquote: ${durchschnittZahlungsquote}%`,
+      ];
+
+      summaryData.forEach((line) => {
+        pdf.text(line, 15, yPosition);
+        yPosition += 6;
+      });
+
+      // Funktion zum Hinzufügen eines Charts
+      const addChartToPDF = async (
+        chartRef: React.RefObject<HTMLDivElement>,
+        title: string
+      ) => {
+        if (!chartRef.current) return;
+
+        // Neue Seite für jeden Chart
+        pdf.addPage();
+        yPosition = 20;
+
+        pdf.setFontSize(14);
+        pdf.text(title, 15, yPosition);
+        yPosition += 10;
+
+        // Chart als Bild erfassen mit erweiterten Optionen
+        const canvas = await html2canvas(chartRef.current, {
+          scale: 2,
+          backgroundColor: "#ffffff",
+          useCORS: true,
+          logging: false,
+          windowWidth: chartRef.current.scrollWidth,
+          windowHeight: chartRef.current.scrollHeight,
+          onclone: (clonedDoc) => {
+            // Entferne problematische CSS-Eigenschaften im geklonten Dokument
+            const elements = clonedDoc.querySelectorAll("*");
+            elements.forEach((el) => {
+              const htmlEl = el as HTMLElement;
+              if (htmlEl.style) {
+                // Ersetze lab() Farben mit Fallback
+                const bgColor = htmlEl.style.backgroundColor;
+                if (bgColor && bgColor.includes("lab")) {
+                  htmlEl.style.backgroundColor = "#ffffff";
+                }
+                const color = htmlEl.style.color;
+                if (color && color.includes("lab")) {
+                  htmlEl.style.color = "#000000";
+                }
+              }
+            });
+          },
+        });
+
+        const imgData = canvas.toDataURL("image/png");
+        const imgWidth = pageWidth - 30;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        // Bild hinzufügen
+        pdf.addImage(imgData, "PNG", 15, yPosition, imgWidth, imgHeight);
+      };
+
+      // Charts hinzufügen
+      await addChartToPDF(finanzChartRef, "Monatliche Finanzdaten");
+      await addChartToPDF(objekteChartRef, "Einnahmen pro Objekt");
+      await addChartToPDF(kostenChartRef, "Kostenverteilung");
+      await addChartToPDF(leerstandChartRef, "Leerstandsquote");
+
+      // PDF speichern
+      pdf.save(
+        `statistiken_${selectedYear}_${selectedObjekt}_${new Date().toLocaleDateString(
+          "de-DE"
+        )}.pdf`
+      );
+
+      toast({
+        title: "PDF-Export erfolgreich",
+        description: `Statistiken mit Charts wurden als PDF exportiert.`,
+      });
+    } catch (error) {
+      console.error("PDF Export Error:", error);
+      toast({
+        title: "Fehler beim PDF-Export",
+        description: "Bitte versuchen Sie es erneut.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -323,13 +737,445 @@ export function StatistikenView() {
             variant="outline"
             size="sm"
             className="transition-all duration-200 hover:shadow-md"
+            onClick={() => setIsEditOpen(true)}
+          >
+            <Settings className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Daten bearbeiten</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="transition-all duration-200 hover:shadow-md"
             onClick={handleExport}
           >
             <Download className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Export</span>
+            <span className="hidden sm:inline">Excel Export</span>
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="transition-all duration-200 hover:shadow-md"
+            onClick={handlePDFExport}
+          >
+            <FileText className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">PDF Export</span>
           </Button>
         </div>
       </div>
+
+      {/* Edit Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
+          <div className="p-6 pb-0">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Statistik-Daten bearbeiten
+              </DialogTitle>
+              <DialogDescription>
+                Hier können Sie alle Datenpunkte für die Statistiken anpassen.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+          <ScrollArea className="flex-1 px-6">
+            <Accordion type="multiple" className="w-full space-y-2">
+              {/* Monatliche Finanzdaten */}
+              <AccordionItem
+                value="finanzdaten"
+                className="border rounded-lg px-4"
+              >
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <Euro className="h-4 w-4 text-success" />
+                    <span>Monatliche Finanzdaten</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-3 py-2">
+                    {monatlicheFinanzDaten.map((item, idx) => (
+                      <div
+                        key={item.monat}
+                        className="grid grid-cols-3 gap-3 items-center"
+                      >
+                        <Label className="font-medium">{item.monat}</Label>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Einnahmen (€)
+                          </Label>
+                          <Input
+                            type="number"
+                            value={item.einnahmen}
+                            onChange={(e) =>
+                              updateFinanzDaten(
+                                idx,
+                                "einnahmen",
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Ausgaben (€)
+                          </Label>
+                          <Input
+                            type="number"
+                            value={item.ausgaben}
+                            onChange={(e) =>
+                              updateFinanzDaten(
+                                idx,
+                                "ausgaben",
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Einnahmen pro Objekt */}
+              <AccordionItem
+                value="einnahmen-objekt"
+                className="border rounded-lg px-4"
+              >
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-primary" />
+                    <span>Einnahmen pro Objekt</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-3 py-2">
+                    {einnahmenProObjekt.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-[1fr_1fr_auto] gap-3 items-center"
+                      >
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Objekt
+                          </Label>
+                          <Input
+                            value={item.name}
+                            onChange={(e) =>
+                              updateEinnahmenObjekt(idx, "name", e.target.value)
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Betrag (€)
+                          </Label>
+                          <Input
+                            type="number"
+                            value={item.einnahmen || item.value || 0}
+                            onChange={(e) =>
+                              updateEinnahmenObjekt(
+                                idx,
+                                "einnahmen",
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive mt-5"
+                          onClick={() => deleteEinnahmenObjekt(idx)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={addEinnahmenObjekt}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Objekt hinzufügen
+                    </Button>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Kostenverteilung */}
+              <AccordionItem
+                value="kostenverteilung"
+                className="border rounded-lg px-4"
+              >
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <PieChartIcon className="h-4 w-4 text-warning" />
+                    <span>Kostenverteilung</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-3 py-2">
+                    {kostenVerteilung.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="grid grid-cols-[1fr_1fr_auto] gap-3 items-center"
+                      >
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Kostenart
+                          </Label>
+                          <Input
+                            value={item.name}
+                            onChange={(e) =>
+                              updateKosten(idx, "name", e.target.value)
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Betrag (€)
+                          </Label>
+                          <Input
+                            type="number"
+                            value={item.value}
+                            onChange={(e) =>
+                              updateKosten(idx, "value", Number(e.target.value))
+                            }
+                          />
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive mt-5"
+                          onClick={() => deleteKosten(idx)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full mt-2"
+                      onClick={addKosten}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Kostenart hinzufügen
+                    </Button>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Leerstandsquote */}
+              <AccordionItem
+                value="leerstand"
+                className="border rounded-lg px-4"
+              >
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <Home className="h-4 w-4 text-destructive" />
+                    <span>Leerstandsquote</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-3 py-2">
+                    {leerstandDaten.map((item, idx) => (
+                      <div
+                        key={item.monat}
+                        className="grid grid-cols-2 gap-3 items-center"
+                      >
+                        <Label className="font-medium">{item.monat}</Label>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Quote (%)
+                          </Label>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            value={item.quote}
+                            onChange={(e) =>
+                              updateLeerstand(idx, Number(e.target.value))
+                            }
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Mieterstruktur */}
+              <AccordionItem
+                value="mieterstruktur"
+                className="border rounded-lg px-4"
+              >
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-info" />
+                    <span>Mieterstruktur</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-3 py-2">
+                    {mieterStruktur.map((item, idx) => (
+                      <div
+                        key={item.name}
+                        className="grid grid-cols-2 gap-3 items-center"
+                      >
+                        <Label className="font-medium">{item.name}</Label>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Anzahl
+                          </Label>
+                          <Input
+                            type="number"
+                            value={item.value}
+                            onChange={(e) =>
+                              updateMieterStruktur(idx, Number(e.target.value))
+                            }
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Vertragslaufzeiten */}
+              <AccordionItem
+                value="vertragszeiten"
+                className="border rounded-lg px-4"
+              >
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary" />
+                    <span>Vertragslaufzeiten</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-3 py-2">
+                    {vertragsLaufzeiten.map((item, idx) => (
+                      <div
+                        key={item.dauer}
+                        className="grid grid-cols-2 gap-3 items-center"
+                      >
+                        <Label className="font-medium">{item.dauer}</Label>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Anzahl Verträge
+                          </Label>
+                          <Input
+                            type="number"
+                            value={item.anzahl}
+                            onChange={(e) =>
+                              updateVertragsLaufzeiten(
+                                idx,
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Energieverbrauch */}
+              <AccordionItem value="energie" className="border rounded-lg px-4">
+                <AccordionTrigger className="hover:no-underline">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-warning" />
+                    <span>Energieverbrauch</span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-3 py-2">
+                    {energieVerbrauch.map((item, idx) => (
+                      <div
+                        key={item.monat}
+                        className="grid grid-cols-4 gap-2 items-center"
+                      >
+                        <Label className="font-medium">{item.monat}</Label>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Strom (kWh)
+                          </Label>
+                          <Input
+                            type="number"
+                            value={item.strom}
+                            onChange={(e) =>
+                              updateEnergieVerbrauch(
+                                idx,
+                                "strom",
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Gas (m³)
+                          </Label>
+                          <Input
+                            type="number"
+                            value={item.gas}
+                            onChange={(e) =>
+                              updateEnergieVerbrauch(
+                                idx,
+                                "gas",
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Wasser (m³)
+                          </Label>
+                          <Input
+                            type="number"
+                            value={item.wasser}
+                            onChange={(e) =>
+                              updateEnergieVerbrauch(
+                                idx,
+                                "wasser",
+                                Number(e.target.value)
+                              )
+                            }
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </ScrollArea>
+          <div className="p-6 pt-0">
+            <DialogFooter className="mt-4 border-t pt-4">
+              <Button variant="outline" onClick={() => setIsEditOpen(false)}>
+                Abbrechen
+              </Button>
+              <Button
+                onClick={() => {
+                  setIsEditOpen(false);
+                  toast({
+                    title: "Daten gespeichert",
+                    description:
+                      "Die Statistik-Daten wurden erfolgreich aktualisiert.",
+                  });
+                }}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Speichern
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -479,7 +1325,7 @@ export function StatistikenView() {
                   € Einnahmen
                 </CardDescription>
               </CardHeader>
-              <CardContent className="p-2 sm:p-6">
+              <CardContent className="p-2 sm:p-6" ref={finanzChartRef}>
                 <ResponsiveContainer
                   width="100%"
                   height={280}
@@ -643,7 +1489,7 @@ export function StatistikenView() {
                   Verteilung der Mieteinnahmen nach Immobilie
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent ref={objekteChartRef}>
                 <div className="space-y-4">
                   {einnahmenProObjekt.map((objekt, idx) => {
                     const colors = [
@@ -1011,7 +1857,7 @@ export function StatistikenView() {
                   Quote der leerstehenden Einheiten in %
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent ref={leerstandChartRef}>
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart data={leerstandDaten}>
                     <CartesianGrid
@@ -1165,14 +2011,14 @@ export function StatistikenView() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <PieChart className="h-5 w-5" />
+                  <PieChartIcon className="h-5 w-5" />
                   Kostenverteilung Gesamt
                 </CardTitle>
                 <CardDescription>
                   Aufschlüsselung der Jahresausgaben
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent ref={kostenChartRef}>
                 <ResponsiveContainer width="100%" height={300}>
                   <RechartsPieChart>
                     <Pie
