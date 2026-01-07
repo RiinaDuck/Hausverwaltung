@@ -452,64 +452,108 @@ export function MieterdatenView() {
                       <Label htmlFor="mieter-nr">Mieter Nr</Label>
                       <Input
                         id="mieter-nr"
-                        defaultValue={selectedMieter.nr}
+                        value={editedMieter?.nr || 0}
                         readOnly
                         className="bg-muted"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="anrede">Anrede</Label>
-                      <Select defaultValue="familie">
-                        <SelectTrigger id="anrede">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="herr">Herr</SelectItem>
-                          <SelectItem value="frau">Frau</SelectItem>
-                          <SelectItem value="familie">Familie</SelectItem>
-                          <SelectItem value="firma">Firma</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="name1">Name 1</Label>
-                      <Input id="name1" defaultValue="Müller" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="name2">Name 2</Label>
-                      <Input id="name2" placeholder="Vorname / Partner" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="strasse">Straße</Label>
-                    <Input id="strasse" defaultValue="Berliner Straße 42" />
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="plz">PLZ</Label>
-                      <Input id="plz" defaultValue="10115" />
-                    </div>
-                    <div className="col-span-2 space-y-2">
-                      <Label htmlFor="ort">Ort</Label>
-                      <Input id="ort" defaultValue="Berlin" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="einzug">Einzug</Label>
+                      <Label htmlFor="geschoss">Wohnung</Label>
                       <Input
-                        id="einzug"
-                        type="date"
-                        defaultValue="2020-01-01"
+                        id="geschoss"
+                        value={editedMieter?.geschoss || ""}
+                        readOnly
+                        className="bg-muted"
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="auszug">Auszug</Label>
-                      <Input id="auszug" type="date" />
+                      <Label htmlFor="name">Name</Label>
+                      <Input
+                        id="name"
+                        value={editedMieter?.name || ""}
+                        onChange={(e) =>
+                          updateEditedMieter("name", e.target.value)
+                        }
+                      />
                     </div>
                     <div className="space-y-2">
-                      <Label>Tage</Label>
-                      <Input value="1832" readOnly className="bg-muted" />
+                      <Label htmlFor="email">E-Mail</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={editedMieter?.email || ""}
+                        onChange={(e) =>
+                          updateEditedMieter("email", e.target.value)
+                        }
+                        placeholder="mieter@email.de"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="telefon">Telefon</Label>
+                      <Input
+                        id="telefon"
+                        value={editedMieter?.telefon || ""}
+                        onChange={(e) =>
+                          updateEditedMieter("telefon", e.target.value)
+                        }
+                        placeholder="030 12345678"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="einzug">Einzugsdatum</Label>
+                      <Input
+                        id="einzug"
+                        type="text"
+                        value={editedMieter?.einzug || ""}
+                        readOnly
+                        className="bg-muted"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="kaltmiete">Kaltmiete (€)</Label>
+                      <Input
+                        id="kaltmiete"
+                        type="number"
+                        value={editedMieter?.kaltmiete || 0}
+                        onChange={(e) =>
+                          updateEditedMieter(
+                            "kaltmiete",
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="nebenkosten">Nebenkosten (€)</Label>
+                      <Input
+                        id="nebenkosten"
+                        type="number"
+                        value={editedMieter?.nebenkosten || 0}
+                        onChange={(e) =>
+                          updateEditedMieter(
+                            "nebenkosten",
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="kaution">Kaution (€)</Label>
+                      <Input
+                        id="kaution"
+                        type="number"
+                        value={editedMieter?.kaution || 0}
+                        onChange={(e) =>
+                          updateEditedMieter(
+                            "kaution",
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
                     </div>
                   </div>
                 </CardContent>
@@ -523,30 +567,38 @@ export function MieterdatenView() {
                   <CardTitle className="text-base">
                     Verteilungsschlüssel
                   </CardTitle>
+                  <CardDescription className="text-xs">
+                    Informationen zur Nebenkostenabrechnung für{" "}
+                    {editedMieter?.name}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="wohnflaeche1">Wohnfläche 1 (m²)</Label>
-                      <Input id="wohnflaeche1" defaultValue="65.50" />
+                      <Label htmlFor="wohnflaeche-anteil">
+                        Wohnfläche (m²)
+                      </Label>
+                      <Input
+                        id="wohnflaeche-anteil"
+                        value={editedMieter?.geschoss || ""}
+                        readOnly
+                        className="bg-muted"
+                      />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="wohnflaeche2">Wohnfläche 2 (m²)</Label>
-                      <Input id="wohnflaeche2" defaultValue="0.00" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="personenanzahl1">Personenanzahl 1</Label>
-                      <Input id="personenanzahl1" defaultValue="3" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="personenanzahl2">Personenanzahl 2</Label>
-                      <Input id="personenanzahl2" defaultValue="0" />
+                      <Label htmlFor="prozentanteile">Prozentanteil</Label>
+                      <Input
+                        id="prozentanteile"
+                        value="Wird berechnet"
+                        readOnly
+                        className="bg-muted"
+                      />
                     </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="prozentanteile">Prozentanteile</Label>
-                    <Input id="prozentanteile" defaultValue="12.50" />
-                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Die Verteilungsschlüssel werden automatisch bei der
+                    Nebenkostenabrechnung berechnet.
+                  </p>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -558,43 +610,25 @@ export function MieterdatenView() {
                   <CardTitle className="text-base">
                     Zählerstände (Zwischenzähler)
                   </CardTitle>
+                  <CardDescription className="text-xs">
+                    Zähler für {editedMieter?.name} - {editedMieter?.geschoss}
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Wasser */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-sm">Wasser</h4>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="wasser-alt">Alt (m³)</Label>
-                        <Input id="wasser-alt" defaultValue="125.50" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="wasser-neu">Neu (m³)</Label>
-                        <Input id="wasser-neu" defaultValue="142.80" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Verbrauch (m³)</Label>
-                        <Input value="17.30" readOnly className="bg-muted" />
-                      </div>
-                    </div>
-                  </div>
-                  {/* Strom */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-sm">Strom</h4>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="strom-alt">Alt (kWh)</Label>
-                        <Input id="strom-alt" defaultValue="4521" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="strom-neu">Neu (kWh)</Label>
-                        <Input id="strom-neu" defaultValue="5892" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Verbrauch (kWh)</Label>
-                        <Input value="1371" readOnly className="bg-muted" />
-                      </div>
-                    </div>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Die Zählerstände werden im Bereich "Zählerstände" verwaltet.
+                  </p>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm">
+                      Wohnung:{" "}
+                      <span className="font-medium">
+                        {editedMieter?.geschoss}
+                      </span>
+                    </p>
+                    <p className="text-sm">
+                      Mieter:{" "}
+                      <span className="font-medium">{editedMieter?.name}</span>
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -602,91 +636,74 @@ export function MieterdatenView() {
 
             {/* Tab 4: Zahlungen */}
             <TabsContent value="zahlungen" className="mt-6 space-y-6">
-              {/* Vorauszahlungen */}
+              {/* Miete & Nebenkosten */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Vorauszahlungen</CardTitle>
+                  <CardTitle className="text-base">
+                    Miete & Nebenkosten
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Monatliche Zahlungen für {editedMieter?.name}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="betriebskosten">Betriebskosten (€)</Label>
-                      <Input id="betriebskosten" defaultValue="85.00" />
+                      <Label htmlFor="kaltmiete-zahlung">Kaltmiete (€)</Label>
+                      <Input
+                        id="kaltmiete-zahlung"
+                        type="number"
+                        value={editedMieter?.kaltmiete || 0}
+                        onChange={(e) =>
+                          updateEditedMieter(
+                            "kaltmiete",
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="heizkosten">Heizkosten (€)</Label>
-                      <Input id="heizkosten" defaultValue="65.00" />
+                      <Label htmlFor="nebenkosten-zahlung">
+                        Nebenkosten (€)
+                      </Label>
+                      <Input
+                        id="nebenkosten-zahlung"
+                        type="number"
+                        value={editedMieter?.nebenkosten || 0}
+                        onChange={(e) =>
+                          updateEditedMieter(
+                            "nebenkosten",
+                            parseFloat(e.target.value) || 0
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Gesamt (€)</Label>
+                      <Input
+                        value={
+                          (editedMieter?.kaltmiete || 0) +
+                          (editedMieter?.nebenkosten || 0)
+                        }
+                        readOnly
+                        className="bg-muted font-medium"
+                      />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Sonstiges */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Sonstiges</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="sonst-text">sonst. Vorauszahlung</Label>
-                      <Input id="sonst-text" placeholder="Bezeichnung" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="sonst-betrag">Betrag (€)</Label>
-                      <Input id="sonst-betrag" placeholder="0.00" />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="kaution-zahlung">Kaution (€)</Label>
+                    <Input
+                      id="kaution-zahlung"
+                      type="number"
+                      value={editedMieter?.kaution || 0}
+                      onChange={(e) =>
+                        updateEditedMieter(
+                          "kaution",
+                          parseFloat(e.target.value) || 0
+                        )
+                      }
+                    />
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Lohnkosten */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Lohnkosten</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="lohn-text">Bezeichnung</Label>
-                      <Input id="lohn-text" placeholder="z.B. Hausmeister" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lohn-betrag">Betrag (€)</Label>
-                      <Input id="lohn-betrag" placeholder="0.00" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Direkte Kosten */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Direkte Kosten</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Biotonne Müllgebühr</Label>
-                      <Input defaultValue="12.50" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>(€)</Label>
-                      <Input value="€" readOnly className="bg-muted w-16" />
-                    </div>
-                  </div>
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>sonstige Kosten {i}</Label>
-                        <Input placeholder="Bezeichnung" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Betrag (€)</Label>
-                        <Input placeholder="0.00" />
-                      </div>
-                    </div>
-                  ))}
                 </CardContent>
               </Card>
             </TabsContent>
