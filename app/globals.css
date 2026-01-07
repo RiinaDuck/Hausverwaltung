@@ -1,7 +1,8 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+/* @variant is valid Tailwind CSS v4 syntax */
+@variant dark (&:is(.dark *));
 
 :root {
   /* Navy/Slate color system for property management SaaS */
@@ -92,6 +93,7 @@
   --sidebar-ring: oklch(0.439 0 0);
 }
 
+/* stylelint-disable-next-line */
 @theme inline {
   --font-sans: "Inter", "Geist", "Geist Fallback";
   --font-mono: "Geist Mono", "Geist Mono Fallback";
@@ -147,22 +149,40 @@
 /* Custom hover effects and animations */
 @layer utilities {
   .card-hover {
-    @apply transition-all duration-200 hover:shadow-lg hover:-translate-y-1;
+    transition: all 200ms;
+    &:hover {
+      box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1),
+        0 4px 6px -4px rgb(0 0 0 / 0.1);
+      transform: translateY(-0.25rem);
+    }
   }
 
   .button-hover {
-    @apply transition-all duration-150 hover:scale-105 active:scale-95;
+    transition: all 150ms;
+    &:hover {
+      transform: scale(1.05);
+    }
+    &:active {
+      transform: scale(0.95);
+    }
   }
 
   .smooth-transition {
-    @apply transition-all duration-200 ease-in-out;
+    transition: all 200ms ease-in-out;
   }
 
   .hover-lift {
-    @apply transition-transform duration-200 hover:-translate-y-0.5;
+    transition: transform 200ms;
+    &:hover {
+      transform: translateY(-0.125rem);
+    }
   }
 
   .hover-glow {
-    @apply transition-shadow duration-200 hover:shadow-md;
+    transition: box-shadow 200ms;
+    &:hover {
+      box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1),
+        0 2px 4px -2px rgb(0 0 0 / 0.1);
+    }
   }
 }

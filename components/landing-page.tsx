@@ -528,7 +528,7 @@ export function LandingPage({ onOpenApp }: LandingPageProps) {
             </div>
           </div>
           <div className="border-t border-primary-foreground/20 mt-8 pt-8 text-center text-sm text-primary-foreground/60">
-            <p>© 2026 WAREHaus GmbH. Alle Rechte vorbehalten.</p>
+            <p>© 2026 HV-Boss. Alle Rechte vorbehalten.</p>
           </div>
         </div>
       </footer>

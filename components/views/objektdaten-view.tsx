@@ -327,33 +327,93 @@ export function ObjektdatenView() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Name</Label>
-                    <Input id="name" defaultValue="Max Mustermann" />
+                    <Input
+                      id="name"
+                      value={selectedObjekt.eigentuemer.name}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          eigentuemer: {
+                            ...selectedObjekt.eigentuemer,
+                            name: e.target.value,
+                          },
+                        })
+                      }
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="adresse">Adresse</Label>
                     <Input
                       id="adresse"
-                      defaultValue="Musterstraße 123, 12345 Berlin"
+                      value={selectedObjekt.eigentuemer.adresse}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          eigentuemer: {
+                            ...selectedObjekt.eigentuemer,
+                            adresse: e.target.value,
+                          },
+                        })
+                      }
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="kontoinhaber">Kontoinhaber</Label>
-                    <Input id="kontoinhaber" defaultValue="Max Mustermann" />
+                    <Input
+                      id="kontoinhaber"
+                      value={selectedObjekt.bankverbindung.kontoinhaber}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          bankverbindung: {
+                            ...selectedObjekt.bankverbindung,
+                            kontoinhaber: e.target.value,
+                          },
+                        })
+                      }
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="bank">Bank</Label>
-                    <Input id="bank" defaultValue="Sparkasse Berlin" />
+                    <Input
+                      id="bank"
+                      value={selectedObjekt.bankverbindung.bank}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          bankverbindung: {
+                            ...selectedObjekt.bankverbindung,
+                            bank: e.target.value,
+                          },
+                        })
+                      }
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="iban">IBAN</Label>
                     <Input
                       id="iban"
-                      defaultValue="DE89 3704 0044 0532 0130 00"
+                      value={selectedObjekt.bankverbindung.iban}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          bankverbindung: {
+                            ...selectedObjekt.bankverbindung,
+                            iban: e.target.value,
+                          },
+                        })
+                      }
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="bic">BIC</Label>
-                    <Input id="bic" defaultValue="COBADEFFXXX" />
+                    <Input
+                      id="bic"
+                      value={selectedObjekt.bankverbindung.bic}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          bankverbindung: {
+                            ...selectedObjekt.bankverbindung,
+                            bic: e.target.value,
+                          },
+                        })
+                      }
+                    />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -377,7 +437,18 @@ export function ObjektdatenView() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="telefon">Telefon</Label>
-                      <Input id="telefon" defaultValue="030 12345678" />
+                      <Input
+                        id="telefon"
+                        value={selectedObjekt.eigentuemer.telefon}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            eigentuemer: {
+                              ...selectedObjekt.eigentuemer,
+                              telefon: e.target.value,
+                            },
+                          })
+                        }
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="fax">Fax</Label>
@@ -390,12 +461,31 @@ export function ObjektdatenView() {
                       <Input
                         id="email"
                         type="email"
-                        defaultValue="max@mustermann.de"
+                        value={selectedObjekt.eigentuemer.email}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            eigentuemer: {
+                              ...selectedObjekt.eigentuemer,
+                              email: e.target.value,
+                            },
+                          })
+                        }
                       />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="mobil">Mobil</Label>
-                      <Input id="mobil" defaultValue="0170 1234567" />
+                      <Input
+                        id="mobil"
+                        value={selectedObjekt.eigentuemer.mobil}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            eigentuemer: {
+                              ...selectedObjekt.eigentuemer,
+                              mobil: e.target.value,
+                            },
+                          })
+                        }
+                      />
                     </div>
                   </div>
                 </CardContent>
