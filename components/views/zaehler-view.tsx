@@ -40,6 +40,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, Pencil, Trash2 } from "lucide-react";
+import { useAppData } from "@/context/app-data-context";
 
 interface Zaehler {
   id: string;
@@ -171,6 +172,7 @@ const initialRauchmelderData: Rauchmelder[] = [
 ];
 
 export function ZaehlerView() {
+  const { wohnungen, selectedObjektId } = useAppData();
   const [showRauchmelder, setShowRauchmelder] = useState(false);
   const [zaehlerData, setZaehlerData] = useState<Zaehler[]>(initialZaehlerData);
   const [rauchmelderData, setRauchmelderData] = useState<Rauchmelder[]>(
@@ -306,17 +308,13 @@ export function ZaehlerView() {
     setDeleteDialogOpen(true);
   };
 
-  // Wohnung options for select
-  const wohnungOptions = [
-    { value: "1", label: "Wohnung 1 - EG links" },
-    { value: "2", label: "Wohnung 2 - EG rechts" },
-    { value: "3", label: "Wohnung 3 - 1.OG links" },
-    { value: "4", label: "Wohnung 4 - 1.OG rechts" },
-    { value: "5", label: "Wohnung 5 - 2.OG links" },
-    { value: "6", label: "Wohnung 6 - 2.OG rechts" },
-    { value: "7", label: "Wohnung 7 - DG links" },
-    { value: "8", label: "Wohnung 8 - DG rechts" },
-  ];
+  // Wohnung options from current object
+  const wohnungOptions = wohnungen
+    .filter((w) => w.objektId === selectedObjektId)
+    .map((w) => ({
+      value: w.id,
+      label: `${w.bezeichnung} - ${w.etage} (${w.flaeche} m²)`,
+    }));
 
   const geschossFromWohnung = (wohnungNr: string) => {
     const option = wohnungOptions.find((o) => o.value === wohnungNr);

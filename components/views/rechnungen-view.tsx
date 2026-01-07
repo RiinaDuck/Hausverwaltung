@@ -23,7 +23,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Save, Plus, Trash2, FileDown, Eye } from "lucide-react";
+import { Save, Plus, Trash2, FileDown, Eye, Pencil } from "lucide-react";
 import { generateRechnungPDF, downloadPDF } from "@/lib/pdf-generator";
 
 interface RechnungsPosition {
@@ -111,6 +111,8 @@ export function RechnungenView() {
     null
   );
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingRechnung, setEditingRechnung] = useState<Rechnung | null>(null);
   const [newRechnung, setNewRechnung] = useState<Partial<Rechnung>>({
     nummer: `2024-${String(initialRechnungen.length + 1).padStart(3, "0")}`,
     datum: new Date().toISOString().split("T")[0],
@@ -205,6 +207,56 @@ export function RechnungenView() {
       bemerkung: "",
       status: "offen",
     });
+  };
+
+  const handleEditRechnung = (rechnung: Rechnung) => {
+    setEditingRechnung(rechnung);
+    setNewRechnung({
+      nummer: rechnung.nummer,
+      datum: rechnung.datum,
+      empfaengerName: rechnung.empfaengerName,
+      empfaengerAdresse: rechnung.empfaengerAdresse,
+      positionen: [...rechnung.positionen],
+      bemerkung: rechnung.bemerkung,
+      status: rechnung.status,
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleSaveEditRechnung = () => {
+    if (!editingRechnung) return;
+    setRechnungen((prev) =>
+      prev.map((r) =>
+        r.id === editingRechnung.id
+          ? {
+              ...r,
+              nummer: newRechnung.nummer || "",
+              datum: newRechnung.datum || "",
+              empfaengerName: newRechnung.empfaengerName || "",
+              empfaengerAdresse: newRechnung.empfaengerAdresse || "",
+              positionen: newRechnung.positionen || [],
+              bemerkung: newRechnung.bemerkung || "",
+            }
+          : r
+      )
+    );
+    setIsEditOpen(false);
+    setEditingRechnung(null);
+    setNewRechnung({
+      nummer: `2024-${String(rechnungen.length + 1).padStart(3, "0")}`,
+      datum: new Date().toISOString().split("T")[0],
+      empfaengerName: "",
+      empfaengerAdresse: "",
+      positionen: [{ id: "1", beschreibung: "", menge: 1, einzelpreis: 0 }],
+      bemerkung: "",
+      status: "offen",
+    });
+  };
+
+  const handleDeleteRechnung = (id: string) => {
+    if (confirm("Möchten Sie diese Rechnung wirklich löschen?")) {
+      setRechnungen((prev) => prev.filter((r) => r.id !== id));
+    }
   };
 
   const getStatusBadge = (status: Rechnung["status"]) => {
@@ -429,6 +481,191 @@ export function RechnungenView() {
         </Dialog>
       </div>
 
+      {/* Edit Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Rechnung bearbeiten</DialogTitle>
+            <DialogDescription>
+              Bearbeiten Sie die Daten der Rechnung.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-nummer">Rechnungsnummer</Label>
+                <Input
+                  id="edit-nummer"
+                  value={newRechnung.nummer}
+                  onChange={(e) =>
+                    setNewRechnung((prev) => ({
+                      ...prev,
+                      nummer: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-datum">Datum</Label>
+                <Input
+                  id="edit-datum"
+                  type="date"
+                  value={newRechnung.datum}
+                  onChange={(e) =>
+                    setNewRechnung((prev) => ({
+                      ...prev,
+                      datum: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-empfaenger">Empfänger Name</Label>
+              <Input
+                id="edit-empfaenger"
+                value={newRechnung.empfaengerName}
+                onChange={(e) =>
+                  setNewRechnung((prev) => ({
+                    ...prev,
+                    empfaengerName: e.target.value,
+                  }))
+                }
+                placeholder="z.B. Familie Müller"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-adresse">Empfänger Adresse</Label>
+              <Textarea
+                id="edit-adresse"
+                value={newRechnung.empfaengerAdresse}
+                onChange={(e) =>
+                  setNewRechnung((prev) => ({
+                    ...prev,
+                    empfaengerAdresse: e.target.value,
+                  }))
+                }
+                placeholder="Straße, PLZ Ort"
+                rows={2}
+              />
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Rechnungspositionen</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addPosition}
+                  className="gap-1 bg-transparent"
+                >
+                  <Plus className="h-3 w-3" />
+                  Position
+                </Button>
+              </div>
+              {newRechnung.positionen?.map((pos) => (
+                <div
+                  key={pos.id}
+                  className="grid grid-cols-12 gap-2 items-end"
+                >
+                  <div className="col-span-5 space-y-1">
+                    <Label className="text-xs">Beschreibung</Label>
+                    <Input
+                      value={pos.beschreibung}
+                      onChange={(e) =>
+                        updatePosition(pos.id, "beschreibung", e.target.value)
+                      }
+                      placeholder="Beschreibung"
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    <Label className="text-xs">Menge</Label>
+                    <Input
+                      type="number"
+                      value={pos.menge}
+                      onChange={(e) =>
+                        updatePosition(
+                          pos.id,
+                          "menge",
+                          Number(e.target.value)
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    <Label className="text-xs">Preis (€)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={pos.einzelpreis}
+                      onChange={(e) =>
+                        updatePosition(
+                          pos.id,
+                          "einzelpreis",
+                          Number(e.target.value)
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-1">
+                    <Label className="text-xs">Gesamt</Label>
+                    <Input
+                      value={`${calculatePositionTotal(pos).toFixed(2)} €`}
+                      readOnly
+                      className="bg-muted"
+                    />
+                  </div>
+                  <div className="col-span-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => removePosition(pos.id)}
+                      className="h-8 w-8"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-bemerkung">Bemerkung</Label>
+              <Textarea
+                id="edit-bemerkung"
+                value={newRechnung.bemerkung}
+                onChange={(e) =>
+                  setNewRechnung((prev) => ({
+                    ...prev,
+                    bemerkung: e.target.value,
+                  }))
+                }
+                placeholder="Optionale Bemerkungen zur Rechnung"
+                rows={2}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsEditOpen(false)}
+              >
+                Abbrechen
+              </Button>
+              <Button
+                onClick={handleSaveEditRechnung}
+                className="bg-success hover:bg-success/90 text-success-foreground"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                Änderungen speichern
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Rechnungen Table */}
       <Card>
         <CardHeader className="pb-3">
@@ -580,9 +817,25 @@ export function RechnungenView() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8"
+                          onClick={() => handleEditRechnung(rechnung)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
                           onClick={() => handleExportPDF(rechnung)}
                         >
                           <FileDown className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive"
+                          onClick={() => handleDeleteRechnung(rechnung.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </TableCell>

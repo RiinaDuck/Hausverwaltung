@@ -64,6 +64,16 @@ export function ObjektdatenView() {
       updateObjekt(editingObjektId, {
         name: objektName,
         adresse: `${objektStrasse}, ${objektPlz} ${objektOrt}`,
+        objektdaten: {
+          ...selectedObjekt?.objektdaten,
+          strasse: objektStrasse,
+          plz: objektPlz,
+          ort: objektOrt,
+        } as any,
+      });
+      toast({
+        title: "Gespeichert",
+        description: `Objekt "${objektName}" wurde aktualisiert.`,
       });
     } else {
       // Neues Objekt
@@ -98,6 +108,10 @@ export function ObjektdatenView() {
           garagen: "",
         },
         notizen: "",
+      });
+      toast({
+        title: "Erstellt",
+        description: `Objekt "${objektName}" wurde angelegt.`,
       });
     }
 

@@ -1119,7 +1119,7 @@ function FinanzamtForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Steuerangaben</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Steuernummer</Label>
@@ -1144,7 +1144,7 @@ function FinanzamtForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Ansprechpartner & Anschrift</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="grid grid-cols-4 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Anrede</Label>
@@ -1201,7 +1201,7 @@ function FinanzamtForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Kommunikation</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="space-y-1">
             <Label className="text-xs">Briefanrede</Label>
             <Input
@@ -1239,7 +1239,7 @@ function FinanzamtForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Bankverbindung</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="space-y-1">
             <Label className="text-xs">Bank</Label>
             <Input
@@ -1308,7 +1308,7 @@ function SteuerberaterForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Kanzlei-Daten</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="space-y-1">
             <Label className="text-xs">Kanzlei Name</Label>
             <Input
@@ -1381,7 +1381,7 @@ function GrundbesitzabgabenForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Abgaben-Daten</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="space-y-1">
             <Label className="text-xs">Bezeichnung</Label>
             <Input
@@ -1431,7 +1431,7 @@ function EnergielieferantForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Lieferanten-Daten</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Energieart</Label>
@@ -1486,7 +1486,7 @@ function EnergielieferantForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Kontakt</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="grid grid-cols-4 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Anrede</Label>
@@ -1566,7 +1566,7 @@ function EnergielieferantForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Technische Daten</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Montageort</Label>
@@ -1597,7 +1597,7 @@ function EnergielieferantForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Zahlungsdaten</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="space-y-1">
             <Label className="text-xs">Bank</Label>
             <Input
@@ -1681,7 +1681,7 @@ function MessdienstForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Meßdienst-Daten</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="space-y-1">
             <Label className="text-xs">Firma</Label>
             <Input
@@ -1738,7 +1738,7 @@ function FinanzierungspartnerForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Darlehensdaten</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="space-y-1">
             <Label className="text-xs">Bank / Kreditinstitut</Label>
             <Input
@@ -1840,7 +1840,7 @@ function FinanzierungspartnerForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Kontakt</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="space-y-1">
             <Label className="text-xs">Ansprechpartner</Label>
             <Input
@@ -1926,7 +1926,7 @@ function VersicherungForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Versicherungsdaten</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Versicherungsart</Label>
@@ -2030,7 +2030,7 @@ function VersicherungForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Kontakt</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="space-y-1">
             <Label className="text-xs">Ansprechpartner</Label>
             <Input
@@ -2116,7 +2116,7 @@ function DienstleisterForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Dienstleister-Daten</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label className="text-xs">Kategorie</Label>
@@ -2217,7 +2217,7 @@ function RechtsberatungForm({
         <CardHeader className="py-3">
           <CardTitle className="text-sm">Kanzlei-Daten</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="space-y-1">
             <Label className="text-xs">Kanzlei</Label>
             <Input

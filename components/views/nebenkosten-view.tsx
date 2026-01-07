@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,7 @@ import {
 import { Save, Plus, Trash2, FileDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { generateNebenkostenPDF, downloadPDF } from "@/lib/pdf-generator";
+import { useAppData } from "@/context/app-data-context";
 
 interface Kostenart {
   id: string;
@@ -32,6 +33,35 @@ interface Kostenart {
   kosten: string;
   schluessel: string;
 }
+
+// Vordefinierte Kostenarten
+const KOSTENARTEN_OPTIONEN = [
+  "Allgemeinstrom/Beleuchtung",
+  "Aufzug",
+  "Elementarschadenversicherung",
+  "Feuerlöscher/Brandmelder",
+  "Fußwegreinigung",
+  "Gartenpflege",
+  "Gebäudereinigung",
+  "Gebäudeversicherung",
+  "Gemeinschaftsantenne/Kabel-TV",
+  "Gewässerschadenhaftpflicht",
+  "Glasbruchversicherung",
+  "Grundsteuer",
+  "Haftpflichtversicherung",
+  "Hausreinigung",
+  "Hauswart/Hausmeister",
+  "Müllbeseitigung",
+  "Niederschlagswasser",
+  "Schmutzwasser",
+  "Schornsteinreinigung/Abgasüberprüfung",
+  "Straßenreinigung",
+  "Tank Wartung/Reinigung",
+  "Wartung Heizung",
+  "Wasser: Grundpreis",
+  "Wasser: Verbrauchskosten",
+  "Wasserkosten",
+];
 
 const initialKostenarten: Kostenart[] = [
   {
@@ -95,8 +125,10 @@ const verteilerschluesselOptions = [
 ];
 
 export function NebenkostenView() {
+  const { objekte, wohnungen, mieter, selectedObjektId } = useAppData();
   const [kostenarten, setKostenarten] =
     useState<Kostenart[]>(initialKostenarten);
+  const [selectedMieterId, setSelectedMieterId] = useState<string | null>(null);
   const [title, setTitle] = useState("Nebenkostenabrechnung");
   const [dateVon, setDateVon] = useState("2024-01-01");
   const [dateBis, setDateBis] = useState("2024-12-31");
@@ -107,6 +139,34 @@ export function NebenkostenView() {
     "Ein sich zu Ihren Gunsten ergebender Betrag wird mit der nächsten Mietzahlung verrechnet bzw. an Sie überwiesen.\n\nEin Nachzahlungsbetrag ist innerhalb von 14 Tagen nach Erhalt dieser Abrechnung fällig.\n\nMit freundlichen Grüßen\nIhre Hausverwaltung"
   );
   const { toast } = useToast();
+
+  // Aktuelles Objekt
+  const currentObjekt = useMemo(
+    () => objekte.find((o) => o.id === selectedObjektId),
+    [objekte, selectedObjektId]
+  );
+
+  // Mieter des aktuellen Objekts
+  const availableMieter = useMemo(() => {
+    if (!selectedObjektId) return [];
+    const objektWohnungen = wohnungen.filter(
+      (w) => w.objektId === selectedObjektId
+    );
+    const wohnungIds = objektWohnungen.map((w) => w.id);
+    return mieter.filter((m) => wohnungIds.includes(m.wohnungId));
+  }, [selectedObjektId, wohnungen, mieter]);
+
+  // Ausgewählter Mieter
+  const selectedMieter = useMemo(
+    () => availableMieter.find((m) => m.id === selectedMieterId),
+    [availableMieter, selectedMieterId]
+  );
+
+  // Wohnung des ausgewählten Mieters
+  const selectedWohnung = useMemo(
+    () => wohnungen.find((w) => w.id === selectedMieter?.wohnungId),
+    [wohnungen, selectedMieter]
+  );
 
   const handleSave = () => {
     toast({
@@ -154,6 +214,15 @@ export function NebenkostenView() {
   };
 
   const handleExportPDF = () => {
+    if (!selectedMieter) {
+      toast({
+        title: "Fehler",
+        description: "Bitte wählen Sie einen Mieter aus.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     const doc = generateNebenkostenPDF({
       title,
       dateVon,
@@ -166,10 +235,10 @@ export function NebenkostenView() {
       })),
       total: calculateTotal(),
       outroText,
-      mieterName: "Familie Müller", // In real app, this would come from selected tenant
-      objektAdresse: "Berliner Straße 42, 10115 Berlin",
+      mieterName: selectedMieter.name,
+      objektAdresse: currentObjekt?.adresse || "",
     });
-    downloadPDF(doc, `nebenkostenabrechnung_${dateVon}_${dateBis}`);
+    downloadPDF(doc, `nebenkostenabrechnung_${selectedMieter.name}_${dateVon}_${dateBis}`);
   };
 
   return (
@@ -203,33 +272,56 @@ export function NebenkostenView() {
       {/* Header */}
       <Card>
         <CardContent className="pt-4 sm:pt-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
-            <div className="sm:col-span-2 md:col-span-2 space-y-2">
-              <Label htmlFor="title">Titel</Label>
-              <Input
-                id="title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="text-lg font-medium"
-              />
-            </div>
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="date-von">Von</Label>
-              <Input
-                id="date-von"
-                type="date"
-                value={dateVon}
-                onChange={(e) => setDateVon(e.target.value)}
-              />
+              <Label htmlFor="mieter-select">Mieter</Label>
+              <Select
+                value={selectedMieterId || ""}
+                onValueChange={(value) => setSelectedMieterId(value)}
+              >
+                <SelectTrigger id="mieter-select">
+                  <SelectValue placeholder="Mieter auswählen" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableMieter.map((m) => {
+                    const wohnung = wohnungen.find((w) => w.id === m.wohnungId);
+                    return (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name} - {wohnung?.bezeichnung}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="date-bis">Bis</Label>
-              <Input
-                id="date-bis"
-                type="date"
-                value={dateBis}
-                onChange={(e) => setDateBis(e.target.value)}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+              <div className="sm:col-span-2 md:col-span-2 space-y-2">
+                <Label htmlFor="title">Titel</Label>
+                <Input
+                  id="title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="text-lg font-medium"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="date-von">Von</Label>
+                <Input
+                  id="date-von"
+                  type="date"
+                  value={dateVon}
+                  onChange={(e) => setDateVon(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="date-bis">Bis</Label>
+                <Input
+                  id="date-bis"
+                  type="date"
+                  value={dateBis}
+                  onChange={(e) => setDateBis(e.target.value)}
+                />
+              </div>
             </div>
           </div>
           <div className="mt-4 text-sm text-muted-foreground">
@@ -289,13 +381,38 @@ export function NebenkostenView() {
               {kostenarten.map((kostenart) => (
                 <TableRow key={kostenart.id}>
                   <TableCell>
-                    <Input
-                      value={kostenart.name}
-                      onChange={(e) =>
-                        updateKostenart(kostenart.id, "name", e.target.value)
-                      }
-                      placeholder="Kostenart eingeben"
-                    />
+                    <Select
+                      value={kostenart.name || "custom"}
+                      onValueChange={(value) => {
+                        if (value === "custom") {
+                          updateKostenart(kostenart.id, "name", "");
+                        } else {
+                          updateKostenart(kostenart.id, "name", value);
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Kostenart wählen" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {KOSTENARTEN_OPTIONEN.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="custom">Eigene eingeben...</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {(!kostenart.name || !KOSTENARTEN_OPTIONEN.includes(kostenart.name)) && (
+                      <Input
+                        value={kostenart.name}
+                        onChange={(e) =>
+                          updateKostenart(kostenart.id, "name", e.target.value)
+                        }
+                        placeholder="Eigene Kostenart eingeben"
+                        className="mt-2"
+                      />
+                    )}
                   </TableCell>
                   <TableCell>
                     <Input
