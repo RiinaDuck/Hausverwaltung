@@ -565,10 +565,7 @@ export function RechnungenView() {
                 </Button>
               </div>
               {newRechnung.positionen?.map((pos) => (
-                <div
-                  key={pos.id}
-                  className="grid grid-cols-12 gap-2 items-end"
-                >
+                <div key={pos.id} className="grid grid-cols-12 gap-2 items-end">
                   <div className="col-span-5 space-y-1">
                     <Label className="text-xs">Beschreibung</Label>
                     <Input
@@ -585,11 +582,7 @@ export function RechnungenView() {
                       type="number"
                       value={pos.menge}
                       onChange={(e) =>
-                        updatePosition(
-                          pos.id,
-                          "menge",
-                          Number(e.target.value)
-                        )
+                        updatePosition(pos.id, "menge", Number(e.target.value))
                       }
                     />
                   </div>
@@ -648,10 +641,7 @@ export function RechnungenView() {
             </div>
 
             <div className="flex justify-end gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setIsEditOpen(false)}
-              >
+              <Button variant="outline" onClick={() => setIsEditOpen(false)}>
                 Abbrechen
               </Button>
               <Button

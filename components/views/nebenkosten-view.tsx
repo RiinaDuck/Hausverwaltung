@@ -238,7 +238,10 @@ export function NebenkostenView() {
       mieterName: selectedMieter.name,
       objektAdresse: currentObjekt?.adresse || "",
     });
-    downloadPDF(doc, `nebenkostenabrechnung_${selectedMieter.name}_${dateVon}_${dateBis}`);
+    downloadPDF(
+      doc,
+      `nebenkostenabrechnung_${selectedMieter.name}_${dateVon}_${dateBis}`
+    );
   };
 
   return (
@@ -400,10 +403,13 @@ export function NebenkostenView() {
                             {option}
                           </SelectItem>
                         ))}
-                        <SelectItem value="custom">Eigene eingeben...</SelectItem>
+                        <SelectItem value="custom">
+                          Eigene eingeben...
+                        </SelectItem>
                       </SelectContent>
                     </Select>
-                    {(!kostenart.name || !KOSTENARTEN_OPTIONEN.includes(kostenart.name)) && (
+                    {(!kostenart.name ||
+                      !KOSTENARTEN_OPTIONEN.includes(kostenart.name)) && (
                       <Input
                         value={kostenart.name}
                         onChange={(e) =>
