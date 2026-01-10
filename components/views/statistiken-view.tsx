@@ -871,7 +871,7 @@ export function StatistikenView() {
                           </Label>
                           <Input
                             type="number"
-                            value={item.einnahmen || item.value || 0}
+                            value={item.einnahmen || 0}
                             onChange={(e) =>
                               updateEinnahmenObjekt(
                                 idx,
