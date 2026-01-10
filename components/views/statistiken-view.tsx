@@ -620,7 +620,7 @@ export function StatistikenView() {
 
       // Funktion zum Hinzufügen eines Charts
       const addChartToPDF = async (
-        chartRef: React.RefObject<HTMLDivElement>,
+        chartRef: React.RefObject<HTMLDivElement | null>,
         title: string
       ) => {
         if (!chartRef.current) return;
