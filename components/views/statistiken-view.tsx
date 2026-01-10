@@ -249,10 +249,10 @@ export function StatistikenView() {
   const { toast } = useToast();
 
   // Refs für Chart-Capture
-  const finanzChartRef = useRef<HTMLDivElement>(null);
-  const objekteChartRef = useRef<HTMLDivElement>(null);
-  const kostenChartRef = useRef<HTMLDivElement>(null);
-  const leerstandChartRef = useRef<HTMLDivElement>(null);
+  const finanzChartRef = useRef<HTMLDivElement | null>(null);
+  const objekteChartRef = useRef<HTMLDivElement | null>(null);
+  const kostenChartRef = useRef<HTMLDivElement | null>(null);
+  const leerstandChartRef = useRef<HTMLDivElement | null>(null);
 
   // Editable state for all data
   const [monatlicheFinanzDaten, setMonatlicheFinanzDaten] = useState(
