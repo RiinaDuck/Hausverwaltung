@@ -128,78 +128,6 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
     };
   }, [wohnungen, mieter, selectedObjektId]);
 
-  // Generiere dynamische Aktivitäten aus echten Daten
-  const aktivitaeten = useMemo(() => {
-    const activities: Array<{
-      text: string;
-      zeit: string;
-      betrag: string | null;
-      typ: string;
-    }> = [];
-
-    // Letzte Mieter-Einzüge
-    const recentMieter = [...mieter]
-      .filter((m) => m.isAktiv !== false)
-      .sort(
-        (a, b) =>
-          new Date(b.einzugsDatum).getTime() -
-          new Date(a.einzugsDatum).getTime(),
-      )
-      .slice(0, 2);
-
-    recentMieter.forEach((m) => {
-      const wohnung = wohnungen.find((w) => w.id === m.wohnungId);
-      if (wohnung) {
-        const daysSince = Math.floor(
-          (Date.now() - new Date(m.einzugsDatum).getTime()) /
-            (1000 * 60 * 60 * 24),
-        );
-        activities.push({
-          text: `Miete eingegangen: ${wohnung.bezeichnung}`,
-          zeit:
-            daysSince < 1
-              ? "vor wenigen Stunden"
-              : `vor ${daysSince} Tag${daysSince !== 1 ? "en" : ""}`,
-          betrag: `+${(m.kaltmiete + m.nebenkosten).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}`,
-          typ: "einnahme",
-        });
-      }
-    });
-
-    // Objekt-Informationen
-    if (objekte.length > 0) {
-      activities.push({
-        text: `Objekt ${objekte[0].name} - ${objekte[0].einheiten} Einheiten verwaltet`,
-        zeit: "vor 3 Std.",
-        betrag: null,
-        typ: "info",
-      });
-    }
-
-    // Leerstand-Warnung
-    const leerstehendeWohnungen = wohnungen.filter((w) => w.status === "leer");
-    if (leerstehendeWohnungen.length > 0) {
-      activities.push({
-        text: `${leerstehendeWohnungen.length} leerstehende Wohnung${leerstehendeWohnungen.length !== 1 ? "en" : ""} verfügbar`,
-        zeit: "vor 1 Tag",
-        betrag: null,
-        typ: "warnung",
-      });
-    }
-
-    // Fallback wenn keine echten Aktivitäten
-    if (activities.length === 0) {
-      activities.push({
-        text: "Noch keine Aktivitäten vorhanden",
-        zeit: "Jetzt",
-        betrag: null,
-        typ: "info",
-      });
-    }
-
-    return activities.slice(0, 4); // Maximal 4 Aktivitäten
-  }, [mieter, wohnungen, objekte]);
-
   const handleObjektOpen = (objektId: string) => {
     setSelectedObjektId(objektId);
     onNavigate("objekte");
@@ -333,33 +261,6 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                 )}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-
-        {/* Recent Activities */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Letzte Aktivitäten</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {aktivitaeten.map((aktivitaet, index) => (
-              <div
-                key={index}
-                className="flex items-start justify-between gap-3 text-sm"
-              >
-                <div className="space-y-1">
-                  <p className="leading-snug">{aktivitaet.text}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {aktivitaet.zeit}
-                  </p>
-                </div>
-                {aktivitaet.betrag && (
-                  <span className="text-success font-medium whitespace-nowrap">
-                    {aktivitaet.betrag}
-                  </span>
-                )}
-              </div>
-            ))}
           </CardContent>
         </Card>
       </div>
