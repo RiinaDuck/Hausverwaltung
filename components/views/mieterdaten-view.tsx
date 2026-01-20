@@ -36,10 +36,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Save, Plus, FileDown, Trash2, Users, Home } from "lucide-react";
+import {
+  Save,
+  Plus,
+  FileDown,
+  Trash2,
+  Users,
+  Home,
+  Calendar,
+  UserCheck,
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import {
   generateMieterKommunikationPDF,
+  generatePDF,
   downloadPDF,
 } from "@/lib/pdf-generator";
 import { useAppData } from "@/context/app-data-context";
@@ -58,6 +70,13 @@ interface MieterDisplay {
   kaltmiete: number;
   nebenkosten: number;
   kaution: number;
+  // Erweiterte Felder
+  einzugsDatumRaw: string; // ISO-Format für Date-Input
+  mieteBisRaw: string | null;
+  isKurzzeitvermietung: boolean;
+  kurzzeitBis?: string | null;
+  isAktiv: boolean;
+  prozentanteil: number;
 }
 
 export function MieterdatenView() {
@@ -66,9 +85,12 @@ export function MieterdatenView() {
     wohnungen,
     selectedObjektId,
     objekte,
+    ehemaligeMieter,
     addMieter,
     updateMieter,
     deleteMieter,
+    archiviereMieter,
+    reaktiviereMieter,
   } = useAppData();
 
   // Finde das aktuelle Objekt für den Namen
@@ -84,8 +106,9 @@ export function MieterdatenView() {
 
   // Konvertiere Context-Mieter zu MieterDisplay-Format und filtere nach Objekt
   const mieterData: MieterDisplay[] = useMemo(() => {
-    const filtered = mieter.filter((m) =>
-      objektWohnungIds.includes(m.wohnungId)
+    // Zeige nur aktive Mieter in der Hauptliste
+    const filtered = mieter.filter(
+      (m) => objektWohnungIds.includes(m.wohnungId) && m.isAktiv !== false,
     );
 
     return filtered.map((m, index) => {
@@ -107,19 +130,38 @@ export function MieterdatenView() {
         kaltmiete: m.kaltmiete,
         nebenkosten: m.nebenkosten,
         kaution: m.kaution,
+        // Erweiterte Felder
+        einzugsDatumRaw: m.einzugsDatum,
+        mieteBisRaw: m.mieteBis,
+        isKurzzeitvermietung: m.isKurzzeitvermietung || false,
+        kurzzeitBis: m.kurzzeitBis,
+        isAktiv: m.isAktiv !== false,
+        prozentanteil: m.prozentanteil || 0,
       };
     });
   }, [mieter, objektWohnungIds, wohnungen]);
 
   const [selectedMieter, setSelectedMieter] = useState<MieterDisplay | null>(
-    null
+    null,
   );
   const [editedMieter, setEditedMieter] = useState<MieterDisplay | null>(null);
+
+  // Alle Mieter (inkl. ehemalige) für die Wohnung des aktuell gewählten Mieters - für Historie
+  const alleMieterFuerWohnung = useMemo(() => {
+    if (!selectedMieter) return [];
+    return mieter.filter((m) => m.wohnungId === selectedMieter.wohnungId);
+  }, [mieter, selectedMieter]);
+
   const [betreff, setBetreff] = useState("Mitteilung");
   const [nachricht, setNachricht] = useState(
-    "Sehr geehrte Damen und Herren,\n\nbitte beachten Sie, dass die jährliche Nebenkostenabrechnung bis Ende Februar zugestellt wird.\n\nMit freundlichen Grüßen\nIhre Hausverwaltung"
+    "Sehr geehrte Damen und Herren,\n\nbitte beachten Sie, dass die jährliche Nebenkostenabrechnung bis Ende Februar zugestellt wird.\n\nMit freundlichen Grüßen\nIhre Hausverwaltung",
   );
   const [isNewMieterOpen, setIsNewMieterOpen] = useState(false);
+  const [isEhemaligeMieterOpen, setIsEhemaligeMieterOpen] = useState(false);
+  const [isHistorieMieterOpen, setIsHistorieMieterOpen] = useState(false);
+  const [editingHistorieMieterId, setEditingHistorieMieterId] = useState<
+    string | null
+  >(null);
   const [newMieter, setNewMieter] = useState<{
     name: string;
     wohnungId: string;
@@ -129,6 +171,9 @@ export function MieterdatenView() {
     kaltmiete: number;
     nebenkosten: number;
     kaution: number;
+    isKurzzeitvermietung: boolean;
+    kurzzeitBis: string;
+    prozentanteil: number;
   }>({
     name: "",
     wohnungId: "",
@@ -138,7 +183,29 @@ export function MieterdatenView() {
     kaltmiete: 0,
     nebenkosten: 0,
     kaution: 0,
+    isKurzzeitvermietung: false,
+    kurzzeitBis: "",
+    prozentanteil: 0,
   });
+  const [historieMieter, setHistorieMieter] = useState<{
+    name: string;
+    einzugsDatum: string;
+    auszugsDatum: string;
+    kaltmiete: number;
+    nebenkosten: number;
+    prozentanteil: number;
+    isKurzzeitvermietung: boolean;
+  }>({
+    name: "",
+    einzugsDatum: "",
+    auszugsDatum: "",
+    kaltmiete: 0,
+    nebenkosten: 0,
+    prozentanteil: 0,
+    isKurzzeitvermietung: false,
+  });
+  const [selectedEhemaligerMieter, setSelectedEhemaligerMieter] =
+    useState<string>("");
   const { toast } = useToast();
 
   // Aktualisiere selectedMieter wenn sich mieterData ändert
@@ -161,7 +228,7 @@ export function MieterdatenView() {
       setEditedMieter({ ...selectedMieter });
       // Aktualisiere auch die Nachricht
       setNachricht(
-        `Sehr geehrte/r ${selectedMieter.name},\n\nbitte beachten Sie, dass die jährliche Nebenkostenabrechnung bis Ende Februar zugestellt wird.\n\nMit freundlichen Grüßen\nIhre Hausverwaltung`
+        `Sehr geehrte/r ${selectedMieter.name},\n\nbitte beachten Sie, dass die jährliche Nebenkostenabrechnung bis Ende Februar zugestellt wird.\n\nMit freundlichen Grüßen\nIhre Hausverwaltung`,
       );
     } else {
       setEditedMieter(null);
@@ -171,7 +238,7 @@ export function MieterdatenView() {
   // Hilfsfunktion zum Aktualisieren der bearbeiteten Mieter-Daten
   const updateEditedMieter = (
     field: keyof MieterDisplay,
-    value: string | number
+    value: string | number | boolean | null,
   ) => {
     if (!editedMieter) return;
     setEditedMieter((prev) => (prev ? { ...prev, [field]: value } : null));
@@ -194,11 +261,166 @@ export function MieterdatenView() {
       kaltmiete: editedMieter.kaltmiete,
       nebenkosten: editedMieter.nebenkosten,
       kaution: editedMieter.kaution,
+      einzugsDatum: editedMieter.einzugsDatumRaw,
+      mieteBis: editedMieter.mieteBisRaw,
+      isKurzzeitvermietung: editedMieter.isKurzzeitvermietung,
+      kurzzeitBis: editedMieter.kurzzeitBis,
+      prozentanteil: editedMieter.prozentanteil,
     });
 
     toast({
       title: "Gespeichert",
       description: `Mieterdaten für "${editedMieter.name}" wurden gespeichert.`,
+    });
+  };
+
+  const handleAddHistorieMieter = () => {
+    if (
+      !selectedMieter ||
+      !historieMieter.name ||
+      !historieMieter.einzugsDatum
+    ) {
+      toast({
+        title: "Fehler",
+        description: "Bitte füllen Sie mindestens Name und Einzugsdatum aus.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Füge neuen ehemaligen Mieter hinzu
+    addMieter({
+      wohnungId: selectedMieter.wohnungId,
+      name: historieMieter.name,
+      email: "",
+      telefon: "",
+      einzugsDatum: historieMieter.einzugsDatum,
+      kaltmiete: historieMieter.kaltmiete,
+      nebenkosten: historieMieter.nebenkosten,
+      kaution: 0,
+      mieteBis: historieMieter.auszugsDatum || null,
+      isAktiv: false,
+      isKurzzeitvermietung: historieMieter.isKurzzeitvermietung,
+      kurzzeitBis: null,
+      prozentanteil: historieMieter.prozentanteil,
+    });
+
+    setIsHistorieMieterOpen(false);
+    setHistorieMieter({
+      name: "",
+      einzugsDatum: "",
+      auszugsDatum: "",
+      kaltmiete: 0,
+      nebenkosten: 0,
+      prozentanteil: 0,
+      isKurzzeitvermietung: false,
+    });
+
+    toast({
+      title: "Historie-Eintrag hinzugefügt",
+      description: `${historieMieter.name} wurde zur Historie hinzugefügt.`,
+    });
+  };
+
+  const handleExportAllDataPDF = () => {
+    if (!selectedMieter || !editedMieter) return;
+
+    const content: any[] = [];
+
+    // Stammdaten
+    content.push(
+      { type: "heading", text: "Stammdaten" },
+      {
+        type: "table",
+        data: {
+          headers: ["Feld", "Wert"],
+          rows: [
+            ["Name", editedMieter.name],
+            ["Wohnung", editedMieter.geschoss],
+            ["E-Mail", editedMieter.email || "-"],
+            ["Telefon", editedMieter.telefon || "-"],
+            [
+              "Einzugsdatum",
+              new Date(editedMieter.einzugsDatumRaw).toLocaleDateString(
+                "de-DE",
+              ),
+            ],
+            [
+              "Auszugsdatum",
+              editedMieter.mieteBisRaw
+                ? new Date(editedMieter.mieteBisRaw).toLocaleDateString("de-DE")
+                : "Unbefristet",
+            ],
+            [
+              "Kaltmiete",
+              `${editedMieter.kaltmiete.toLocaleString("de-DE")} €`,
+            ],
+            [
+              "Nebenkosten",
+              `${editedMieter.nebenkosten.toLocaleString("de-DE")} €`,
+            ],
+            ["Kaution", `${editedMieter.kaution.toLocaleString("de-DE")} €`],
+            [
+              "Kurzzeitvermietung",
+              editedMieter.isKurzzeitvermietung ? "Ja" : "Nein",
+            ],
+          ],
+        },
+      },
+      { type: "spacer", height: 10 },
+    );
+
+    // Historie
+    content.push(
+      { type: "heading", text: "Mieterhistorie" },
+      {
+        type: "table",
+        data: {
+          headers: ["Name", "Von", "Bis", "Miete", "Status"],
+          rows: alleMieterFuerWohnung.map((m) => [
+            m.name,
+            new Date(m.einzugsDatum).toLocaleDateString("de-DE"),
+            m.mieteBis
+              ? new Date(m.mieteBis).toLocaleDateString("de-DE")
+              : "heute",
+            `${m.kaltmiete.toLocaleString("de-DE")} €`,
+            m.isAktiv !== false && !m.mieteBis ? "Aktuell" : "Ehemalig",
+          ]),
+        },
+      },
+      { type: "spacer", height: 10 },
+    );
+
+    // Verteilungsschlüssel
+    content.push(
+      { type: "heading", text: "Verteilungsschlüssel" },
+      {
+        type: "table",
+        data: {
+          headers: ["Feld", "Wert"],
+          rows: [
+            ["Wohnung", editedMieter.geschoss],
+            ["Prozentanteil", `${editedMieter.prozentanteil}%`],
+          ],
+        },
+      },
+    );
+
+    const doc = generatePDF({
+      title: `Mieterdaten - ${editedMieter.name}`,
+      subtitle: `${currentObjekt?.name || ""} - ${editedMieter.geschoss}`,
+      content,
+      footer: `Hausverwaltung Boss - ${currentObjekt?.objektdaten.strasse || ""}, ${currentObjekt?.objektdaten.plz || ""} ${currentObjekt?.objektdaten.ort || ""}`,
+    });
+
+    downloadPDF(
+      doc,
+      `Mieterdaten_${editedMieter.name}_${new Date().toISOString().split("T")[0]}`,
+    );
+
+    toast({
+      title: "PDF erstellt",
+      description: `Mieterdaten für ${editedMieter.name} wurden als PDF exportiert.`,
     });
   };
 
@@ -217,7 +439,7 @@ export function MieterdatenView() {
       doc,
       `mitteilung_${selectedMieter.name.replace(/\s+/g, "_")}_${
         new Date().toISOString().split("T")[0]
-      }`
+      }`,
     );
   };
 
@@ -243,6 +465,12 @@ export function MieterdatenView() {
       kaltmiete: newMieter.kaltmiete,
       nebenkosten: newMieter.nebenkosten,
       kaution: newMieter.kaution,
+      isKurzzeitvermietung: newMieter.isKurzzeitvermietung,
+      kurzzeitBis: newMieter.isKurzzeitvermietung
+        ? newMieter.kurzzeitBis
+        : null,
+      isAktiv: true,
+      prozentanteil: newMieter.prozentanteil,
     });
 
     setIsNewMieterOpen(false);
@@ -255,6 +483,9 @@ export function MieterdatenView() {
       kaltmiete: 0,
       nebenkosten: 0,
       kaution: 0,
+      isKurzzeitvermietung: false,
+      kurzzeitBis: "",
+      prozentanteil: 0,
     });
 
     toast({
@@ -533,6 +764,15 @@ export function MieterdatenView() {
                 <span className="hidden sm:inline">Löschen</span>
               </Button>
               <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={handleExportAllDataPDF}
+              >
+                <FileDown className="h-4 w-4" />
+                <span className="hidden sm:inline">In PDF Exportieren</span>
+              </Button>
+              <Button
                 size="sm"
                 className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
                 onClick={handleSave}
@@ -544,12 +784,16 @@ export function MieterdatenView() {
           </div>
 
           <Tabs defaultValue="stammdaten" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 max-w-3xl h-auto">
+            <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 max-w-4xl h-auto">
               <TabsTrigger
                 value="stammdaten"
                 className="text-xs sm:text-sm py-2"
               >
                 Stammdaten
+              </TabsTrigger>
+              <TabsTrigger value="historie" className="text-xs sm:text-sm py-2">
+                <Calendar className="h-3 w-3 mr-1 hidden sm:inline" />
+                Historie
               </TabsTrigger>
               <TabsTrigger
                 value="verteilung"
@@ -639,13 +883,88 @@ export function MieterdatenView() {
                       <Label htmlFor="einzug">Einzugsdatum</Label>
                       <Input
                         id="einzug"
-                        type="text"
-                        value={editedMieter?.einzug || ""}
-                        readOnly
-                        className="bg-muted"
+                        type="date"
+                        value={editedMieter?.einzugsDatumRaw || ""}
+                        onChange={(e) =>
+                          updateEditedMieter("einzugsDatumRaw", e.target.value)
+                        }
                       />
                     </div>
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="auszug">Auszugsdatum</Label>
+                      <Input
+                        id="auszug"
+                        type="date"
+                        value={editedMieter?.mieteBisRaw || ""}
+                        onChange={(e) =>
+                          updateEditedMieter(
+                            "mieteBisRaw",
+                            e.target.value || null,
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2 flex items-end gap-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="kurzzeitvermietung"
+                          checked={editedMieter?.isKurzzeitvermietung || false}
+                          onCheckedChange={(checked) =>
+                            setEditedMieter((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    isKurzzeitvermietung: checked === true,
+                                  }
+                                : null,
+                            )
+                          }
+                        />
+                        <Label
+                          htmlFor="kurzzeitvermietung"
+                          className="text-sm font-medium"
+                        >
+                          Kurzzeitvermietung
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+                  {editedMieter?.isKurzzeitvermietung && (
+                    <div className="p-4 border rounded-lg bg-muted/30 space-y-4">
+                      <h4 className="text-sm font-medium">
+                        Kurzzeitvermietung Zeitraum
+                      </h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="kurzzeit-von">Von (Einzug)</Label>
+                          <Input
+                            id="kurzzeit-von"
+                            type="date"
+                            value={editedMieter?.einzugsDatumRaw || ""}
+                            onChange={(e) =>
+                              updateEditedMieter(
+                                "einzugsDatumRaw",
+                                e.target.value,
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="kurzzeit-bis">Bis (Auszug)</Label>
+                          <Input
+                            id="kurzzeit-bis"
+                            type="date"
+                            value={editedMieter?.kurzzeitBis || ""}
+                            onChange={(e) =>
+                              updateEditedMieter("kurzzeitBis", e.target.value)
+                            }
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="kaltmiete">Kaltmiete (€)</Label>
@@ -656,7 +975,7 @@ export function MieterdatenView() {
                         onChange={(e) =>
                           updateEditedMieter(
                             "kaltmiete",
-                            parseFloat(e.target.value) || 0
+                            parseFloat(e.target.value) || 0,
                           )
                         }
                       />
@@ -670,7 +989,7 @@ export function MieterdatenView() {
                         onChange={(e) =>
                           updateEditedMieter(
                             "nebenkosten",
-                            parseFloat(e.target.value) || 0
+                            parseFloat(e.target.value) || 0,
                           )
                         }
                       />
@@ -684,7 +1003,7 @@ export function MieterdatenView() {
                         onChange={(e) =>
                           updateEditedMieter(
                             "kaution",
-                            parseFloat(e.target.value) || 0
+                            parseFloat(e.target.value) || 0,
                           )
                         }
                       />
@@ -694,7 +1013,198 @@ export function MieterdatenView() {
               </Card>
             </TabsContent>
 
-            {/* Tab 2: Verteilungsschlüssel */}
+            {/* Tab 2: Mieterhistorie / Timeline */}
+            <TabsContent value="historie" className="mt-6 space-y-6">
+              <Card>
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Mietzeiträume für {editedMieter?.geschoss}
+                      </CardTitle>
+                      <CardDescription className="text-xs">
+                        Übersicht aller Mieter dieser Wohnung inkl. Zeiträume
+                      </CardDescription>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => setIsHistorieMieterOpen(true)}
+                    >
+                      <Plus className="h-3 w-3" />
+                      Vorherigen Mieter hinzufügen
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Timeline Visualisierung */}
+                  <div className="space-y-3">
+                    {alleMieterFuerWohnung
+                      .sort(
+                        (a, b) =>
+                          new Date(a.einzugsDatum).getTime() -
+                          new Date(b.einzugsDatum).getTime(),
+                      ) // Chronologisch: älteste zuerst
+                      .map((m, index, array) => {
+                        const isCurrentMieter = m.id === editedMieter?.id;
+                        const einzug = new Date(m.einzugsDatum);
+                        const auszug = m.mieteBis ? new Date(m.mieteBis) : null;
+                        const isAktiv = m.isAktiv !== false && !m.mieteBis;
+
+                        // Berechne Mietdauer
+                        const endDate = auszug || new Date();
+                        const durationMs = endDate.getTime() - einzug.getTime();
+                        const durationMonths = Math.floor(
+                          durationMs / (1000 * 60 * 60 * 24 * 30.44),
+                        );
+                        const durationYears = Math.floor(durationMonths / 12);
+                        const remainingMonths = durationMonths % 12;
+
+                        let durationText = "";
+                        if (durationYears > 0) {
+                          durationText = `${durationYears} Jahr${durationYears !== 1 ? "e" : ""}`;
+                          if (remainingMonths > 0) {
+                            durationText += `, ${remainingMonths} Monat${remainingMonths !== 1 ? "e" : ""}`;
+                          }
+                        } else {
+                          durationText = `${durationMonths} Monat${durationMonths !== 1 ? "e" : ""}`;
+                        }
+
+                        return (
+                          <div
+                            key={m.id}
+                            className={`relative pl-8 pb-4 ${
+                              index !== array.length - 1
+                                ? "border-l-2 border-muted-foreground/20"
+                                : ""
+                            }`}
+                          >
+                            {/* Timeline Punkt */}
+                            <div
+                              className={`absolute left-[-5px] top-0 w-3 h-3 rounded-full border-2 border-background ${
+                                isAktiv
+                                  ? "bg-success ring-2 ring-success/20"
+                                  : "bg-muted-foreground/50"
+                              }`}
+                            />
+
+                            <div
+                              className={`p-3 rounded-lg border ${
+                                isCurrentMieter
+                                  ? "border-primary bg-primary/5"
+                                  : "border-muted"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{m.name}</span>
+                                  {isAktiv && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs bg-success/10 text-success border-success/20"
+                                    >
+                                      Aktuell
+                                    </Badge>
+                                  )}
+                                  {m.isKurzzeitvermietung && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs bg-amber-500/10 text-amber-500 border-amber-500/20"
+                                    >
+                                      Kurzzeit
+                                    </Badge>
+                                  )}
+                                  {!isAktiv && (
+                                    <Badge
+                                      variant="outline"
+                                      className="text-xs bg-muted text-muted-foreground"
+                                    >
+                                      Ehemalig
+                                    </Badge>
+                                  )}
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {m.prozentanteil ? `${m.prozentanteil}%` : ""}
+                                </span>
+                              </div>
+
+                              {/* Zeitraum-Balken */}
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="text-muted-foreground font-medium">
+                                  {einzug.toLocaleDateString("de-DE")}
+                                </span>
+                                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden relative">
+                                  <div
+                                    className={`h-full transition-all ${
+                                      isAktiv
+                                        ? "bg-gradient-to-r from-success/70 to-success"
+                                        : "bg-gradient-to-r from-muted-foreground/30 to-muted-foreground/50"
+                                    }`}
+                                    style={{ width: "100%" }}
+                                  />
+                                </div>
+                                <span className="text-muted-foreground font-medium">
+                                  {auszug
+                                    ? auszug.toLocaleDateString("de-DE")
+                                    : "heute"}
+                                </span>
+                              </div>
+
+                              {/* Details */}
+                              <div className="mt-2 flex items-center justify-between">
+                                <div className="flex flex-col gap-1">
+                                  <span className="text-xs text-muted-foreground">
+                                    Miete: {m.kaltmiete.toLocaleString("de-DE")}{" "}
+                                    € + {m.nebenkosten.toLocaleString("de-DE")}{" "}
+                                    € NK
+                                  </span>
+                                  <span className="text-xs text-muted-foreground font-medium">
+                                    Dauer: {durationText}
+                                    {isAktiv ? " (läuft)" : ""}
+                                  </span>
+                                </div>
+                                {!isAktiv && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-7 text-xs"
+                                    onClick={() => {
+                                      setEditingHistorieMieterId(m.id);
+                                      setHistorieMieter({
+                                        name: m.name,
+                                        einzugsDatum: m.einzugsDatum,
+                                        auszugsDatum: m.mieteBis || "",
+                                        kaltmiete: m.kaltmiete,
+                                        nebenkosten: m.nebenkosten,
+                                        prozentanteil: m.prozentanteil || 0,
+                                        isKurzzeitvermietung:
+                                          m.isKurzzeitvermietung || false,
+                                      });
+                                      setIsHistorieMieterOpen(true);
+                                    }}
+                                  >
+                                    Bearbeiten
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                    {alleMieterFuerWohnung.length === 0 && (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Keine Mieterhistorie für diese Wohnung vorhanden.
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Tab 3: Verteilungsschlüssel */}
             <TabsContent value="verteilung" className="mt-6 space-y-6">
               <Card>
                 <CardHeader className="pb-3">
@@ -709,9 +1219,7 @@ export function MieterdatenView() {
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="wohnflaeche-anteil">
-                        Wohnfläche (m²)
-                      </Label>
+                      <Label htmlFor="wohnflaeche-anteil">Wohnung</Label>
                       <Input
                         id="wohnflaeche-anteil"
                         value={editedMieter?.geschoss || ""}
@@ -720,18 +1228,25 @@ export function MieterdatenView() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="prozentanteile">Prozentanteil</Label>
+                      <Label htmlFor="prozentanteile">Prozentanteil (%)</Label>
                       <Input
                         id="prozentanteile"
-                        value="Wird berechnet"
-                        readOnly
-                        className="bg-muted"
+                        type="number"
+                        step="0.1"
+                        value={editedMieter?.prozentanteil || 0}
+                        onChange={(e) =>
+                          updateEditedMieter(
+                            "prozentanteil",
+                            parseFloat(e.target.value) || 0,
+                          )
+                        }
+                        placeholder="z.B. 12.5"
                       />
                     </div>
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Die Verteilungsschlüssel werden automatisch bei der
-                    Nebenkostenabrechnung berechnet.
+                    Der Prozentanteil wird für die Verteilung der Nebenkosten
+                    verwendet. Vergessen Sie nicht, die Änderungen zu speichern.
                   </p>
                 </CardContent>
               </Card>
@@ -791,7 +1306,7 @@ export function MieterdatenView() {
                         onChange={(e) =>
                           updateEditedMieter(
                             "kaltmiete",
-                            parseFloat(e.target.value) || 0
+                            parseFloat(e.target.value) || 0,
                           )
                         }
                       />
@@ -807,7 +1322,7 @@ export function MieterdatenView() {
                         onChange={(e) =>
                           updateEditedMieter(
                             "nebenkosten",
-                            parseFloat(e.target.value) || 0
+                            parseFloat(e.target.value) || 0,
                           )
                         }
                       />
@@ -833,7 +1348,7 @@ export function MieterdatenView() {
                       onChange={(e) =>
                         updateEditedMieter(
                           "kaution",
-                          parseFloat(e.target.value) || 0
+                          parseFloat(e.target.value) || 0,
                         )
                       }
                     />
@@ -1003,6 +1518,108 @@ export function MieterdatenView() {
                 />
               </div>
             </div>
+
+            {/* Kurzzeitvermietung Rubrik */}
+            <div className="border rounded-lg p-4 space-y-4 bg-muted/30">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="new-kurzzeitvermietung"
+                  checked={newMieter.isKurzzeitvermietung}
+                  onCheckedChange={(checked) =>
+                    setNewMieter((prev) => ({
+                      ...prev,
+                      isKurzzeitvermietung: checked === true,
+                    }))
+                  }
+                />
+                <Label
+                  htmlFor="new-kurzzeitvermietung"
+                  className="text-sm font-medium"
+                >
+                  Kurzzeitvermietung
+                </Label>
+              </div>
+              {newMieter.isKurzzeitvermietung && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-kurzzeit-von">Einzugsdatum: von</Label>
+                    <Input
+                      id="new-kurzzeit-von"
+                      type="date"
+                      value={newMieter.einzugsDatum}
+                      onChange={(e) =>
+                        setNewMieter((prev) => ({
+                          ...prev,
+                          einzugsDatum: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-kurzzeit-bis">Einzugsdatum: bis</Label>
+                    <Input
+                      id="new-kurzzeit-bis"
+                      type="date"
+                      value={newMieter.kurzzeitBis}
+                      onChange={(e) =>
+                        setNewMieter((prev) => ({
+                          ...prev,
+                          kurzzeitBis: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Ehemalige Mieter wiederverwenden */}
+            {ehemaligeMieter.length > 0 && (
+              <div className="border rounded-lg p-4 space-y-4 bg-blue-50/50 dark:bg-blue-950/20">
+                <div className="flex items-center gap-2">
+                  <UserCheck className="h-4 w-4 text-blue-500" />
+                  <Label className="text-sm font-medium">
+                    Ehemaligen Mieter zuordnen
+                  </Label>
+                </div>
+                <Select
+                  value={selectedEhemaligerMieter}
+                  onValueChange={(value) => {
+                    setSelectedEhemaligerMieter(value);
+                    const selected = ehemaligeMieter.find(
+                      (m) => m.id === value,
+                    );
+                    if (selected) {
+                      setNewMieter((prev) => ({
+                        ...prev,
+                        name: selected.name,
+                        email: selected.email,
+                        telefon: selected.telefon,
+                      }));
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Ehemaligen Mieter auswählen..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ehemaligeMieter.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name} (Auszug:{" "}
+                        {new Date(m.letztesAuszugsDatum).toLocaleDateString(
+                          "de-DE",
+                        )}
+                        )
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Wählen Sie einen ehemaligen Mieter aus, um dessen Daten zu
+                  übernehmen.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsNewMieterOpen(false)}>
@@ -1013,6 +1630,161 @@ export function MieterdatenView() {
               onClick={handleCreateMieter}
             >
               Mieter anlegen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog zum Hinzufügen/Bearbeiten von Historie-Mietern */}
+      <Dialog
+        open={isHistorieMieterOpen}
+        onOpenChange={setIsHistorieMieterOpen}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editingHistorieMieterId
+                ? "Historie-Eintrag bearbeiten"
+                : "Vorherigen Mieter hinzufügen"}
+            </DialogTitle>
+            <DialogDescription>
+              Erfassen Sie die Daten eines vorherigen Mieters für die Historie.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="historie-name">Name des Mieters *</Label>
+              <Input
+                id="historie-name"
+                value={historieMieter.name}
+                onChange={(e) =>
+                  setHistorieMieter((prev) => ({
+                    ...prev,
+                    name: e.target.value,
+                  }))
+                }
+                placeholder="z.B. Max Mustermann"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="historie-einzug">Einzugsdatum *</Label>
+                <Input
+                  id="historie-einzug"
+                  type="date"
+                  value={historieMieter.einzugsDatum}
+                  onChange={(e) =>
+                    setHistorieMieter((prev) => ({
+                      ...prev,
+                      einzugsDatum: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="historie-auszug">Auszugsdatum</Label>
+                <Input
+                  id="historie-auszug"
+                  type="date"
+                  value={historieMieter.auszugsDatum}
+                  onChange={(e) =>
+                    setHistorieMieter((prev) => ({
+                      ...prev,
+                      auszugsDatum: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="historie-kaltmiete">Kaltmiete (€)</Label>
+                <Input
+                  id="historie-kaltmiete"
+                  type="number"
+                  value={historieMieter.kaltmiete}
+                  onChange={(e) =>
+                    setHistorieMieter((prev) => ({
+                      ...prev,
+                      kaltmiete: parseFloat(e.target.value) || 0,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="historie-nebenkosten">Nebenkosten (€)</Label>
+                <Input
+                  id="historie-nebenkosten"
+                  type="number"
+                  value={historieMieter.nebenkosten}
+                  onChange={(e) =>
+                    setHistorieMieter((prev) => ({
+                      ...prev,
+                      nebenkosten: parseFloat(e.target.value) || 0,
+                    }))
+                  }
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="historie-prozent">Prozentanteil (%)</Label>
+                <Input
+                  id="historie-prozent"
+                  type="number"
+                  step="0.1"
+                  value={historieMieter.prozentanteil}
+                  onChange={(e) =>
+                    setHistorieMieter((prev) => ({
+                      ...prev,
+                      prozentanteil: parseFloat(e.target.value) || 0,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2 flex items-end pb-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="historie-kurzzeit"
+                    checked={historieMieter.isKurzzeitvermietung}
+                    onCheckedChange={(checked) =>
+                      setHistorieMieter((prev) => ({
+                        ...prev,
+                        isKurzzeitvermietung: !!checked,
+                      }))
+                    }
+                  />
+                  <Label htmlFor="historie-kurzzeit" className="text-sm">
+                    Kurzzeitvermietung
+                  </Label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsHistorieMieterOpen(false);
+                setEditingHistorieMieterId(null);
+                setHistorieMieter({
+                  name: "",
+                  einzugsDatum: "",
+                  auszugsDatum: "",
+                  kaltmiete: 0,
+                  nebenkosten: 0,
+                  prozentanteil: 0,
+                  isKurzzeitvermietung: false,
+                });
+              }}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              className="bg-success hover:bg-success/90 text-success-foreground"
+              onClick={handleAddHistorieMieter}
+            >
+              {editingHistorieMieterId ? "Aktualisieren" : "Hinzufügen"}
             </Button>
           </DialogFooter>
         </DialogContent>

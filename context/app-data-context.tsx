@@ -66,12 +66,28 @@ export interface Mieter {
   kaltmiete: number;
   nebenkosten: number;
   kaution: number;
+  // Neue Felder für erweiterte Mieterverwaltung
+  isKurzzeitvermietung: boolean;
+  kurzzeitBis?: string | null; // Enddatum für Kurzzeitvermietung
+  isAktiv: boolean; // true = aktueller Mieter, false = ehemaliger Mieter
+  prozentanteil?: number; // Verteilungsschlüssel Prozentanteil
+}
+
+// Ehemalige Mieter-Datenbank (für Wiederverwendung)
+export interface EhemalierMieter {
+  id: string;
+  name: string;
+  email: string;
+  telefon: string;
+  letzteWohnungId: string;
+  letztesAuszugsDatum: string;
 }
 
 interface AppDataContextType {
   objekte: Objekt[];
   wohnungen: Wohnung[];
   mieter: Mieter[];
+  ehemaligeMieter: EhemalierMieter[];
   selectedObjektId: string | null;
   addObjekt: (objekt: Omit<Objekt, "id">) => void;
   updateObjekt: (id: string, objekt: Partial<Objekt>) => void;
@@ -82,6 +98,8 @@ interface AppDataContextType {
   addMieter: (mieter: Omit<Mieter, "id">) => void;
   updateMieter: (id: string, mieter: Partial<Mieter>) => void;
   deleteMieter: (id: string) => void;
+  archiviereMieter: (id: string) => void; // Mieter als ehemalig markieren und archivieren
+  reaktiviereMieter: (ehemaligerMieterId: string, wohnungId: string) => void; // Ehemaligen Mieter wiederverwenden
   setSelectedObjektId: (id: string | null) => void;
 }
 
@@ -272,6 +290,9 @@ const initialMieter: Mieter[] = [
     kaltmiete: 650,
     nebenkosten: 150,
     kaution: 1950,
+    isKurzzeitvermietung: false,
+    isAktiv: true,
+    prozentanteil: 12.5,
   },
   {
     id: "m2",
@@ -284,6 +305,9 @@ const initialMieter: Mieter[] = [
     kaltmiete: 700,
     nebenkosten: 160,
     kaution: 2100,
+    isKurzzeitvermietung: false,
+    isAktiv: true,
+    prozentanteil: 13.8,
   },
   {
     id: "m3",
@@ -296,6 +320,9 @@ const initialMieter: Mieter[] = [
     kaltmiete: 680,
     nebenkosten: 150,
     kaution: 2040,
+    isKurzzeitvermietung: false,
+    isAktiv: true,
+    prozentanteil: 12.5,
   },
   {
     id: "m4",
@@ -308,6 +335,9 @@ const initialMieter: Mieter[] = [
     kaltmiete: 850,
     nebenkosten: 180,
     kaution: 2550,
+    isKurzzeitvermietung: false,
+    isAktiv: true,
+    prozentanteil: 14.2,
   },
   {
     id: "m5",
@@ -320,8 +350,13 @@ const initialMieter: Mieter[] = [
     kaltmiete: 880,
     nebenkosten: 180,
     kaution: 2640,
+    isKurzzeitvermietung: false,
+    isAktiv: true,
+    prozentanteil: 14.2,
   },
 ];
+
+const initialEhemaligeMieter: EhemalierMieter[] = [];
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
   // LocalStorage Keys
@@ -329,6 +364,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     objekte: "hausverwaltung_objekte",
     wohnungen: "hausverwaltung_wohnungen",
     mieter: "hausverwaltung_mieter",
+    ehemaligeMieter: "hausverwaltung_ehemalige_mieter",
     selectedObjektId: "hausverwaltung_selectedObjektId",
   };
 
@@ -346,16 +382,19 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   // Initialize state with localStorage or fallback to initial data
   const [objekte, setObjekte] = useState<Objekt[]>(() =>
-    loadFromStorage(STORAGE_KEYS.objekte, initialObjekte)
+    loadFromStorage(STORAGE_KEYS.objekte, initialObjekte),
   );
   const [wohnungen, setWohnungen] = useState<Wohnung[]>(() =>
-    loadFromStorage(STORAGE_KEYS.wohnungen, initialWohnungen)
+    loadFromStorage(STORAGE_KEYS.wohnungen, initialWohnungen),
   );
   const [mieter, setMieter] = useState<Mieter[]>(() =>
-    loadFromStorage(STORAGE_KEYS.mieter, initialMieter)
+    loadFromStorage(STORAGE_KEYS.mieter, initialMieter),
+  );
+  const [ehemaligeMieter, setEhemaligeMieter] = useState<EhemalierMieter[]>(
+    () => loadFromStorage(STORAGE_KEYS.ehemaligeMieter, initialEhemaligeMieter),
   );
   const [selectedObjektId, setSelectedObjektId] = useState<string | null>(() =>
-    loadFromStorage(STORAGE_KEYS.selectedObjektId, "1")
+    loadFromStorage(STORAGE_KEYS.selectedObjektId, "1"),
   );
 
   // Auto-save to localStorage whenever data changes
@@ -390,8 +429,20 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return;
     try {
       localStorage.setItem(
+        STORAGE_KEYS.ehemaligeMieter,
+        JSON.stringify(ehemaligeMieter),
+      );
+    } catch (error) {
+      console.error("Error saving ehemaligeMieter to localStorage:", error);
+    }
+  }, [ehemaligeMieter]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(
         STORAGE_KEYS.selectedObjektId,
-        JSON.stringify(selectedObjektId)
+        JSON.stringify(selectedObjektId),
       );
     } catch (error) {
       console.error("Error saving selectedObjektId to localStorage:", error);
@@ -410,7 +461,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   const updateObjekt = (id: string, updates: Partial<Objekt>) => {
     setObjekte((prev) =>
-      prev.map((obj) => (obj.id === id ? { ...obj, ...updates } : obj))
+      prev.map((obj) => (obj.id === id ? { ...obj, ...updates } : obj)),
     );
   };
 
@@ -427,7 +478,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   const updateWohnung = (id: string, updates: Partial<Wohnung>) => {
     setWohnungen((prev) =>
-      prev.map((w) => (w.id === id ? { ...w, ...updates } : w))
+      prev.map((w) => (w.id === id ? { ...w, ...updates } : w)),
     );
   };
 
@@ -444,12 +495,69 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   const updateMieter = (id: string, updates: Partial<Mieter>) => {
     setMieter((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, ...updates } : m))
+      prev.map((m) => (m.id === id ? { ...m, ...updates } : m)),
     );
   };
 
   const deleteMieter = (id: string) => {
     setMieter((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  // Archiviert einen aktiven Mieter und fügt ihn zur ehemaligen Mieter-Datenbank hinzu
+  const archiviereMieter = (id: string) => {
+    const mieterToArchive = mieter.find((m) => m.id === id);
+    if (!mieterToArchive) return;
+
+    // Füge zur ehemaligen Mieter-Datenbank hinzu
+    const ehemaligerMieter: EhemalierMieter = {
+      id: generateId(),
+      name: mieterToArchive.name,
+      email: mieterToArchive.email,
+      telefon: mieterToArchive.telefon,
+      letzteWohnungId: mieterToArchive.wohnungId,
+      letztesAuszugsDatum:
+        mieterToArchive.mieteBis || new Date().toISOString().split("T")[0],
+    };
+    setEhemaligeMieter((prev) => [...prev, ehemaligerMieter]);
+
+    // Markiere als inaktiv statt zu löschen (für Historie)
+    setMieter((prev) =>
+      prev.map((m) =>
+        m.id === id
+          ? {
+              ...m,
+              isAktiv: false,
+              mieteBis: m.mieteBis || new Date().toISOString().split("T")[0],
+            }
+          : m,
+      ),
+    );
+  };
+
+  // Reaktiviert einen ehemaligen Mieter für eine neue Wohnung
+  const reaktiviereMieter = (ehemaligerMieterId: string, wohnungId: string) => {
+    const ehemaligerMieterData = ehemaligeMieter.find(
+      (m) => m.id === ehemaligerMieterId,
+    );
+    if (!ehemaligerMieterData) return;
+
+    // Erstelle neuen aktiven Mieter basierend auf ehemaligen Daten
+    const neuerMieter: Mieter = {
+      id: generateId(),
+      wohnungId,
+      name: ehemaligerMieterData.name,
+      email: ehemaligerMieterData.email,
+      telefon: ehemaligerMieterData.telefon,
+      einzugsDatum: new Date().toISOString().split("T")[0],
+      mieteBis: null,
+      kaltmiete: 0,
+      nebenkosten: 0,
+      kaution: 0,
+      isKurzzeitvermietung: false,
+      isAktiv: true,
+      prozentanteil: 0,
+    };
+    setMieter((prev) => [...prev, neuerMieter]);
   };
 
   return (
@@ -458,6 +566,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         objekte,
         wohnungen,
         mieter,
+        ehemaligeMieter,
         selectedObjektId,
         addObjekt,
         updateObjekt,
@@ -468,6 +577,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         addMieter,
         updateMieter,
         deleteMieter,
+        archiviereMieter,
+        reaktiviereMieter,
         setSelectedObjektId,
       }}
     >

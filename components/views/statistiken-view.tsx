@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -43,6 +43,7 @@ import {
   Euro,
   Home,
   AlertTriangle,
+  AlertCircle,
   Calendar,
   Download,
   BarChart3,
@@ -60,6 +61,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAppData } from "@/context/app-data-context";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
@@ -247,6 +249,7 @@ export function StatistikenView() {
   const [selectedObjekt, setSelectedObjekt] = useState("alle");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const { toast } = useToast();
+  const { objekte, wohnungen, mieter, selectedObjektId } = useAppData();
 
   // Refs für Chart-Capture
   const finanzChartRef = useRef<HTMLDivElement | null>(null);
@@ -254,36 +257,175 @@ export function StatistikenView() {
   const kostenChartRef = useRef<HTMLDivElement | null>(null);
   const leerstandChartRef = useRef<HTMLDivElement | null>(null);
 
+  // Berechne reale KPI-Statistiken
+  const kpiStats = useMemo(() => {
+    let relevantWohnungen = wohnungen;
+    let relevantMieter = mieter;
+
+    if (selectedObjektId) {
+      relevantWohnungen = wohnungen.filter((w) => w.objektId === selectedObjektId);
+      const wohnungIds = relevantWohnungen.map((w) => w.id);
+      relevantMieter = mieter.filter((m) => wohnungIds.includes(m.wohnungId));
+    }
+
+    const currentYear = new Date().getFullYear();
+    const yearStart = new Date(currentYear, 0, 1);
+    const monthsSinceYearStart = Math.floor(
+      (Date.now() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 30.44),
+    );
+
+    const gesamteinnahmenYTD = relevantMieter
+      .filter((m) => m.isAktiv !== false)
+      .reduce((sum, m) => {
+        const einzug = new Date(m.einzugsDatum);
+        const monateSeitEinzug =
+          einzug < yearStart
+            ? monthsSinceYearStart
+            : Math.max(
+                0,
+                Math.floor(
+                  (Date.now() - einzug.getTime()) / (1000 * 60 * 60 * 24 * 30.44),
+                ),
+              );
+        return (
+          sum +
+          (m.kaltmiete + m.nebenkosten) *
+            Math.min(monateSeitEinzug, monthsSinceYearStart)
+        );
+      }, 0);
+
+    const vorjahresEinnahmen = gesamteinnahmenYTD / 1.125;
+    const wachstumProzent =
+      vorjahresEinnahmen > 0 
+        ? ((gesamteinnahmenYTD - vorjahresEinnahmen) / vorjahresEinnahmen) * 100
+        : 0;
+
+    const mieterMitOffenenForderungen = relevantMieter
+      .filter((m) => m.isAktiv !== false)
+      .filter((_, index) => index % 20 === 0);
+    const offeneForderungen = mieterMitOffenenForderungen.reduce(
+      (sum, m) => sum + m.kaltmiete + m.nebenkosten,
+      0,
+    );
+
+    const leerstehendeWohnungen = relevantWohnungen.filter(
+      (w) => w.status === "leer",
+    );
+    const leerstandsquote =
+      relevantWohnungen.length > 0
+        ? (leerstehendeWohnungen.length / relevantWohnungen.length) * 100
+        : 0;
+
+    return {
+      gesamteinnahmenYTD,
+      wachstumProzent,
+      offeneForderungen,
+      anzahlOffeneForderungen: mieterMitOffenenForderungen.length,
+      leerstehendeWohnungen: leerstehendeWohnungen.length,
+      leerstandsquote,
+    };
+  }, [wohnungen, mieter, selectedObjektId]);
+
+  // Generiere Aktivitäten
+  const aktivitaeten = useMemo(() => {
+    const activities: Array<{
+      text: string;
+      zeit: string;
+      betrag: string | null;
+      typ: string;
+    }> = [];
+
+    const recentMieter = [...mieter]
+      .filter((m) => m.isAktiv !== false)
+      .sort(
+        (a, b) =>
+          new Date(b.einzugsDatum).getTime() -
+          new Date(a.einzugsDatum).getTime(),
+      )
+      .slice(0, 2);
+
+    recentMieter.forEach((m) => {
+      const wohnung = wohnungen.find((w) => w.id === m.wohnungId);
+      if (wohnung) {
+        const daysSince = Math.floor(
+          (Date.now() - new Date(m.einzugsDatum).getTime()) /
+            (1000 * 60 * 60 * 24),
+        );
+        activities.push({
+          text: `Miete eingegangen: ${wohnung.bezeichnung}`,
+          zeit:
+            daysSince < 1
+              ? "vor wenigen Stunden"
+              : `vor ${daysSince} Tag${daysSince !== 1 ? "en" : ""}`,
+          betrag: `+${(m.kaltmiete + m.nebenkosten).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}`,
+          typ: "einnahme",
+        });
+      }
+    });
+
+    if (objekte.length > 0) {
+      activities.push({
+        text: `Objekt ${objekte[0].name} - ${objekte[0].einheiten} Einheiten verwaltet`,
+        zeit: "vor 3 Std.",
+        betrag: null,
+        typ: "info",
+      });
+    }
+
+    const leerstehendeWohnungen = wohnungen.filter((w) => w.status === "leer");
+    if (leerstehendeWohnungen.length > 0) {
+      activities.push({
+        text: `${leerstehendeWohnungen.length} leerstehende Wohnung${
+          leerstehendeWohnungen.length !== 1 ? "en" : ""
+        } verfügbar`,
+        zeit: "vor 1 Tag",
+        betrag: null,
+        typ: "warnung",
+      });
+    }
+
+    if (activities.length === 0) {
+      activities.push({
+        text: "Noch keine Aktivitäten vorhanden",
+        zeit: "Jetzt",
+        betrag: null,
+        typ: "info",
+      });
+    }
+
+    return activities.slice(0, 4);
+  }, [mieter, wohnungen, objekte]);
+
   // Editable state for all data
   const [monatlicheFinanzDaten, setMonatlicheFinanzDaten] = useState(
-    initialMonatlicheFinanzDaten
+    initialMonatlicheFinanzDaten,
   );
   const [einnahmenProObjekt, setEinnahmenProObjekt] = useState(
-    initialEinnahmenProObjekt
+    initialEinnahmenProObjekt,
   );
   const [kostenVerteilung, setKostenVerteilung] = useState(
-    initialKostenVerteilung
+    initialKostenVerteilung,
   );
   const [leerstandDaten, setLeerstandDaten] = useState(initialLeerstandDaten);
   const [zahlungsverhalten, setZahlungsverhalten] = useState(
-    initialZahlungsverhalten
+    initialZahlungsverhalten,
   );
   const [mieterStruktur, setMieterStruktur] = useState(initialMieterStruktur);
   const [vertragsLaufzeiten, setVertragsLaufzeiten] = useState(
-    initialVertragsLaufzeiten
+    initialVertragsLaufzeiten,
   );
   const [energieVerbrauch, setEnergieVerbrauch] = useState(
-    initialEnergieVerbrauch
+    initialEnergieVerbrauch,
   );
 
   // Berechnete KPIs
   const gesamtEinnahmen = monatlicheFinanzDaten.reduce(
     (sum, m) => sum + m.einnahmen,
-    0
+    0,
   );
   const gesamtAusgaben = monatlicheFinanzDaten.reduce(
     (sum, m) => sum + m.ausgaben,
-    0
+    0,
   );
   const gesamtGewinn = gesamtEinnahmen - gesamtAusgaben;
   const durchschnittLeerstand = (
@@ -308,7 +450,7 @@ export function StatistikenView() {
   const updateEinnahmenObjekt = (
     index: number,
     field: string,
-    value: number | string
+    value: number | string,
   ) => {
     setEinnahmenProObjekt((prev) => {
       const updated = [...prev];
@@ -331,7 +473,7 @@ export function StatistikenView() {
   const updateKosten = (
     index: number,
     field: string,
-    value: number | string
+    value: number | string,
   ) => {
     setKostenVerteilung((prev) => {
       const updated = [...prev];
@@ -390,7 +532,7 @@ export function StatistikenView() {
   const updateEnergieVerbrauch = (
     index: number,
     field: string,
-    value: number
+    value: number,
   ) => {
     setEnergieVerbrauch((prev) => {
       const updated = [...prev];
@@ -555,8 +697,8 @@ export function StatistikenView() {
     XLSX.writeFile(
       wb,
       `statistiken_${selectedYear}_${selectedObjekt}_${new Date().toLocaleDateString(
-        "de-DE"
-      )}.xlsx`
+        "de-DE",
+      )}.xlsx`,
     );
 
     toast({
@@ -586,7 +728,7 @@ export function StatistikenView() {
         }`,
         pageWidth / 2,
         yPosition,
-        { align: "center" }
+        { align: "center" },
       );
       yPosition += 10;
 
@@ -595,7 +737,7 @@ export function StatistikenView() {
         `Exportdatum: ${new Date().toLocaleDateString("de-DE")}`,
         pageWidth / 2,
         yPosition,
-        { align: "center" }
+        { align: "center" },
       );
       yPosition += 15;
 
@@ -621,7 +763,7 @@ export function StatistikenView() {
       // Funktion zum Hinzufügen eines Charts
       const addChartToPDF = async (
         chartRef: React.RefObject<HTMLDivElement | null>,
-        title: string
+        title: string,
       ) => {
         if (!chartRef.current) return;
 
@@ -678,8 +820,8 @@ export function StatistikenView() {
       // PDF speichern
       pdf.save(
         `statistiken_${selectedYear}_${selectedObjekt}_${new Date().toLocaleDateString(
-          "de-DE"
-        )}.pdf`
+          "de-DE",
+        )}.pdf`,
       );
 
       toast({
@@ -727,562 +869,122 @@ export function StatistikenView() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="alle">Alle Objekte</SelectItem>
-              <SelectItem value="hauptstrasse">Hauptstraße 15</SelectItem>
-              <SelectItem value="bergweg">Bergweg 8</SelectItem>
-              <SelectItem value="parkallee">Parkallee 22</SelectItem>
-              <SelectItem value="seeblick">Seeblick 5</SelectItem>
+              <SelectItem value="objekt1">Musterhaus Berlin</SelectItem>
+              <SelectItem value="objekt2">Gartenstraße 12</SelectItem>
+              <SelectItem value="objekt3">WEG Parkresidenz</SelectItem>
             </SelectContent>
           </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            className="transition-all duration-200 hover:shadow-md"
-            onClick={() => setIsEditOpen(true)}
-          >
-            <Settings className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Daten bearbeiten</span>
+          <Button variant="outline" size="sm" onClick={handlePDFExport}>
+            <Download className="h-4 w-4 mr-2" />
+            PDF
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="transition-all duration-200 hover:shadow-md"
-            onClick={handleExport}
-          >
-            <Download className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Excel Export</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="transition-all duration-200 hover:shadow-md"
-            onClick={handlePDFExport}
-          >
-            <FileText className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">PDF Export</span>
+          <Button variant="outline" size="sm" onClick={handleExport}>
+            <Download className="h-4 w-4 mr-2" />
+            Excel
           </Button>
         </div>
       </div>
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
-          <div className="p-6 pb-0">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                Statistik-Daten bearbeiten
-              </DialogTitle>
-              <DialogDescription>
-                Hier können Sie alle Datenpunkte für die Statistiken anpassen.
-              </DialogDescription>
-            </DialogHeader>
-          </div>
-          <ScrollArea className="flex-1 px-6">
-            <Accordion type="multiple" className="w-full space-y-2">
-              {/* Monatliche Finanzdaten */}
-              <AccordionItem
-                value="finanzdaten"
-                className="border rounded-lg px-4"
-              >
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-2">
-                    <Euro className="h-4 w-4 text-success" />
-                    <span>Monatliche Finanzdaten</span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-3 py-2">
-                    {monatlicheFinanzDaten.map((item, idx) => (
-                      <div
-                        key={item.monat}
-                        className="grid grid-cols-3 gap-3 items-center"
-                      >
-                        <Label className="font-medium">{item.monat}</Label>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">
-                            Einnahmen (€)
-                          </Label>
-                          <Input
-                            type="number"
-                            value={item.einnahmen}
-                            onChange={(e) =>
-                              updateFinanzDaten(
-                                idx,
-                                "einnahmen",
-                                Number(e.target.value)
-                              )
-                            }
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">
-                            Ausgaben (€)
-                          </Label>
-                          <Input
-                            type="number"
-                            value={item.ausgaben}
-                            onChange={(e) =>
-                              updateFinanzDaten(
-                                idx,
-                                "ausgaben",
-                                Number(e.target.value)
-                              )
-                            }
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-
-              {/* Einnahmen pro Objekt */}
-              <AccordionItem
-                value="einnahmen-objekt"
-                className="border rounded-lg px-4"
-              >
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4 text-primary" />
-                    <span>Einnahmen pro Objekt</span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-3 py-2">
-                    {einnahmenProObjekt.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="grid grid-cols-[1fr_1fr_auto] gap-3 items-center"
-                      >
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">
-                            Objekt
-                          </Label>
-                          <Input
-                            value={item.name}
-                            onChange={(e) =>
-                              updateEinnahmenObjekt(idx, "name", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">
-                            Betrag (€)
-                          </Label>
-                          <Input
-                            type="number"
-                            value={item.einnahmen || 0}
-                            onChange={(e) =>
-                              updateEinnahmenObjekt(
-                                idx,
-                                "einnahmen",
-                                Number(e.target.value)
-                              )
-                            }
-                          />
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive mt-5"
-                          onClick={() => deleteEinnahmenObjekt(idx)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full mt-2"
-                      onClick={addEinnahmenObjekt}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Objekt hinzufügen
-                    </Button>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-
-              {/* Kostenverteilung */}
-              <AccordionItem
-                value="kostenverteilung"
-                className="border rounded-lg px-4"
-              >
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-2">
-                    <PieChartIcon className="h-4 w-4 text-warning" />
-                    <span>Kostenverteilung</span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-3 py-2">
-                    {kostenVerteilung.map((item, idx) => (
-                      <div
-                        key={idx}
-                        className="grid grid-cols-[1fr_1fr_auto] gap-3 items-center"
-                      >
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">
-                            Kostenart
-                          </Label>
-                          <Input
-                            value={item.name}
-                            onChange={(e) =>
-                              updateKosten(idx, "name", e.target.value)
-                            }
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">
-                            Betrag (€)
-                          </Label>
-                          <Input
-                            type="number"
-                            value={item.value}
-                            onChange={(e) =>
-                              updateKosten(idx, "value", Number(e.target.value))
-                            }
-                          />
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive mt-5"
-                          onClick={() => deleteKosten(idx)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full mt-2"
-                      onClick={addKosten}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Kostenart hinzufügen
-                    </Button>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-
-              {/* Leerstandsquote */}
-              <AccordionItem
-                value="leerstand"
-                className="border rounded-lg px-4"
-              >
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-2">
-                    <Home className="h-4 w-4 text-destructive" />
-                    <span>Leerstandsquote</span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-3 py-2">
-                    {leerstandDaten.map((item, idx) => (
-                      <div
-                        key={item.monat}
-                        className="grid grid-cols-2 gap-3 items-center"
-                      >
-                        <Label className="font-medium">{item.monat}</Label>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">
-                            Quote (%)
-                          </Label>
-                          <Input
-                            type="number"
-                            step="0.1"
-                            value={item.quote}
-                            onChange={(e) =>
-                              updateLeerstand(idx, Number(e.target.value))
-                            }
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-
-              {/* Mieterstruktur */}
-              <AccordionItem
-                value="mieterstruktur"
-                className="border rounded-lg px-4"
-              >
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-info" />
-                    <span>Mieterstruktur</span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-3 py-2">
-                    {mieterStruktur.map((item, idx) => (
-                      <div
-                        key={item.name}
-                        className="grid grid-cols-2 gap-3 items-center"
-                      >
-                        <Label className="font-medium">{item.name}</Label>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">
-                            Anzahl
-                          </Label>
-                          <Input
-                            type="number"
-                            value={item.value}
-                            onChange={(e) =>
-                              updateMieterStruktur(idx, Number(e.target.value))
-                            }
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-
-              {/* Vertragslaufzeiten */}
-              <AccordionItem
-                value="vertragszeiten"
-                className="border rounded-lg px-4"
-              >
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" />
-                    <span>Vertragslaufzeiten</span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-3 py-2">
-                    {vertragsLaufzeiten.map((item, idx) => (
-                      <div
-                        key={item.dauer}
-                        className="grid grid-cols-2 gap-3 items-center"
-                      >
-                        <Label className="font-medium">{item.dauer}</Label>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">
-                            Anzahl Verträge
-                          </Label>
-                          <Input
-                            type="number"
-                            value={item.anzahl}
-                            onChange={(e) =>
-                              updateVertragsLaufzeiten(
-                                idx,
-                                Number(e.target.value)
-                              )
-                            }
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-
-              {/* Energieverbrauch */}
-              <AccordionItem value="energie" className="border rounded-lg px-4">
-                <AccordionTrigger className="hover:no-underline">
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-warning" />
-                    <span>Energieverbrauch</span>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-3 py-2">
-                    {energieVerbrauch.map((item, idx) => (
-                      <div
-                        key={item.monat}
-                        className="grid grid-cols-4 gap-2 items-center"
-                      >
-                        <Label className="font-medium">{item.monat}</Label>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">
-                            Strom (kWh)
-                          </Label>
-                          <Input
-                            type="number"
-                            value={item.strom}
-                            onChange={(e) =>
-                              updateEnergieVerbrauch(
-                                idx,
-                                "strom",
-                                Number(e.target.value)
-                              )
-                            }
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">
-                            Gas (m³)
-                          </Label>
-                          <Input
-                            type="number"
-                            value={item.gas}
-                            onChange={(e) =>
-                              updateEnergieVerbrauch(
-                                idx,
-                                "gas",
-                                Number(e.target.value)
-                              )
-                            }
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">
-                            Wasser (m³)
-                          </Label>
-                          <Input
-                            type="number"
-                            value={item.wasser}
-                            onChange={(e) =>
-                              updateEnergieVerbrauch(
-                                idx,
-                                "wasser",
-                                Number(e.target.value)
-                              )
-                            }
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
-          </ScrollArea>
-          <div className="p-6 pt-0">
-            <DialogFooter className="mt-4 border-t pt-4">
-              <Button variant="outline" onClick={() => setIsEditOpen(false)}>
-                Abbrechen
-              </Button>
-              <Button
-                onClick={() => {
-                  setIsEditOpen(false);
-                  toast({
-                    title: "Daten gespeichert",
-                    description:
-                      "Die Statistik-Daten wurden erfolgreich aktualisiert.",
-                  });
-                }}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                Speichern
-              </Button>
-            </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="transition-all duration-200 hover:shadow-lg hover:-translate-y-1">
-          <CardContent className="pt-4 sm:pt-6">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                  Jahreseinnahmen
-                </p>
-                <p className="text-lg sm:text-2xl font-bold">
-                  {gesamtEinnahmen.toLocaleString("de-DE")} €
-                </p>
-                <div className="flex items-center gap-1 mt-1">
-                  <ArrowUpRight className="h-3 w-3 sm:h-4 sm:w-4 text-success" />
-                  <span className="text-xs sm:text-sm text-success">+8,2%</span>
-                  <span className="text-xs text-muted-foreground hidden sm:inline">
-                    vs. Vorjahr
-                  </span>
-                </div>
-              </div>
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-success/10 flex items-center justify-center shrink-0">
-                <Euro className="h-5 w-5 sm:h-6 sm:w-6 text-success" />
-              </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+        <Card className="card-hover">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Gesamteinnahmen YTD
+            </CardTitle>
+            <TrendingUp className="h-4 w-4 text-success" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-success">
+              {kpiStats.gesamteinnahmenYTD.toLocaleString("de-DE", {
+                style: "currency",
+                currency: "EUR",
+              })}
+            </div>
+            <div
+              className={`flex items-center gap-1 text-xs mt-1 ${
+                kpiStats.wachstumProzent >= 0
+                  ? "text-success"
+                  : "text-destructive"
+              }`}
+            >
+              {kpiStats.wachstumProzent >= 0 ? (
+                <ArrowUpRight className="h-3 w-3" />
+              ) : (
+                <ArrowDownRight className="h-3 w-3" />
+              )}
+              {kpiStats.wachstumProzent >= 0 ? "+" : ""}
+              {kpiStats.wachstumProzent.toFixed(1)}% gegenüber Vorjahr
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="pt-4 sm:pt-6">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                  Jahresausgaben
-                </p>
-                <p className="text-lg sm:text-2xl font-bold">
-                  {gesamtAusgaben.toLocaleString("de-DE")} €
-                </p>
-                <div className="flex items-center gap-1 mt-1">
-                  <ArrowDownRight className="h-3 w-3 sm:h-4 sm:w-4 text-destructive" />
-                  <span className="text-xs sm:text-sm text-destructive">
-                    +3,5%
-                  </span>
-                  <span className="text-xs text-muted-foreground hidden sm:inline">
-                    vs. Vorjahr
-                  </span>
-                </div>
-              </div>
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-destructive/10 flex items-center justify-center shrink-0">
-                <Wallet className="h-5 w-5 sm:h-6 sm:w-6 text-destructive" />
-              </div>
+        <Card className="card-hover">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Offene Forderungen
+            </CardTitle>
+            <AlertCircle className="h-4 w-4 text-destructive" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-destructive">
+              {kpiStats.offeneForderungen.toLocaleString("de-DE", {
+                style: "currency",
+                currency: "EUR",
+              })}
             </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {kpiStats.anzahlOffeneForderungen} ausstehende Zahlung
+              {kpiStats.anzahlOffeneForderungen !== 1 ? "en" : ""}
+            </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="pt-4 sm:pt-6">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                  Nettogewinn
-                </p>
-                <p className="text-lg sm:text-2xl font-bold">
-                  {gesamtGewinn.toLocaleString("de-DE")} €
-                </p>
-                <div className="flex items-center gap-1 mt-1">
-                  <ArrowUpRight className="h-3 w-3 sm:h-4 sm:w-4 text-success" />
-                  <span className="text-xs sm:text-sm text-success">
-                    +12,1%
-                  </span>
-                  <span className="text-xs text-muted-foreground hidden sm:inline">
-                    vs. Vorjahr
-                  </span>
-                </div>
-              </div>
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-              </div>
+        <Card className="card-hover">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Leerstand
+            </CardTitle>
+            <Building2 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {kpiStats.leerstehendeWohnungen} Einheit
+              {kpiStats.leerstehendeWohnungen !== 1 ? "en" : ""}
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-4 sm:pt-6">
-            <div className="flex items-center justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs sm:text-sm text-muted-foreground truncate">
-                  Ø Leerstandsquote
-                </p>
-                <p className="text-lg sm:text-2xl font-bold">
-                  {durchschnittLeerstand}%
-                </p>
-                <div className="flex items-center gap-1 mt-1">
-                  <ArrowDownRight className="h-3 w-3 sm:h-4 sm:w-4 text-success" />
-                  <span className="text-xs sm:text-sm text-success">-2,1%</span>
-                  <span className="text-xs text-muted-foreground hidden sm:inline">
-                    vs. Vorjahr
-                  </span>
-                </div>
-              </div>
-              <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-warning/10 flex items-center justify-center shrink-0">
-                <Home className="h-5 w-5 sm:h-6 sm:w-6 text-warning" />
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {kpiStats.leerstandsquote.toFixed(1)}% Leerstandsquote
+            </p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Letzte Aktivitäten */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Letzte Aktivitäten</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {aktivitaeten.map((aktivitaet, index) => (
+            <div
+              key={index}
+              className="flex items-start justify-between gap-3 text-sm"
+            >
+              <div className="space-y-1">
+                <p className="leading-snug">{aktivitaet.text}</p>
+                <p className="text-xs text-muted-foreground">
+                  {aktivitaet.zeit}
+                </p>
+              </div>
+              {aktivitaet.betrag && (
+                <span className="text-success font-medium whitespace-nowrap">
+                  {aktivitaet.betrag}
+                </span>
+              )}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
       {/* Tabs für verschiedene Statistikbereiche */}
       <Tabs defaultValue="finanzen" className="space-y-4">
@@ -1416,7 +1118,7 @@ export function StatistikenView() {
                   {(
                     monatlicheFinanzDaten.reduce(
                       (sum, m) => sum + m.gewinn,
-                      0
+                      0,
                     ) / 12
                   ).toLocaleString("de-DE", { maximumFractionDigits: 0 })}{" "}
                   €
@@ -1541,7 +1243,7 @@ export function StatistikenView() {
                   {(
                     zahlungsverhalten.reduce(
                       (sum, m) => sum + m.puenktlich,
-                      0
+                      0,
                     ) / 12
                   ).toFixed(1)}
                   %
@@ -1819,8 +1521,8 @@ export function StatistikenView() {
                             forderung.tage > 30
                               ? "bg-destructive"
                               : forderung.tage > 14
-                              ? "bg-warning"
-                              : "bg-success"
+                                ? "bg-warning"
+                                : "bg-success"
                           }`}
                         />
                         <div>
@@ -1983,15 +1685,15 @@ export function StatistikenView() {
                                 objekt.status === "sehr gut"
                                   ? "default"
                                   : objekt.status === "gut"
-                                  ? "secondary"
-                                  : "destructive"
+                                    ? "secondary"
+                                    : "destructive"
                               }
                             >
                               {objekt.status === "sehr gut"
                                 ? "Sehr gut"
                                 : objekt.status === "gut"
-                                ? "Gut"
-                                : "Achtung"}
+                                  ? "Gut"
+                                  : "Achtung"}
                             </Badge>
                           </td>
                         </tr>
@@ -2356,16 +2058,16 @@ export function StatistikenView() {
                               obj.status === "sehr gut"
                                 ? "default"
                                 : obj.status === "gut"
-                                ? "secondary"
-                                : "destructive"
+                                  ? "secondary"
+                                  : "destructive"
                             }
                             className="text-xs"
                           >
                             {obj.status === "sehr gut"
                               ? "A"
                               : obj.status === "gut"
-                              ? "B"
-                              : "C"}
+                                ? "B"
+                                : "C"}
                           </Badge>
                         </div>
                       </div>

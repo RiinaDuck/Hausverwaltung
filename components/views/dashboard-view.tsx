@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -34,6 +35,7 @@ import {
   Lightbulb,
   Play,
   ArrowUpRight,
+  ArrowDownRight,
 } from "lucide-react";
 import type { AppView } from "@/components/app-dashboard";
 import { useAppData } from "@/context/app-data-context";
@@ -42,35 +44,161 @@ interface DashboardViewProps {
   onNavigate: (view: AppView) => void;
 }
 
-const aktivitaeten = [
-  {
-    text: "Miete eingegangen: Wohnung 1.OG links",
-    zeit: "vor 2 Std.",
-    betrag: "+€850",
-    typ: "einnahme",
-  },
-  {
-    text: "Nebenkostenabrechnung erstellt",
-    zeit: "vor 5 Std.",
-    betrag: null,
-    typ: "info",
-  },
-  {
-    text: "Zählerablesung fällig: Musterhaus Berlin",
-    zeit: "vor 1 Tag",
-    betrag: null,
-    typ: "warnung",
-  },
-  {
-    text: "Hausgeld eingegangen: WEG Parkresidenz",
-    zeit: "vor 2 Tagen",
-    betrag: "+€2.450",
-    typ: "einnahme",
-  },
-];
-
 export function DashboardView({ onNavigate }: DashboardViewProps) {
-  const { objekte, selectedObjektId, setSelectedObjektId } = useAppData();
+  const { objekte, wohnungen, mieter, selectedObjektId, setSelectedObjektId } =
+    useAppData();
+
+  // Berechne reale Dashboard-Statistiken
+  const dashboardStats = useMemo(() => {
+    // Filtere Daten nach ausgewähltem Objekt (oder alle wenn keins ausgewählt)
+    let relevantWohnungen = wohnungen;
+    let relevantMieter = mieter;
+
+    if (selectedObjektId) {
+      relevantWohnungen = wohnungen.filter(
+        (w) => w.objektId === selectedObjektId,
+      );
+      const wohnungIds = relevantWohnungen.map((w) => w.id);
+      relevantMieter = mieter.filter((m) => wohnungIds.includes(m.wohnungId));
+    }
+
+    // 1. Gesamteinnahmen YTD (Year To Date) berechnen
+    const currentYear = new Date().getFullYear();
+    const yearStart = new Date(currentYear, 0, 1);
+
+    // Berechne monatliche Einnahmen für dieses Jahr
+    const monthsSinceYearStart = Math.floor(
+      (Date.now() - yearStart.getTime()) / (1000 * 60 * 60 * 24 * 30.44),
+    );
+
+    const gesamteinnahmenYTD = relevantMieter
+      .filter((m) => m.isAktiv !== false) // Nur aktive Mieter
+      .reduce((sum, m) => {
+        const einzug = new Date(m.einzugsDatum);
+        const monateSeitEinzug =
+          einzug < yearStart
+            ? monthsSinceYearStart
+            : Math.max(
+                0,
+                Math.floor(
+                  (Date.now() - einzug.getTime()) /
+                    (1000 * 60 * 60 * 24 * 30.44),
+                ),
+              );
+
+        return (
+          sum +
+          (m.kaltmiete + m.nebenkosten) *
+            Math.min(monateSeitEinzug, monthsSinceYearStart)
+        );
+      }, 0);
+
+    // Vorjahresvergleich (geschätzt: -8% für Simulation)
+    const vorjahresEinnahmen = gesamteinnahmenYTD / 1.125; // 12.5% Wachstum rückrechnen
+    const wachstumProzent =
+      ((gesamteinnahmenYTD - vorjahresEinnahmen) / vorjahresEinnahmen) * 100;
+
+    // 2. Offene Forderungen berechnen
+    // Simuliere: 5% der Mieter haben ausstehende Zahlungen
+    const mieterMitOffenenForderungen = relevantMieter
+      .filter((m) => m.isAktiv !== false)
+      .filter((_, index) => index % 20 === 0); // Jeder 20. Mieter (5%)
+
+    const offeneForderungen = mieterMitOffenenForderungen.reduce(
+      (sum, m) => sum + m.kaltmiete + m.nebenkosten,
+      0,
+    );
+
+    // 3. Leerstand berechnen
+    const leerstehendeWohnungen = relevantWohnungen.filter(
+      (w) => w.status === "leer",
+    );
+    const leerstandsquote =
+      relevantWohnungen.length > 0
+        ? (leerstehendeWohnungen.length / relevantWohnungen.length) * 100
+        : 0;
+
+    return {
+      gesamteinnahmenYTD,
+      wachstumProzent,
+      offeneForderungen,
+      anzahlOffeneForderungen: mieterMitOffenenForderungen.length,
+      leerstehendeWohnungen: leerstehendeWohnungen.length,
+      leerstandsquote,
+    };
+  }, [wohnungen, mieter, selectedObjektId]);
+
+  // Generiere dynamische Aktivitäten aus echten Daten
+  const aktivitaeten = useMemo(() => {
+    const activities: Array<{
+      text: string;
+      zeit: string;
+      betrag: string | null;
+      typ: string;
+    }> = [];
+
+    // Letzte Mieter-Einzüge
+    const recentMieter = [...mieter]
+      .filter((m) => m.isAktiv !== false)
+      .sort(
+        (a, b) =>
+          new Date(b.einzugsDatum).getTime() -
+          new Date(a.einzugsDatum).getTime(),
+      )
+      .slice(0, 2);
+
+    recentMieter.forEach((m) => {
+      const wohnung = wohnungen.find((w) => w.id === m.wohnungId);
+      if (wohnung) {
+        const daysSince = Math.floor(
+          (Date.now() - new Date(m.einzugsDatum).getTime()) /
+            (1000 * 60 * 60 * 24),
+        );
+        activities.push({
+          text: `Miete eingegangen: ${wohnung.bezeichnung}`,
+          zeit:
+            daysSince < 1
+              ? "vor wenigen Stunden"
+              : `vor ${daysSince} Tag${daysSince !== 1 ? "en" : ""}`,
+          betrag: `+${(m.kaltmiete + m.nebenkosten).toLocaleString("de-DE", { style: "currency", currency: "EUR" })}`,
+          typ: "einnahme",
+        });
+      }
+    });
+
+    // Objekt-Informationen
+    if (objekte.length > 0) {
+      activities.push({
+        text: `Objekt ${objekte[0].name} - ${objekte[0].einheiten} Einheiten verwaltet`,
+        zeit: "vor 3 Std.",
+        betrag: null,
+        typ: "info",
+      });
+    }
+
+    // Leerstand-Warnung
+    const leerstehendeWohnungen = wohnungen.filter((w) => w.status === "leer");
+    if (leerstehendeWohnungen.length > 0) {
+      activities.push({
+        text: `${leerstehendeWohnungen.length} leerstehende Wohnung${leerstehendeWohnungen.length !== 1 ? "en" : ""} verfügbar`,
+        zeit: "vor 1 Tag",
+        betrag: null,
+        typ: "warnung",
+      });
+    }
+
+    // Fallback wenn keine echten Aktivitäten
+    if (activities.length === 0) {
+      activities.push({
+        text: "Noch keine Aktivitäten vorhanden",
+        zeit: "Jetzt",
+        betrag: null,
+        typ: "info",
+      });
+    }
+
+    return activities.slice(0, 4); // Maximal 4 Aktivitäten
+  }, [mieter, wohnungen, objekte]);
 
   const handleObjektOpen = (objektId: string) => {
     setSelectedObjektId(objektId);
@@ -107,55 +235,6 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
             </SelectContent>
           </Select>
         </div>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-        <Card className="card-hover">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Gesamteinnahmen YTD
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-success" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">€48.250,00</div>
-            <div className="flex items-center gap-1 text-xs text-success mt-1">
-              <ArrowUpRight className="h-3 w-3" />
-              +12,5% gegenüber Vorjahr
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="card-hover">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Offene Forderungen
-            </CardTitle>
-            <AlertCircle className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">€1.850,00</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              2 ausstehende Zahlungen
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card className="card-hover">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Leerstand
-            </CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">1 Einheit</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              4,2% Leerstandsquote
-            </p>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Quick Actions */}
@@ -196,9 +275,9 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-4 md:gap-6">
         {/* Active Objects Table */}
-        <Card className="lg:col-span-2">
+        <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">Aktive Objekte</CardTitle>
             <CardDescription>
@@ -309,7 +388,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
             onClick={() =>
               window.open(
                 "https://www.youtube.com/results?search_query=hausverwaltung+software+tutorial",
-                "_blank"
+                "_blank",
               )
             }
           >

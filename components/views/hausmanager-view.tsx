@@ -1,8 +1,6 @@
 "use client";
 
-import type React from "react";
-
-import { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -436,29 +434,138 @@ export function HausmanagerView() {
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
-  // State for all data
-  const [finanzaemter, setFinanzaemter] =
-    useState<Finanzamt[]>(initialFinanzaemter);
-  const [steuerberater, setSteuerberater] =
-    useState<Steuerberater[]>(initialSteuerberater);
+  // LocalStorage Keys
+  const STORAGE_KEYS = {
+    finanzaemter: "hausverwaltung_finanzaemter",
+    steuerberater: "hausverwaltung_steuerberater",
+    grundbesitzabgaben: "hausverwaltung_grundbesitzabgaben",
+    energielieferanten: "hausverwaltung_energielieferanten",
+    messdienst: "hausverwaltung_messdienst",
+    finanzierungspartner: "hausverwaltung_finanzierungspartner",
+    versicherungen: "hausverwaltung_versicherungen",
+    dienstleister: "hausverwaltung_dienstleister",
+    rechtsberatung: "hausverwaltung_rechtsberatung",
+  };
+
+  // Helper: Load from localStorage with fallback
+  const loadFromStorage = <T,>(key: string, fallback: T): T => {
+    if (typeof window === "undefined") return fallback;
+    try {
+      const stored = localStorage.getItem(key);
+      return stored ? JSON.parse(stored) : fallback;
+    } catch (error) {
+      console.error(`Error loading ${key} from localStorage:`, error);
+      return fallback;
+    }
+  };
+
+  // State for all data - with localStorage persistence
+  const [finanzaemter, setFinanzaemter] = useState<Finanzamt[]>(() =>
+    loadFromStorage(STORAGE_KEYS.finanzaemter, initialFinanzaemter),
+  );
+  const [steuerberater, setSteuerberater] = useState<Steuerberater[]>(() =>
+    loadFromStorage(STORAGE_KEYS.steuerberater, initialSteuerberater),
+  );
   const [grundbesitzabgaben, setGrundbesitzabgaben] = useState<
     Grundbesitzabgabe[]
-  >(initialGrundbesitzabgaben);
+  >(() =>
+    loadFromStorage(STORAGE_KEYS.grundbesitzabgaben, initialGrundbesitzabgaben),
+  );
   const [energielieferanten, setEnergielieferanten] = useState<
     Energielieferant[]
-  >(initialEnergielieferanten);
-  const [messdienst, setMessdienst] = useState<Messdienst[]>(initialMessdienst);
+  >(() =>
+    loadFromStorage(STORAGE_KEYS.energielieferanten, initialEnergielieferanten),
+  );
+  const [messdienst, setMessdienst] = useState<Messdienst[]>(() =>
+    loadFromStorage(STORAGE_KEYS.messdienst, initialMessdienst),
+  );
   const [finanzierungspartner, setFinanzierungspartner] = useState<
     Finanzierungspartner[]
-  >(initialFinanzierungspartner);
-  const [versicherungen, setVersicherungen] = useState<Versicherung[]>(
-    initialVersicherungen
+  >(() =>
+    loadFromStorage(
+      STORAGE_KEYS.finanzierungspartner,
+      initialFinanzierungspartner,
+    ),
   );
-  const [dienstleister, setDienstleister] =
-    useState<Dienstleister[]>(initialDienstleister);
-  const [rechtsberatung, setRechtsberatung] = useState<Rechtsberatung[]>(
-    initialRechtsberatung
+  const [versicherungen, setVersicherungen] = useState<Versicherung[]>(() =>
+    loadFromStorage(STORAGE_KEYS.versicherungen, initialVersicherungen),
   );
+  const [dienstleister, setDienstleister] = useState<Dienstleister[]>(() =>
+    loadFromStorage(STORAGE_KEYS.dienstleister, initialDienstleister),
+  );
+  const [rechtsberatung, setRechtsberatung] = useState<Rechtsberatung[]>(() =>
+    loadFromStorage(STORAGE_KEYS.rechtsberatung, initialRechtsberatung),
+  );
+
+  // Auto-save to localStorage whenever data changes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(
+      STORAGE_KEYS.finanzaemter,
+      JSON.stringify(finanzaemter),
+    );
+  }, [finanzaemter]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(
+      STORAGE_KEYS.steuerberater,
+      JSON.stringify(steuerberater),
+    );
+  }, [steuerberater]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(
+      STORAGE_KEYS.grundbesitzabgaben,
+      JSON.stringify(grundbesitzabgaben),
+    );
+  }, [grundbesitzabgaben]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(
+      STORAGE_KEYS.energielieferanten,
+      JSON.stringify(energielieferanten),
+    );
+  }, [energielieferanten]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(STORAGE_KEYS.messdienst, JSON.stringify(messdienst));
+  }, [messdienst]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(
+      STORAGE_KEYS.finanzierungspartner,
+      JSON.stringify(finanzierungspartner),
+    );
+  }, [finanzierungspartner]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(
+      STORAGE_KEYS.versicherungen,
+      JSON.stringify(versicherungen),
+    );
+  }, [versicherungen]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(
+      STORAGE_KEYS.dienstleister,
+      JSON.stringify(dienstleister),
+    );
+  }, [dienstleister]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(
+      STORAGE_KEYS.rechtsberatung,
+      JSON.stringify(rechtsberatung),
+    );
+  }, [rechtsberatung]);
 
   // Modal state
   const [briefModalOpen, setBriefModalOpen] = useState(false);
@@ -469,14 +576,14 @@ export function HausmanagerView() {
   // Delete confirmation
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteCallback, setDeleteCallback] = useState<(() => void) | null>(
-    null
+    null,
   );
 
   const openBriefModal = (empfaenger: string) => {
     setBriefEmpfaenger(empfaenger);
     setBriefBetreff("");
     setBriefText(
-      "Sehr geehrte Damen und Herren,\n\n\n\nMit freundlichen Grüßen\nIhre Hausverwaltung Boss"
+      "Sehr geehrte Damen und Herren,\n\n\n\nMit freundlichen Grüßen\nIhre Hausverwaltung Boss",
     );
     setBriefModalOpen(true);
   };
@@ -491,7 +598,7 @@ export function HausmanagerView() {
       doc,
       `brief_${briefEmpfaenger.replace(/\s+/g, "_")}_${
         new Date().toISOString().split("T")[0]
-      }`
+      }`,
     );
     setBriefModalOpen(false);
     toast({
@@ -514,9 +621,11 @@ export function HausmanagerView() {
   };
 
   const handleSave = (item: BaseItem) => {
+    // Die Daten werden automatisch über useEffect in localStorage gespeichert
     toast({
-      title: "Gespeichert",
-      description: `"${item.name}" wurde gespeichert.`,
+      title: "✓ Speicherung erfolgreich",
+      description: `"${item.name}" wurde erfolgreich gespeichert und bleibt auch nach einem Neustart erhalten.`,
+      duration: 3000,
     });
   };
 
@@ -526,9 +635,9 @@ export function HausmanagerView() {
       finanzaemter.filter(
         (item) =>
           item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.steuernummer.toLowerCase().includes(searchQuery.toLowerCase())
+          item.steuernummer.toLowerCase().includes(searchQuery.toLowerCase()),
       ),
-    [finanzaemter, searchQuery]
+    [finanzaemter, searchQuery],
   );
 
   const filteredSteuerberater = useMemo(
@@ -536,9 +645,11 @@ export function HausmanagerView() {
       steuerberater.filter(
         (item) =>
           item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.ansprechpartner.toLowerCase().includes(searchQuery.toLowerCase())
+          item.ansprechpartner
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()),
       ),
-    [steuerberater, searchQuery]
+    [steuerberater, searchQuery],
   );
 
   const filteredDienstleister = useMemo(
@@ -547,9 +658,9 @@ export function HausmanagerView() {
         (item) =>
           item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           item.gewerk?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.kategorie.toLowerCase().includes(searchQuery.toLowerCase())
+          item.kategorie.toLowerCase().includes(searchQuery.toLowerCase()),
       ),
-    [dienstleister, searchQuery]
+    [dienstleister, searchQuery],
   );
 
   const filteredVersicherungen = useMemo(
@@ -559,9 +670,9 @@ export function HausmanagerView() {
           item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
           item.versicherungsart
             .toLowerCase()
-            .includes(searchQuery.toLowerCase())
+            .includes(searchQuery.toLowerCase()),
       ),
-    [versicherungen, searchQuery]
+    [versicherungen, searchQuery],
   );
 
   return (
@@ -1011,7 +1122,7 @@ interface GenericMasterDetailProps<T extends BaseItem> {
   createNew: () => T;
   renderForm: (
     item: T,
-    updateItem: (updates: Partial<T>) => void
+    updateItem: (updates: Partial<T>) => void,
   ) => React.ReactNode;
   onBrief?: (empfaenger: string) => void;
   onDelete: (callback: () => void) => void;
@@ -1049,8 +1160,8 @@ function GenericMasterDetail<T extends BaseItem>({
   const updateSelected = (updates: Partial<T>) => {
     setItems((prev) =>
       prev.map((item) =>
-        item.id === selected.id ? { ...item, ...updates } : item
-      )
+        item.id === selected.id ? { ...item, ...updates } : item,
+      ),
     );
     setSelected((prev) => ({ ...prev, ...updates }));
   };

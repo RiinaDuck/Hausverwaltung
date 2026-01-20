@@ -307,8 +307,8 @@ export function WohnungsdatenView() {
         w.status === "vermietet"
           ? "vermietet"
           : w.status === "leer"
-          ? "frei"
-          : ("vermietet" as const),
+            ? "frei"
+            : ("vermietet" as const),
       miete: w.miete,
     }));
   }, [wohnungen, selectedObjektId]);
@@ -360,11 +360,14 @@ export function WohnungsdatenView() {
   }, [selectedUnit]);
 
   const filteredUnits = units.filter((unit) =>
-    unit.lage.toLowerCase().includes(searchQuery.toLowerCase())
+    unit.lage.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   // Hilfsfunktion zum Aktualisieren der bearbeiteten Unit
-  const updateEditedUnit = (field: keyof Unit, value: string | number) => {
+  const updateEditedUnit = (
+    field: keyof Unit,
+    value: string | number | "vermietet" | "frei" | "renovierung",
+  ) => {
     if (!editedUnit) return;
     setEditedUnit((prev) => (prev ? { ...prev, [field]: value } : null));
   };
@@ -382,8 +385,8 @@ export function WohnungsdatenView() {
         editedUnit.status === "vermietet"
           ? "vermietet"
           : editedUnit.status === "frei"
-          ? "leer"
-          : "vermietet",
+            ? "leer"
+            : "vermietet",
     });
 
     // Aktualisiere auch selectedUnit
@@ -666,7 +669,7 @@ export function WohnungsdatenView() {
                   className={cn(
                     "p-3 rounded-lg cursor-pointer transition-all hover:bg-accent group",
                     selectedUnit?.id === unit.id &&
-                      "bg-accent ring-1 ring-border"
+                      "bg-accent ring-1 ring-border",
                   )}
                   onClick={() => setSelectedUnit(unit)}
                 >
@@ -693,7 +696,7 @@ export function WohnungsdatenView() {
                           variant="outline"
                           className={cn(
                             "text-xs",
-                            statusConfig[unit.status].color
+                            statusConfig[unit.status].color,
                           )}
                         >
                           {statusConfig[unit.status].label}
@@ -732,7 +735,7 @@ export function WohnungsdatenView() {
                       variant="outline"
                       className={cn(
                         "text-xs",
-                        statusConfig[selectedUnit.status].color
+                        statusConfig[selectedUnit.status].color,
                       )}
                     >
                       {statusConfig[selectedUnit.status].label}
@@ -845,7 +848,7 @@ export function WohnungsdatenView() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="lage">Geschosslage</Label>
                       <Input
@@ -866,7 +869,7 @@ export function WohnungsdatenView() {
                         onChange={(e) =>
                           updateEditedUnit(
                             "wohnflaeche",
-                            parseFloat(e.target.value) || 0
+                            parseFloat(e.target.value) || 0,
                           )
                         }
                       />
@@ -881,7 +884,7 @@ export function WohnungsdatenView() {
                         onChange={(e) =>
                           updateEditedUnit(
                             "nutzflaeche",
-                            parseFloat(e.target.value) || 0
+                            parseFloat(e.target.value) || 0,
                           )
                         }
                       />
@@ -895,7 +898,7 @@ export function WohnungsdatenView() {
                         onChange={(e) =>
                           updateEditedUnit(
                             "raeume",
-                            parseInt(e.target.value) || 0
+                            parseInt(e.target.value) || 0,
                           )
                         }
                       />
@@ -909,7 +912,7 @@ export function WohnungsdatenView() {
                         onChange={(e) =>
                           updateEditedUnit(
                             "punkte",
-                            parseInt(e.target.value) || 0
+                            parseInt(e.target.value) || 0,
                           )
                         }
                       />
@@ -924,7 +927,45 @@ export function WohnungsdatenView() {
                         onChange={(e) =>
                           updateEditedUnit(
                             "prozent",
-                            parseFloat(e.target.value) || 0
+                            parseFloat(e.target.value) || 0,
+                          )
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Status</Label>
+                      <Select
+                        value={editedUnit?.status || "frei"}
+                        onValueChange={(value) =>
+                          updateEditedUnit(
+                            "status",
+                            value as "vermietet" | "frei" | "renovierung",
+                          )
+                        }
+                      >
+                        <SelectTrigger id="status">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="frei">Frei</SelectItem>
+                          <SelectItem value="vermietet">Vermietet</SelectItem>
+                          <SelectItem value="renovierung">
+                            Renovierung
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="miete">Kaltmiete (€)</Label>
+                      <Input
+                        id="miete"
+                        type="number"
+                        step="0.01"
+                        value={editedUnit?.miete || 0}
+                        onChange={(e) =>
+                          updateEditedUnit(
+                            "miete",
+                            parseFloat(e.target.value) || 0,
                           )
                         }
                       />
