@@ -263,7 +263,9 @@ export function StatistikenView() {
     let relevantMieter = mieter;
 
     if (selectedObjektId) {
-      relevantWohnungen = wohnungen.filter((w) => w.objektId === selectedObjektId);
+      relevantWohnungen = wohnungen.filter(
+        (w) => w.objektId === selectedObjektId,
+      );
       const wohnungIds = relevantWohnungen.map((w) => w.id);
       relevantMieter = mieter.filter((m) => wohnungIds.includes(m.wohnungId));
     }
@@ -284,7 +286,8 @@ export function StatistikenView() {
             : Math.max(
                 0,
                 Math.floor(
-                  (Date.now() - einzug.getTime()) / (1000 * 60 * 60 * 24 * 30.44),
+                  (Date.now() - einzug.getTime()) /
+                    (1000 * 60 * 60 * 24 * 30.44),
                 ),
               );
         return (
@@ -296,7 +299,7 @@ export function StatistikenView() {
 
     const vorjahresEinnahmen = gesamteinnahmenYTD / 1.125;
     const wachstumProzent =
-      vorjahresEinnahmen > 0 
+      vorjahresEinnahmen > 0
         ? ((gesamteinnahmenYTD - vorjahresEinnahmen) / vorjahresEinnahmen) * 100
         : 0;
 
