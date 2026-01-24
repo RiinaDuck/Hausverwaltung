@@ -24,7 +24,11 @@ import {
 } from "@/components/ui/table";
 import { Save, Plus, Trash2, FileDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { generateNebenkostenPDF, downloadPDF, sanitizeFilename } from "@/lib/pdf-generator";
+import {
+  generateNebenkostenPDF,
+  downloadPDF,
+  sanitizeFilename,
+} from "@/lib/pdf-generator";
 import { useAppData } from "@/context/app-data-context";
 import { useAuth } from "@/context/auth-context";
 
@@ -135,24 +139,24 @@ export function NebenkostenView() {
   const [dateVon, setDateVon] = useState("2024-01-01");
   const [dateBis, setDateBis] = useState("2024-12-31");
   const [introText, setIntroText] = useState(
-    "Sehr geehrte Mieter,\n\nnachfolgend erhalten Sie die Abrechnung der Betriebskosten für den oben genannten Abrechnungszeitraum."
+    "Sehr geehrte Mieter,\n\nnachfolgend erhalten Sie die Abrechnung der Betriebskosten für den oben genannten Abrechnungszeitraum.",
   );
   const [outroText, setOutroText] = useState(
-    "Ein sich zu Ihren Gunsten ergebender Betrag wird mit der nächsten Mietzahlung verrechnet bzw. an Sie überwiesen.\n\nEin Nachzahlungsbetrag ist innerhalb von 14 Tagen nach Erhalt dieser Abrechnung fällig.\n\nMit freundlichen Grüßen\nIhre Hausverwaltung"
+    "Ein sich zu Ihren Gunsten ergebender Betrag wird mit der nächsten Mietzahlung verrechnet bzw. an Sie überwiesen.\n\nEin Nachzahlungsbetrag ist innerhalb von 14 Tagen nach Erhalt dieser Abrechnung fällig.\n\nMit freundlichen Grüßen\nIhre Hausverwaltung",
   );
   const { toast } = useToast();
 
   // Aktuelles Objekt
   const currentObjekt = useMemo(
     () => objekte.find((o) => o.id === selectedObjektId),
-    [objekte, selectedObjektId]
+    [objekte, selectedObjektId],
   );
 
   // Mieter des aktuellen Objekts
   const availableMieter = useMemo(() => {
     if (!selectedObjektId) return [];
     const objektWohnungen = wohnungen.filter(
-      (w) => w.objektId === selectedObjektId
+      (w) => w.objektId === selectedObjektId,
     );
     const wohnungIds = objektWohnungen.map((w) => w.id);
     return mieter.filter((m) => wohnungIds.includes(m.wohnungId));
@@ -161,13 +165,13 @@ export function NebenkostenView() {
   // Ausgewählter Mieter
   const selectedMieter = useMemo(
     () => availableMieter.find((m) => m.id === selectedMieterId),
-    [availableMieter, selectedMieterId]
+    [availableMieter, selectedMieterId],
   );
 
   // Wohnung des ausgewählten Mieters
   const selectedWohnung = useMemo(
     () => wohnungen.find((w) => w.id === selectedMieter?.wohnungId),
-    [wohnungen, selectedMieter]
+    [wohnungen, selectedMieter],
   );
 
   const handleSave = () => {
@@ -194,10 +198,10 @@ export function NebenkostenView() {
   const updateKostenart = (
     id: string,
     field: keyof Kostenart,
-    value: string
+    value: string,
   ) => {
     setKostenarten((prev) =>
-      prev.map((k) => (k.id === id ? { ...k, [field]: value } : k))
+      prev.map((k) => (k.id === id ? { ...k, [field]: value } : k)),
     );
   };
 
@@ -205,12 +209,13 @@ export function NebenkostenView() {
     if (isDemo) {
       toast({
         title: "Demo-Modus",
-        description: "Im Demo-Modus können keine neuen Buchungen angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
+        description:
+          "Im Demo-Modus können keine neuen Buchungen angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
         variant: "destructive",
       });
       return;
     }
-    
+
     const newId = (
       Math.max(...kostenarten.map((k) => Number.parseInt(k.id))) + 1
     ).toString();
@@ -253,7 +258,9 @@ export function NebenkostenView() {
       });
       downloadPDF(
         doc,
-        sanitizeFilename(`nebenkostenabrechnung_${selectedMieter.name}_${dateVon}_${dateBis}`)
+        sanitizeFilename(
+          `nebenkostenabrechnung_${selectedMieter.name}_${dateVon}_${dateBis}`,
+        ),
       );
       toast({
         title: "PDF erstellt",

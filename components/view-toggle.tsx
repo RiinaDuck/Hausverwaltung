@@ -30,8 +30,8 @@ function ViewToggleContent() {
   return (
     <>
       {!showApp ? (
-        <LandingPage 
-          onOpenApp={() => setView("app")} 
+        <LandingPage
+          onOpenApp={() => setView("app")}
           onLogin={handleLogin}
           onStartDemo={handleStartDemo}
         />

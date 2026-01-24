@@ -91,7 +91,8 @@ export function ObjektdatenView() {
     if (isDemo && !editingObjektId) {
       toast({
         title: "Demo-Modus",
-        description: "Im Demo-Modus können keine neuen Objekte angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
+        description:
+          "Im Demo-Modus können keine neuen Objekte angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
         variant: "destructive",
       });
       return;

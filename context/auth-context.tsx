@@ -63,15 +63,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    const authState = loadFromStorage(AUTH_STORAGE_KEY, { isAuthenticated: false, isDemo: false });
+    const authState = loadFromStorage(AUTH_STORAGE_KEY, {
+      isAuthenticated: false,
+      isDemo: false,
+    });
     return authState.isAuthenticated;
   });
   const [isDemo, setIsDemo] = useState<boolean>(() => {
-    const authState = loadFromStorage(AUTH_STORAGE_KEY, { isAuthenticated: false, isDemo: false });
+    const authState = loadFromStorage(AUTH_STORAGE_KEY, {
+      isAuthenticated: false,
+      isDemo: false,
+    });
     return authState.isDemo;
   });
   const [profile, setProfile] = useState<UserProfile>(() =>
-    loadFromStorage(STORAGE_KEY, defaultProfile)
+    loadFromStorage(STORAGE_KEY, defaultProfile),
   );
 
   // Speichere Profil-Änderungen
@@ -88,7 +94,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({ isAuthenticated, isDemo }));
+      localStorage.setItem(
+        AUTH_STORAGE_KEY,
+        JSON.stringify({ isAuthenticated, isDemo }),
+      );
     } catch (error) {
       console.error("Error saving auth state to localStorage:", error);
     }

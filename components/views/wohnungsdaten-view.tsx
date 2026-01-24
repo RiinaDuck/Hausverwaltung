@@ -409,7 +409,8 @@ export function WohnungsdatenView() {
     if (isDemo) {
       toast({
         title: "Demo-Modus",
-        description: "Im Demo-Modus können keine neuen Wohnungen angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
+        description:
+          "Im Demo-Modus können keine neuen Wohnungen angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
         variant: "destructive",
       });
       return;

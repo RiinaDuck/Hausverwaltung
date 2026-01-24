@@ -419,7 +419,9 @@ export function MieterdatenView() {
 
     downloadPDF(
       doc,
-      sanitizeFilename(`Mieterdaten_${editedMieter.name}_${new Date().toISOString().split("T")[0]}`),
+      sanitizeFilename(
+        `Mieterdaten_${editedMieter.name}_${new Date().toISOString().split("T")[0]}`,
+      ),
     );
 
     toast({
@@ -442,7 +444,9 @@ export function MieterdatenView() {
     });
     downloadPDF(
       doc,
-      sanitizeFilename(`mitteilung_${selectedMieter.name}_${new Date().toISOString().split("T")[0]}`),
+      sanitizeFilename(
+        `mitteilung_${selectedMieter.name}_${new Date().toISOString().split("T")[0]}`,
+      ),
     );
   };
 
@@ -451,7 +455,8 @@ export function MieterdatenView() {
     if (isDemo) {
       toast({
         title: "Demo-Modus",
-        description: "Im Demo-Modus können keine neuen Mieter angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
+        description:
+          "Im Demo-Modus können keine neuen Mieter angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
         variant: "destructive",
       });
       return;

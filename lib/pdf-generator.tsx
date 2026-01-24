@@ -49,11 +49,11 @@ export function generatePDF(options: PDFOptions) {
       doc.setFont("helvetica", "bold");
       doc.setTextColor(0);
       doc.text(options.profile.name || "Hausverwaltung Boss", margin, y);
-      
+
       doc.setFont("helvetica", "normal");
       doc.setTextColor(80);
       y += 5;
-      
+
       if (options.profile.anschrift) {
         doc.text(options.profile.anschrift, margin, y);
         y += 4;
@@ -63,18 +63,22 @@ export function generatePDF(options: PDFOptions) {
         y += 4;
       }
       if (options.profile.ansprechpartner) {
-        doc.text(`Ansprechpartner: ${options.profile.ansprechpartner}`, margin, y);
+        doc.text(
+          `Ansprechpartner: ${options.profile.ansprechpartner}`,
+          margin,
+          y,
+        );
         y += 4;
       }
-      
+
       // Datum rechts oben
       doc.text(
         options.date || new Date().toLocaleDateString("de-DE"),
         pageWidth - margin,
         20,
-        { align: "right" }
+        { align: "right" },
       );
-      
+
       y += 6;
     } else {
       // Standard-Header ohne Profil
@@ -85,7 +89,7 @@ export function generatePDF(options: PDFOptions) {
         options.date || new Date().toLocaleDateString("de-DE"),
         pageWidth - margin,
         y,
-        { align: "right" }
+        { align: "right" },
       );
       y += 15;
     }
@@ -133,7 +137,7 @@ export function generatePDF(options: PDFOptions) {
           doc.setFont("helvetica", "normal");
           const lines = doc.splitTextToSize(
             item.text || "",
-            pageWidth - margin * 2
+            pageWidth - margin * 2,
           );
           doc.text(lines, margin, y);
           y += lines.length * 5 + 5;
@@ -155,7 +159,11 @@ export function generatePDF(options: PDFOptions) {
             headers.forEach((header, i) => {
               // Header mit Textumbruch
               const headerLines = doc.splitTextToSize(header, maxCellWidth);
-              doc.text(headerLines[0] || header, margin + i * colWidth + cellPadding, y);
+              doc.text(
+                headerLines[0] || header,
+                margin + i * colWidth + cellPadding,
+                y,
+              );
             });
             y += 8;
 
@@ -165,7 +173,7 @@ export function generatePDF(options: PDFOptions) {
               // Berechne die maximale Zeilenhöhe für diese Zeile
               let maxRowHeight = 6;
               const cellLines: string[][] = [];
-              
+
               row.forEach((cell, i) => {
                 const cellText = cell || "";
                 const lines = doc.splitTextToSize(cellText, maxCellWidth);
@@ -212,7 +220,7 @@ export function generatePDF(options: PDFOptions) {
       doc.line(margin, footerY - 5, pageWidth - margin, footerY - 5);
       const footerLines = doc.splitTextToSize(
         options.footer,
-        pageWidth - margin * 2
+        pageWidth - margin * 2,
       );
       doc.text(footerLines, margin, footerY);
     }
@@ -220,7 +228,9 @@ export function generatePDF(options: PDFOptions) {
     return doc;
   } catch (error) {
     console.error("Fehler beim Erstellen des PDFs:", error);
-    throw new Error("PDF konnte nicht erstellt werden. Bitte versuchen Sie es erneut.");
+    throw new Error(
+      "PDF konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
+    );
   }
 }
 
@@ -263,7 +273,7 @@ export function generateNebenkostenPDF(data: {
       title: data.title,
       subtitle: data.mieterName ? `Mieter: ${data.mieterName}` : undefined,
       date: `Zeitraum: ${new Date(data.dateVon).toLocaleDateString(
-        "de-DE"
+        "de-DE",
       )} - ${new Date(data.dateBis).toLocaleDateString("de-DE")}`,
       profile: data.profile,
       content: [
@@ -321,7 +331,8 @@ export function generateMieterKommunikationPDF(data: {
         {
           type: "paragraph",
           text:
-            data.absender || "Mit freundlichen Grüßen\nIhre Hausverwaltung Boss",
+            data.absender ||
+            "Mit freundlichen Grüßen\nIhre Hausverwaltung Boss",
         },
       ],
       footer:
@@ -458,10 +469,16 @@ export function generateMieterdatenPDF(data: {
             rows: [
               ["Wohnung", data.wohnung],
               ["Objekt", data.objektAdresse || "-"],
-              ["Einzugsdatum", new Date(data.einzugsDatum).toLocaleDateString("de-DE")],
+              [
+                "Einzugsdatum",
+                new Date(data.einzugsDatum).toLocaleDateString("de-DE"),
+              ],
               ["Kaltmiete", `${data.kaltmiete.toFixed(2)} €`],
               ["Nebenkosten", `${data.nebenkosten.toFixed(2)} €`],
-              ["Gesamtmiete", `${(data.kaltmiete + data.nebenkosten).toFixed(2)} €`],
+              [
+                "Gesamtmiete",
+                `${(data.kaltmiete + data.nebenkosten).toFixed(2)} €`,
+              ],
               ["Kaution", `${data.kaution.toFixed(2)} €`],
             ],
           },

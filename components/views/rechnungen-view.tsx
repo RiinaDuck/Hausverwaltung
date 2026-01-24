@@ -31,7 +31,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Save, Plus, Trash2, FileDown, Eye, Pencil } from "lucide-react";
-import { generateRechnungPDF, downloadPDF, sanitizeFilename } from "@/lib/pdf-generator";
+import {
+  generateRechnungPDF,
+  downloadPDF,
+  sanitizeFilename,
+} from "@/lib/pdf-generator";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 
@@ -119,7 +123,7 @@ export function RechnungenView() {
   const { toast } = useToast();
   const [rechnungen, setRechnungen] = useState<Rechnung[]>(initialRechnungen);
   const [selectedRechnung, setSelectedRechnung] = useState<Rechnung | null>(
-    null
+    null,
   );
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -137,13 +141,13 @@ export function RechnungenView() {
   // Memoized calculation functions
   const calculatePositionTotal = useMemo(
     () => (pos: RechnungsPosition) => pos.menge * pos.einzelpreis,
-    []
+    [],
   );
 
   const calculateNetto = useMemo(
     () => (positionen: RechnungsPosition[]) =>
       positionen.reduce((sum, p) => sum + p.menge * p.einzelpreis, 0),
-    []
+    [],
   );
 
   const calculateMwst = useMemo(() => (netto: number) => netto * 0.19, []);
@@ -215,12 +219,12 @@ export function RechnungenView() {
   const updatePosition = (
     id: string,
     field: keyof RechnungsPosition,
-    value: string | number
+    value: string | number,
   ) => {
     setNewRechnung((prev) => ({
       ...prev,
       positionen: prev.positionen?.map((p) =>
-        p.id === id ? { ...p, [field]: value } : p
+        p.id === id ? { ...p, [field]: value } : p,
       ),
     }));
   };
@@ -236,12 +240,13 @@ export function RechnungenView() {
     if (isDemo) {
       toast({
         title: "Demo-Modus",
-        description: "Im Demo-Modus können keine neuen Rechnungen angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
+        description:
+          "Im Demo-Modus können keine neuen Rechnungen angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
         variant: "destructive",
       });
       return;
     }
-    
+
     const rechnung: Rechnung = {
       id: String(rechnungen.length + 1),
       nummer: newRechnung.nummer || "",
@@ -295,8 +300,8 @@ export function RechnungenView() {
               bemerkung: newRechnung.bemerkung || "",
               status: newRechnung.status || "offen",
             }
-          : r
-      )
+          : r,
+      ),
     );
     setIsEditOpen(false);
     setEditingRechnung(null);
@@ -460,7 +465,7 @@ export function RechnungenView() {
                           updatePosition(
                             pos.id,
                             "menge",
-                            Number(e.target.value)
+                            Number(e.target.value),
                           )
                         }
                       />
@@ -475,7 +480,7 @@ export function RechnungenView() {
                           updatePosition(
                             pos.id,
                             "einzelpreis",
-                            Number(e.target.value)
+                            Number(e.target.value),
                           )
                         }
                       />
@@ -676,7 +681,7 @@ export function RechnungenView() {
                         updatePosition(
                           pos.id,
                           "einzelpreis",
-                          Number(e.target.value)
+                          Number(e.target.value),
                         )
                       }
                     />
@@ -819,7 +824,7 @@ export function RechnungenView() {
                                   <p className="text-muted-foreground">Datum</p>
                                   <p className="font-medium">
                                     {new Date(
-                                      rechnung.datum
+                                      rechnung.datum,
                                     ).toLocaleDateString("de-DE")}
                                   </p>
                                 </div>

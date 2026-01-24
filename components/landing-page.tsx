@@ -51,7 +51,11 @@ interface LandingPageProps {
   onStartDemo: () => void;
 }
 
-export function LandingPage({ onOpenApp, onLogin, onStartDemo }: LandingPageProps) {
+export function LandingPage({
+  onOpenApp,
+  onLogin,
+  onStartDemo,
+}: LandingPageProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
@@ -82,10 +86,17 @@ export function LandingPage({ onOpenApp, onLogin, onStartDemo }: LandingPageProp
       id: "dashboard",
       title: "Dashboard",
       icon: <LayoutDashboard className="h-4 w-4" />,
-      description: "Das Dashboard bietet Ihnen eine Übersicht über alle wichtigen Kennzahlen.",
+      description:
+        "Das Dashboard bietet Ihnen eine Übersicht über alle wichtigen Kennzahlen.",
       fields: [
-        { name: "Gesamtübersicht", description: "Zeigt Objekte, Wohnungen, Mieter und Leerstand." },
-        { name: "Monatliche Einnahmen", description: "Summe aller Mieteinnahmen des aktuellen Monats." },
+        {
+          name: "Gesamtübersicht",
+          description: "Zeigt Objekte, Wohnungen, Mieter und Leerstand.",
+        },
+        {
+          name: "Monatliche Einnahmen",
+          description: "Summe aller Mieteinnahmen des aktuellen Monats.",
+        },
       ],
     },
     {
@@ -95,27 +106,45 @@ export function LandingPage({ onOpenApp, onLogin, onStartDemo }: LandingPageProp
       description: "Verwalten Sie alle Ihre Immobilienobjekte.",
       fields: [
         { name: "Objektname", description: "Eindeutiger Name für das Objekt." },
-        { name: "Objekttyp", description: "'Miete' oder 'WEG' für Wohnungseigentümergemeinschaften." },
+        {
+          name: "Objekttyp",
+          description:
+            "'Miete' oder 'WEG' für Wohnungseigentümergemeinschaften.",
+        },
       ],
     },
     {
       id: "wohnungen",
       title: "Wohnungen",
       icon: <DoorOpen className="h-4 w-4" />,
-      description: "Verwalten Sie einzelne Wohneinheiten innerhalb eines Objekts.",
+      description:
+        "Verwalten Sie einzelne Wohneinheiten innerhalb eines Objekts.",
       fields: [
-        { name: "Bezeichnung", description: "Eindeutige Bezeichnung der Wohnung." },
-        { name: "Wohnfläche", description: "Relevant für Nebenkostenverteilung." },
+        {
+          name: "Bezeichnung",
+          description: "Eindeutige Bezeichnung der Wohnung.",
+        },
+        {
+          name: "Wohnfläche",
+          description: "Relevant für Nebenkostenverteilung.",
+        },
       ],
     },
     {
       id: "mieter",
       title: "Mieter & Mieten",
       icon: <Users className="h-4 w-4" />,
-      description: "Erfassen Sie Mieterdaten, Verträge und Zahlungsinformationen.",
+      description:
+        "Erfassen Sie Mieterdaten, Verträge und Zahlungsinformationen.",
       fields: [
-        { name: "Mietvertrag", description: "Einzugsdatum und Mietkonditionen." },
-        { name: "Kommunikation", description: "Briefe und Nachrichten an Mieter." },
+        {
+          name: "Mietvertrag",
+          description: "Einzugsdatum und Mietkonditionen.",
+        },
+        {
+          name: "Kommunikation",
+          description: "Briefe und Nachrichten an Mieter.",
+        },
       ],
     },
     {
@@ -125,7 +154,10 @@ export function LandingPage({ onOpenApp, onLogin, onStartDemo }: LandingPageProp
       description: "Erstellen Sie die jährliche Nebenkostenabrechnung.",
       fields: [
         { name: "Kostenarten", description: "Betriebskosten nach Kategorien." },
-        { name: "Verteilerschlüssel", description: "Wohnfläche, Personen, Verbrauch etc." },
+        {
+          name: "Verteilerschlüssel",
+          description: "Wohnfläche, Personen, Verbrauch etc.",
+        },
       ],
     },
     {
@@ -135,7 +167,10 @@ export function LandingPage({ onOpenApp, onLogin, onStartDemo }: LandingPageProp
       description: "Erfassen Sie alle Zähler mit Eichdaten und Standorten.",
       fields: [
         { name: "Eichfristen", description: "Überwachung der Eichgültigkeit." },
-        { name: "Rauchmelder", description: "Wartungsintervalle und Lebensdauer." },
+        {
+          name: "Rauchmelder",
+          description: "Wartungsintervalle und Lebensdauer.",
+        },
       ],
     },
     {
@@ -184,9 +219,9 @@ export function LandingPage({ onOpenApp, onLogin, onStartDemo }: LandingPageProp
             </a>
           </nav>
           <div className="flex items-center gap-2 md:gap-3">
-            <Button 
-              variant="ghost" 
-              size="sm" 
+            <Button
+              variant="ghost"
+              size="sm"
               className="hidden sm:flex"
               onClick={() => setLoginDialogOpen(true)}
             >
@@ -235,9 +270,9 @@ export function LandingPage({ onOpenApp, onLogin, onStartDemo }: LandingPageProp
             >
               FAQ
             </a>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="w-full"
               onClick={() => setLoginDialogOpen(true)}
             >
@@ -287,8 +322,8 @@ export function LandingPage({ onOpenApp, onLogin, onStartDemo }: LandingPageProp
             {loginError && (
               <p className="text-sm text-destructive">{loginError}</p>
             )}
-            <Button 
-              className="w-full bg-success hover:bg-success/90 text-success-foreground" 
+            <Button
+              className="w-full bg-success hover:bg-success/90 text-success-foreground"
               onClick={handleLogin}
             >
               Anmelden
@@ -308,7 +343,8 @@ export function LandingPage({ onOpenApp, onLogin, onStartDemo }: LandingPageProp
           </DialogHeader>
           <ScrollArea className="h-[60vh] pr-4">
             <p className="text-sm text-muted-foreground mb-4">
-              Willkommen bei Hausverwaltung Boss! Hier finden Sie Erklärungen zu allen Bereichen.
+              Willkommen bei Hausverwaltung Boss! Hier finden Sie Erklärungen zu
+              allen Bereichen.
             </p>
             <Accordion type="single" collapsible className="w-full">
               {helpSections.map((section) => (
@@ -328,7 +364,10 @@ export function LandingPage({ onOpenApp, onLogin, onStartDemo }: LandingPageProp
                       </p>
                       <div className="space-y-2">
                         {section.fields.map((field, index) => (
-                          <div key={index} className="rounded-lg bg-muted/50 p-3">
+                          <div
+                            key={index}
+                            className="rounded-lg bg-muted/50 p-3"
+                          >
                             <p className="font-medium text-sm">{field.name}</p>
                             <p className="text-xs text-muted-foreground mt-1">
                               {field.description}

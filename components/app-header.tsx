@@ -490,7 +490,8 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
     if (isDemo) {
       toast({
         title: "Demo-Modus",
-        description: "Im Demo-Modus können keine Änderungen gespeichert werden. Bitte melden Sie sich an, um Ihr Profil zu bearbeiten.",
+        description:
+          "Im Demo-Modus können keine Änderungen gespeichert werden. Bitte melden Sie sich an, um Ihr Profil zu bearbeiten.",
         variant: "destructive",
       });
       return;
@@ -568,11 +569,13 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
                 <User className="h-5 w-5 text-success" />
                 Profil bearbeiten
                 {isDemo && (
-                  <Badge variant="secondary" className="ml-2">Demo</Badge>
+                  <Badge variant="secondary" className="ml-2">
+                    Demo
+                  </Badge>
                 )}
               </DialogTitle>
               <DialogDescription>
-                {isDemo 
+                {isDemo
                   ? "Im Demo-Modus können Profildaten nicht geändert werden."
                   : "Aktualisieren Sie Ihre persönlichen Daten und Kontaktinformationen."}
               </DialogDescription>
@@ -583,7 +586,9 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
                 <Input
                   id="profile-name"
                   value={editedProfile.name}
-                  onChange={(e) => setEditedProfile({ ...editedProfile, name: e.target.value })}
+                  onChange={(e) =>
+                    setEditedProfile({ ...editedProfile, name: e.target.value })
+                  }
                   disabled={isDemo}
                   placeholder="Ihr vollständiger Name"
                 />
@@ -594,7 +599,12 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
                   id="profile-email"
                   type="email"
                   value={editedProfile.email}
-                  onChange={(e) => setEditedProfile({ ...editedProfile, email: e.target.value })}
+                  onChange={(e) =>
+                    setEditedProfile({
+                      ...editedProfile,
+                      email: e.target.value,
+                    })
+                  }
                   disabled={isDemo}
                   placeholder="ihre@email.de"
                 />
@@ -604,7 +614,12 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
                 <Input
                   id="profile-anschrift"
                   value={editedProfile.anschrift}
-                  onChange={(e) => setEditedProfile({ ...editedProfile, anschrift: e.target.value })}
+                  onChange={(e) =>
+                    setEditedProfile({
+                      ...editedProfile,
+                      anschrift: e.target.value,
+                    })
+                  }
                   disabled={isDemo}
                   placeholder="Straße, PLZ Ort"
                 />
@@ -614,22 +629,31 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
                 <Input
                   id="profile-ansprechpartner"
                   value={editedProfile.ansprechpartner}
-                  onChange={(e) => setEditedProfile({ ...editedProfile, ansprechpartner: e.target.value })}
+                  onChange={(e) =>
+                    setEditedProfile({
+                      ...editedProfile,
+                      ansprechpartner: e.target.value,
+                    })
+                  }
                   disabled={isDemo}
                   placeholder="Name des Ansprechpartners"
                 />
               </div>
               <div className="pt-2 p-3 rounded-lg bg-muted/50">
                 <p className="text-xs text-muted-foreground">
-                  <strong>Initialen:</strong> {getInitials()} (automatisch generiert)
+                  <strong>Initialen:</strong> {getInitials()} (automatisch
+                  generiert)
                 </p>
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setProfileDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setProfileDialogOpen(false)}
+              >
                 Abbrechen
               </Button>
-              <Button 
+              <Button
                 onClick={handleSaveProfile}
                 disabled={isDemo}
                 className="gap-2 bg-success hover:bg-success/90 text-success-foreground"

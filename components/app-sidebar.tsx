@@ -107,7 +107,7 @@ export function AppSidebar({
           // Mobile styles
           isMobile && "fixed left-0 top-0 z-50 w-72 shadow-xl",
           // Desktop styles
-          !isMobile && (isCollapsed ? "w-16" : "w-64")
+          !isMobile && (isCollapsed ? "w-16" : "w-64"),
         )}
       >
         {/* Mobile Close Button */}
@@ -142,7 +142,7 @@ export function AppSidebar({
         <div
           className={cn(
             "p-4 border-b border-sidebar-border transition-all duration-300",
-            !isMobile && isCollapsed && "px-2"
+            !isMobile && isCollapsed && "px-2",
           )}
         >
           <button
@@ -158,7 +158,7 @@ export function AppSidebar({
                 "overflow-hidden transition-all duration-300",
                 !isMobile && isCollapsed
                   ? "w-0 opacity-0"
-                  : "w-auto opacity-100"
+                  : "w-auto opacity-100",
               )}
             >
               <span className="font-semibold text-sm whitespace-nowrap">
@@ -175,7 +175,7 @@ export function AppSidebar({
         <nav
           className={cn(
             "flex-1 p-3 space-y-1 overflow-y-auto transition-all duration-300",
-            !isMobile && isCollapsed && "px-2"
+            !isMobile && isCollapsed && "px-2",
           )}
         >
           {navItems.map((item) => {
@@ -189,7 +189,7 @@ export function AppSidebar({
                     "bg-sidebar-accent text-sidebar-foreground",
                   !isMobile && isCollapsed
                     ? "justify-center px-0"
-                    : "justify-start gap-3"
+                    : "justify-start gap-3",
                 )}
                 onClick={() => handleNavigate(item.id)}
               >
@@ -199,7 +199,7 @@ export function AppSidebar({
                     "text-sm transition-all duration-300 overflow-hidden whitespace-nowrap",
                     !isMobile && isCollapsed
                       ? "w-0 opacity-0"
-                      : "w-auto opacity-100"
+                      : "w-auto opacity-100",
                   )}
                 >
                   {item.label}
@@ -226,13 +226,13 @@ export function AppSidebar({
         <div
           className={cn(
             "p-4 border-t border-sidebar-border transition-all duration-300",
-            !isMobile && isCollapsed && "px-2"
+            !isMobile && isCollapsed && "px-2",
           )}
         >
           <div
             className={cn(
               "flex items-center transition-all duration-300",
-              !isMobile && isCollapsed ? "justify-center" : "gap-3"
+              !isMobile && isCollapsed ? "justify-center" : "gap-3",
             )}
           >
             {!isMobile && isCollapsed ? (
