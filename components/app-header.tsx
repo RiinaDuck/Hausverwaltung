@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -12,9 +14,11 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Accordion,
@@ -23,6 +27,8 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import {
   Bell,
   HelpCircle,
@@ -36,9 +42,13 @@ import {
   Gauge,
   BarChart3,
   Briefcase,
+  User,
+  Save,
 } from "lucide-react";
 import type { AppView } from "@/components/app-dashboard";
 import { useAppData } from "@/context/app-data-context";
+import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/hooks/use-toast";
 
 interface HelpSection {
   id: string;
@@ -466,6 +476,32 @@ const viewTitles: Record<AppView, string> = {
 
 export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
   const { objekte, selectedObjektId, setSelectedObjektId } = useAppData();
+  const { profile, updateProfile, getInitials, isDemo } = useAuth();
+  const { toast } = useToast();
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [editedProfile, setEditedProfile] = useState(profile);
+
+  const handleOpenProfileDialog = () => {
+    setEditedProfile({ ...profile });
+    setProfileDialogOpen(true);
+  };
+
+  const handleSaveProfile = () => {
+    if (isDemo) {
+      toast({
+        title: "Demo-Modus",
+        description: "Im Demo-Modus können keine Änderungen gespeichert werden. Bitte melden Sie sich an, um Ihr Profil zu bearbeiten.",
+        variant: "destructive",
+      });
+      return;
+    }
+    updateProfile(editedProfile);
+    setProfileDialogOpen(false);
+    toast({
+      title: "Profil gespeichert",
+      description: "Ihre Profildaten wurden erfolgreich aktualisiert.",
+    });
+  };
 
   return (
     <header className="h-14 md:h-16 border-b border-border bg-card px-4 md:px-6 flex items-center justify-between shrink-0">
@@ -509,6 +545,102 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
         <Button variant="ghost" size="icon" className="h-9 w-9">
           <Bell className="h-4 w-4" />
         </Button>
+
+        {/* Profil-Button */}
+        <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
+          <DialogTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 hidden sm:flex"
+              onClick={handleOpenProfileDialog}
+            >
+              <Avatar className="h-7 w-7">
+                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                  {getInitials()}
+                </AvatarFallback>
+              </Avatar>
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <User className="h-5 w-5 text-success" />
+                Profil bearbeiten
+                {isDemo && (
+                  <Badge variant="secondary" className="ml-2">Demo</Badge>
+                )}
+              </DialogTitle>
+              <DialogDescription>
+                {isDemo 
+                  ? "Im Demo-Modus können Profildaten nicht geändert werden."
+                  : "Aktualisieren Sie Ihre persönlichen Daten und Kontaktinformationen."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="profile-name">Name</Label>
+                <Input
+                  id="profile-name"
+                  value={editedProfile.name}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, name: e.target.value })}
+                  disabled={isDemo}
+                  placeholder="Ihr vollständiger Name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="profile-email">E-Mail</Label>
+                <Input
+                  id="profile-email"
+                  type="email"
+                  value={editedProfile.email}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, email: e.target.value })}
+                  disabled={isDemo}
+                  placeholder="ihre@email.de"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="profile-anschrift">Anschrift</Label>
+                <Input
+                  id="profile-anschrift"
+                  value={editedProfile.anschrift}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, anschrift: e.target.value })}
+                  disabled={isDemo}
+                  placeholder="Straße, PLZ Ort"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="profile-ansprechpartner">Ansprechpartner</Label>
+                <Input
+                  id="profile-ansprechpartner"
+                  value={editedProfile.ansprechpartner}
+                  onChange={(e) => setEditedProfile({ ...editedProfile, ansprechpartner: e.target.value })}
+                  disabled={isDemo}
+                  placeholder="Name des Ansprechpartners"
+                />
+              </div>
+              <div className="pt-2 p-3 rounded-lg bg-muted/50">
+                <p className="text-xs text-muted-foreground">
+                  <strong>Initialen:</strong> {getInitials()} (automatisch generiert)
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setProfileDialogOpen(false)}>
+                Abbrechen
+              </Button>
+              <Button 
+                onClick={handleSaveProfile}
+                disabled={isDemo}
+                className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
+              >
+                <Save className="h-4 w-4" />
+                Speichern
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <Dialog>
           <DialogTrigger asChild>
             <Button

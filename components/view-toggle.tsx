@@ -4,19 +4,50 @@ import { useState } from "react";
 import { LandingPage } from "@/components/landing-page";
 import { AppDashboard } from "@/components/app-dashboard";
 import { AppDataProvider } from "@/context/app-data-context";
+import { AuthProvider, useAuth } from "@/context/auth-context";
 
-export function ViewToggle() {
+function ViewToggleContent() {
   const [view, setView] = useState<"landing" | "app">("landing");
+  const { isAuthenticated, login, startDemo, logout } = useAuth();
+
+  const handleLogin = (username: string, password: string): boolean => {
+    return login(username, password);
+  };
+
+  const handleStartDemo = () => {
+    startDemo();
+  };
+
+  const handleSwitchToLanding = () => {
+    logout();
+    setView("landing");
+  };
+
+  // Wenn authentifiziert und view ist app, zeige App
+  // Ansonsten zeige Landing
+  const showApp = view === "app" && isAuthenticated;
 
   return (
     <>
-      {view === "landing" ? (
-        <LandingPage onOpenApp={() => setView("app")} />
+      {!showApp ? (
+        <LandingPage 
+          onOpenApp={() => setView("app")} 
+          onLogin={handleLogin}
+          onStartDemo={handleStartDemo}
+        />
       ) : (
         <AppDataProvider>
-          <AppDashboard onSwitchToLanding={() => setView("landing")} />
+          <AppDashboard onSwitchToLanding={handleSwitchToLanding} />
         </AppDataProvider>
       )}
     </>
+  );
+}
+
+export function ViewToggle() {
+  return (
+    <AuthProvider>
+      <ViewToggleContent />
+    </AuthProvider>
   );
 }

@@ -23,12 +23,11 @@ import {
   BarChart3,
   ChevronLeft,
   ChevronRight,
-  Globe,
-  Monitor,
   X,
 } from "lucide-react";
 import type { AppView } from "@/components/app-dashboard";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useAuth } from "@/context/auth-context";
 
 interface AppSidebarProps {
   currentView: AppView;
@@ -59,12 +58,21 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const isMobile = useIsMobile();
+  const { profile, getInitials, logout } = useAuth();
 
   // Handle navigation on mobile - close sidebar after selection
   const handleNavigate = (view: AppView) => {
     onNavigate(view);
     if (isMobile && onClose) {
       onClose();
+    }
+  };
+
+  // Handle logout and switch to landing
+  const handleLogout = () => {
+    logout();
+    if (onSwitchToLanding) {
+      onSwitchToLanding();
     }
   };
 
@@ -130,14 +138,18 @@ export function AppSidebar({
           </Button>
         )}
 
-        {/* Logo */}
+        {/* Logo - klickbar zurück zur Landing Page */}
         <div
           className={cn(
             "p-4 border-b border-sidebar-border transition-all duration-300",
             !isMobile && isCollapsed && "px-2"
           )}
         >
-          <div className="flex items-center gap-2">
+          <button
+            onClick={onSwitchToLanding}
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity cursor-pointer w-full"
+            title="Zurück zur Startseite"
+          >
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-success shrink-0">
               <Home className="h-5 w-5 text-success-foreground" />
             </div>
@@ -156,7 +168,7 @@ export function AppSidebar({
                 Boss
               </span>
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Navigation */}
@@ -210,67 +222,6 @@ export function AppSidebar({
           })}
         </nav>
 
-        {/* View Toggle */}
-        <div
-          className={cn(
-            "px-3 pb-2 transition-all duration-300",
-            !isMobile && isCollapsed && "px-2"
-          )}
-        >
-          <div
-            className={cn(
-              "flex gap-1 p-1 rounded-lg bg-sidebar-accent/50 transition-all duration-300",
-              !isMobile && isCollapsed ? "flex-col" : "flex-row"
-            )}
-          >
-            {!isMobile && isCollapsed ? (
-              <>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={onSwitchToLanding}
-                      className="h-9 w-full text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-                    >
-                      <Globe className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">Website</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="default"
-                      size="icon"
-                      className="h-9 w-full"
-                    >
-                      <Monitor className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">App</TooltipContent>
-                </Tooltip>
-              </>
-            ) : (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onSwitchToLanding}
-                  className="flex-1 gap-2 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-                >
-                  <Globe className="h-4 w-4" />
-                  Website
-                </Button>
-                <Button variant="default" size="sm" className="flex-1 gap-2">
-                  <Monitor className="h-4 w-4" />
-                  App
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
-
         {/* User Profile */}
         <div
           className={cn(
@@ -289,14 +240,14 @@ export function AppSidebar({
                 <TooltipTrigger asChild>
                   <Avatar className="h-9 w-9 cursor-pointer">
                     <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground text-sm">
-                      MM
+                      {getInitials()}
                     </AvatarFallback>
                   </Avatar>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  <p className="font-medium">Max Mustermann</p>
+                  <p className="font-medium">{profile.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    admin@example.de
+                    {profile.email}
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -304,22 +255,28 @@ export function AppSidebar({
               <>
                 <Avatar className="h-9 w-9 shrink-0">
                   <AvatarFallback className="bg-sidebar-accent text-sidebar-foreground text-sm">
-                    MM
+                    {getInitials()}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0 overflow-hidden">
-                  <p className="text-sm font-medium truncate">Max Mustermann</p>
+                  <p className="text-sm font-medium truncate">{profile.name}</p>
                   <p className="text-xs text-sidebar-foreground/60 truncate">
-                    admin@example.de
+                    {profile.email}
                   </p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-sidebar-foreground/60 hover:text-sidebar-foreground shrink-0"
-                >
-                  <LogOut className="h-4 w-4" />
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleLogout}
+                      className="h-8 w-8 text-sidebar-foreground/60 hover:text-sidebar-foreground shrink-0"
+                    >
+                      <LogOut className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Abmelden</TooltipContent>
+                </Tooltip>
               </>
             )}
           </div>

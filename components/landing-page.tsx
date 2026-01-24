@@ -15,6 +15,16 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
   Building2,
   Calculator,
   FileText,
@@ -27,14 +37,118 @@ import {
   ArrowRight,
   Menu,
   X,
+  HelpCircle,
+  LayoutDashboard,
+  DoorOpen,
+  Receipt,
+  Gauge,
+  Briefcase,
 } from "lucide-react";
 
 interface LandingPageProps {
   onOpenApp: () => void;
+  onLogin: (username: string, password: string) => boolean;
+  onStartDemo: () => void;
 }
 
-export function LandingPage({ onOpenApp }: LandingPageProps) {
+export function LandingPage({ onOpenApp, onLogin, onStartDemo }: LandingPageProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+  const [helpDialogOpen, setHelpDialogOpen] = useState(false);
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+
+  const handleLogin = () => {
+    setLoginError("");
+    if (onLogin(loginUsername, loginPassword)) {
+      setLoginDialogOpen(false);
+      setLoginUsername("");
+      setLoginPassword("");
+      onOpenApp();
+    } else {
+      setLoginError("Ungültige Anmeldedaten. Bitte versuchen Sie es erneut.");
+    }
+  };
+
+  const handleStartDemo = () => {
+    onStartDemo();
+    onOpenApp();
+  };
+
+  // Hilfe-Sektionen für den Dialog
+  const helpSections = [
+    {
+      id: "dashboard",
+      title: "Dashboard",
+      icon: <LayoutDashboard className="h-4 w-4" />,
+      description: "Das Dashboard bietet Ihnen eine Übersicht über alle wichtigen Kennzahlen.",
+      fields: [
+        { name: "Gesamtübersicht", description: "Zeigt Objekte, Wohnungen, Mieter und Leerstand." },
+        { name: "Monatliche Einnahmen", description: "Summe aller Mieteinnahmen des aktuellen Monats." },
+      ],
+    },
+    {
+      id: "objekte",
+      title: "Objekte",
+      icon: <Building2 className="h-4 w-4" />,
+      description: "Verwalten Sie alle Ihre Immobilienobjekte.",
+      fields: [
+        { name: "Objektname", description: "Eindeutiger Name für das Objekt." },
+        { name: "Objekttyp", description: "'Miete' oder 'WEG' für Wohnungseigentümergemeinschaften." },
+      ],
+    },
+    {
+      id: "wohnungen",
+      title: "Wohnungen",
+      icon: <DoorOpen className="h-4 w-4" />,
+      description: "Verwalten Sie einzelne Wohneinheiten innerhalb eines Objekts.",
+      fields: [
+        { name: "Bezeichnung", description: "Eindeutige Bezeichnung der Wohnung." },
+        { name: "Wohnfläche", description: "Relevant für Nebenkostenverteilung." },
+      ],
+    },
+    {
+      id: "mieter",
+      title: "Mieter & Mieten",
+      icon: <Users className="h-4 w-4" />,
+      description: "Erfassen Sie Mieterdaten, Verträge und Zahlungsinformationen.",
+      fields: [
+        { name: "Mietvertrag", description: "Einzugsdatum und Mietkonditionen." },
+        { name: "Kommunikation", description: "Briefe und Nachrichten an Mieter." },
+      ],
+    },
+    {
+      id: "nebenkosten",
+      title: "Nebenkosten",
+      icon: <Receipt className="h-4 w-4" />,
+      description: "Erstellen Sie die jährliche Nebenkostenabrechnung.",
+      fields: [
+        { name: "Kostenarten", description: "Betriebskosten nach Kategorien." },
+        { name: "Verteilerschlüssel", description: "Wohnfläche, Personen, Verbrauch etc." },
+      ],
+    },
+    {
+      id: "zaehler",
+      title: "Zähler & Rauchmelder",
+      icon: <Gauge className="h-4 w-4" />,
+      description: "Erfassen Sie alle Zähler mit Eichdaten und Standorten.",
+      fields: [
+        { name: "Eichfristen", description: "Überwachung der Eichgültigkeit." },
+        { name: "Rauchmelder", description: "Wartungsintervalle und Lebensdauer." },
+      ],
+    },
+    {
+      id: "hausmanager",
+      title: "Hausmanager",
+      icon: <Briefcase className="h-4 w-4" />,
+      description: "Verwaltung aller externen Kontakte und Dienstleister.",
+      fields: [
+        { name: "Versicherungen", description: "Policen und Ansprechpartner." },
+        { name: "Handwerker", description: "Kontakte für Reparaturen." },
+      ],
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -70,12 +184,17 @@ export function LandingPage({ onOpenApp }: LandingPageProps) {
             </a>
           </nav>
           <div className="flex items-center gap-2 md:gap-3">
-            <Button variant="ghost" size="sm" className="hidden sm:flex">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="hidden sm:flex"
+              onClick={() => setLoginDialogOpen(true)}
+            >
               Anmelden
             </Button>
             <Button
               size="sm"
-              onClick={onOpenApp}
+              onClick={handleStartDemo}
               className="bg-success hover:bg-success/90 text-success-foreground"
             >
               <span className="hidden sm:inline">Jetzt starten</span>
@@ -116,12 +235,127 @@ export function LandingPage({ onOpenApp }: LandingPageProps) {
             >
               FAQ
             </a>
-            <Button variant="outline" size="sm" className="w-full">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="w-full"
+              onClick={() => setLoginDialogOpen(true)}
+            >
               Anmelden
             </Button>
           </div>
         )}
       </header>
+
+      {/* Login Dialog */}
+      <Dialog open={loginDialogOpen} onOpenChange={setLoginDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-success">
+                <Home className="h-4 w-4 text-success-foreground" />
+              </div>
+              Anmelden
+            </DialogTitle>
+            <DialogDescription>
+              Melden Sie sich an, um auf Ihre Hausverwaltung zuzugreifen.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="username">Benutzername</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="Benutzername eingeben"
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="password">Passwort</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Passwort eingeben"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              />
+            </div>
+            {loginError && (
+              <p className="text-sm text-destructive">{loginError}</p>
+            )}
+            <Button 
+              className="w-full bg-success hover:bg-success/90 text-success-foreground" 
+              onClick={handleLogin}
+            >
+              Anmelden
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Help Dialog */}
+      <Dialog open={helpDialogOpen} onOpenChange={setHelpDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <HelpCircle className="h-5 w-5 text-success" />
+              Hilfe & Dokumentation
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            <p className="text-sm text-muted-foreground mb-4">
+              Willkommen bei Hausverwaltung Boss! Hier finden Sie Erklärungen zu allen Bereichen.
+            </p>
+            <Accordion type="single" collapsible className="w-full">
+              {helpSections.map((section) => (
+                <AccordionItem key={section.id} value={section.id}>
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-md bg-success/10 text-success">
+                        {section.icon}
+                      </div>
+                      <span className="font-semibold">{section.title}</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="pl-11 space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        {section.description}
+                      </p>
+                      <div className="space-y-2">
+                        {section.fields.map((field, index) => (
+                          <div key={index} className="rounded-lg bg-muted/50 p-3">
+                            <p className="font-medium text-sm">{field.name}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {field.description}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+            <div className="mt-6 p-4 rounded-lg bg-success/10 border border-success/20">
+              <h4 className="font-medium text-sm flex items-center gap-2">
+                <HelpCircle className="h-4 w-4 text-success" />
+                Tipps für den Einstieg
+              </h4>
+              <ul className="mt-2 text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                <li>Beginnen Sie mit dem Anlegen eines Objekts</li>
+                <li>Fügen Sie dann Wohnungen hinzu</li>
+                <li>Erfassen Sie die Mieter für jede Wohnung</li>
+                <li>Nutzen Sie das Dashboard für eine schnelle Übersicht</li>
+              </ul>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
 
       {/* Hero Section */}
       <section className="relative overflow-hidden py-12 md:py-20 lg:py-32">
@@ -139,18 +373,20 @@ export function LandingPage({ onOpenApp }: LandingPageProps) {
               <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
                 <Button
                   size="lg"
-                  onClick={onOpenApp}
+                  onClick={handleStartDemo}
                   className="bg-success hover:bg-success/90 text-success-foreground gap-2 w-full sm:w-auto"
                 >
-                  Jetzt kostenlos testen
+                  Demo starten
                   <ArrowRight className="h-4 w-4" />
                 </Button>
                 <Button
                   size="lg"
                   variant="outline"
-                  className="w-full sm:w-auto"
+                  className="w-full sm:w-auto gap-2"
+                  onClick={() => setHelpDialogOpen(true)}
                 >
-                  Demo ansehen
+                  <HelpCircle className="h-4 w-4" />
+                  Video-Tutorial ansehen
                 </Button>
               </div>
               <div className="flex flex-wrap items-center gap-4 md:gap-6 pt-2 md:pt-4">
@@ -414,7 +650,7 @@ export function LandingPage({ onOpenApp }: LandingPageProps) {
             </p>
             <Button
               size="lg"
-              onClick={onOpenApp}
+              onClick={handleStartDemo}
               className="bg-success hover:bg-success/90 text-success-foreground gap-2"
             >
               Kostenlos registrieren

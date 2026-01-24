@@ -39,6 +39,8 @@ import {
 } from "lucide-react";
 import type { AppView } from "@/components/app-dashboard";
 import { useAppData } from "@/context/app-data-context";
+import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/hooks/use-toast";
 
 interface DashboardViewProps {
   onNavigate: (view: AppView) => void;
@@ -47,6 +49,16 @@ interface DashboardViewProps {
 export function DashboardView({ onNavigate }: DashboardViewProps) {
   const { objekte, wohnungen, mieter, selectedObjektId, setSelectedObjektId } =
     useAppData();
+  const { isDemo } = useAuth();
+  const { toast } = useToast();
+
+  const handleDemoRestriction = (action: string) => {
+    toast({
+      title: "Demo-Modus",
+      description: `Im Demo-Modus können Sie keine ${action} anlegen. Bitte melden Sie sich an, um diese Funktion zu nutzen.`,
+      variant: "destructive",
+    });
+  };
 
   // Berechne reale Dashboard-Statistiken
   const dashboardStats = useMemo(() => {
@@ -176,7 +188,13 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
             <Button
               variant="outline"
               className="gap-2 bg-transparent justify-start sm:justify-center"
-              onClick={() => onNavigate("nebenkosten")}
+              onClick={() => {
+                if (isDemo) {
+                  handleDemoRestriction("neue Buchung");
+                } else {
+                  onNavigate("nebenkosten");
+                }
+              }}
             >
               <Plus className="h-4 w-4" />
               Neue Buchung
@@ -184,7 +202,13 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
             <Button
               variant="outline"
               className="gap-2 bg-transparent justify-start sm:justify-center"
-              onClick={() => onNavigate("mieter")}
+              onClick={() => {
+                if (isDemo) {
+                  handleDemoRestriction("neuen Mieter");
+                } else {
+                  onNavigate("mieter");
+                }
+              }}
             >
               <UserPlus className="h-4 w-4" />
               Neuer Mieter

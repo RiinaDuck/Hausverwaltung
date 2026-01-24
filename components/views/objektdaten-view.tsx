@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Save, Plus, Building2, Trash2, Edit } from "lucide-react";
 import { useAppData } from "@/context/app-data-context";
+import { useAuth } from "@/context/auth-context";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -38,6 +39,7 @@ export function ObjektdatenView() {
     selectedObjektId,
     setSelectedObjektId,
   } = useAppData();
+  const { isDemo } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [objektName, setObjektName] = useState("");
   const [objektStrasse, setObjektStrasse] = useState("");
@@ -85,6 +87,16 @@ export function ObjektdatenView() {
   };
 
   const handleNeuesObjekt = () => {
+    // Demo-Modus Einschränkung
+    if (isDemo && !editingObjektId) {
+      toast({
+        title: "Demo-Modus",
+        description: "Im Demo-Modus können keine neuen Objekte angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!validateForm()) {
       toast({
         title: "Validierungsfehler",

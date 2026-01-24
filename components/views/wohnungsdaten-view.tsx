@@ -61,6 +61,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useAppData } from "@/context/app-data-context";
+import { useAuth } from "@/context/auth-context";
 
 interface Unit {
   id: string;
@@ -285,6 +286,7 @@ export function WohnungsdatenView() {
     updateWohnung,
     deleteWohnung,
   } = useAppData();
+  const { isDemo } = useAuth();
 
   // Finde das aktuelle Objekt für den Namen
   const currentObjekt = objekte.find((o) => o.id === selectedObjektId);
@@ -403,6 +405,16 @@ export function WohnungsdatenView() {
   };
 
   const handleCreateUnit = () => {
+    // Demo-Modus Einschränkung
+    if (isDemo) {
+      toast({
+        title: "Demo-Modus",
+        description: "Im Demo-Modus können keine neuen Wohnungen angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!selectedObjektId) {
       toast({
         title: "Fehler",

@@ -53,8 +53,10 @@ import {
   generateMieterKommunikationPDF,
   generatePDF,
   downloadPDF,
+  sanitizeFilename,
 } from "@/lib/pdf-generator";
 import { useAppData } from "@/context/app-data-context";
+import { useAuth } from "@/context/auth-context";
 
 // Lokales Interface für die Ansicht (kombiniert Mieter + Wohnungsdaten)
 interface MieterDisplay {
@@ -92,6 +94,7 @@ export function MieterdatenView() {
     archiviereMieter,
     reaktiviereMieter,
   } = useAppData();
+  const { isDemo, profile } = useAuth();
 
   // Finde das aktuelle Objekt für den Namen
   const currentObjekt = objekte.find((o) => o.id === selectedObjektId);
@@ -410,12 +413,13 @@ export function MieterdatenView() {
       title: `Mieterdaten - ${editedMieter.name}`,
       subtitle: `${currentObjekt?.name || ""} - ${editedMieter.geschoss}`,
       content,
+      profile: profile,
       footer: `Hausverwaltung Boss - ${currentObjekt?.objektdaten.strasse || ""}, ${currentObjekt?.objektdaten.plz || ""} ${currentObjekt?.objektdaten.ort || ""}`,
     });
 
     downloadPDF(
       doc,
-      `Mieterdaten_${editedMieter.name}_${new Date().toISOString().split("T")[0]}`,
+      sanitizeFilename(`Mieterdaten_${editedMieter.name}_${new Date().toISOString().split("T")[0]}`),
     );
 
     toast({
@@ -434,16 +438,25 @@ export function MieterdatenView() {
       betreff,
       nachricht,
       absender: "Mit freundlichen Grüßen\nIhre Hausverwaltung Boss",
+      profile: profile,
     });
     downloadPDF(
       doc,
-      `mitteilung_${selectedMieter.name.replace(/\s+/g, "_")}_${
-        new Date().toISOString().split("T")[0]
-      }`,
+      sanitizeFilename(`mitteilung_${selectedMieter.name}_${new Date().toISOString().split("T")[0]}`),
     );
   };
 
   const handleCreateMieter = () => {
+    // Demo-Modus Einschränkung
+    if (isDemo) {
+      toast({
+        title: "Demo-Modus",
+        description: "Im Demo-Modus können keine neuen Mieter angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!newMieter.wohnungId || !newMieter.name) {
       toast({
         title: "Fehler",

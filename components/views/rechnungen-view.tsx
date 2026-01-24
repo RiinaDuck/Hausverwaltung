@@ -31,7 +31,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Save, Plus, Trash2, FileDown, Eye, Pencil } from "lucide-react";
-import { generateRechnungPDF, downloadPDF } from "@/lib/pdf-generator";
+import { generateRechnungPDF, downloadPDF, sanitizeFilename } from "@/lib/pdf-generator";
+import { useAuth } from "@/context/auth-context";
+import { useToast } from "@/hooks/use-toast";
 
 interface RechnungsPosition {
   id: string;
@@ -113,6 +115,8 @@ const initialRechnungen: Rechnung[] = [
 ];
 
 export function RechnungenView() {
+  const { profile, isDemo } = useAuth();
+  const { toast } = useToast();
   const [rechnungen, setRechnungen] = useState<Rechnung[]>(initialRechnungen);
   const [selectedRechnung, setSelectedRechnung] = useState<Rechnung | null>(
     null
@@ -161,26 +165,40 @@ export function RechnungenView() {
   }, [rechnungen, calculateNetto, calculateBrutto]);
 
   const handleExportPDF = (rechnung: Rechnung) => {
-    const netto = calculateNetto(rechnung.positionen);
-    const doc = generateRechnungPDF({
-      rechnungsNr: rechnung.nummer,
-      datum: new Date(rechnung.datum).toLocaleDateString("de-DE"),
-      empfaenger: {
-        name: rechnung.empfaengerName,
-        adresse: rechnung.empfaengerAdresse,
-      },
-      positionen: rechnung.positionen.map((p) => ({
-        beschreibung: p.beschreibung,
-        menge: p.menge,
-        einzelpreis: p.einzelpreis,
-        gesamt: calculatePositionTotal(p),
-      })),
-      summeNetto: netto,
-      mwst: calculateMwst(netto),
-      summeBrutto: calculateBrutto(netto),
-      bemerkung: rechnung.bemerkung,
-    });
-    downloadPDF(doc, `rechnung_${rechnung.nummer}`);
+    try {
+      const netto = calculateNetto(rechnung.positionen);
+      const doc = generateRechnungPDF({
+        rechnungsNr: rechnung.nummer,
+        datum: new Date(rechnung.datum).toLocaleDateString("de-DE"),
+        empfaenger: {
+          name: rechnung.empfaengerName,
+          adresse: rechnung.empfaengerAdresse,
+        },
+        positionen: rechnung.positionen.map((p) => ({
+          beschreibung: p.beschreibung,
+          menge: p.menge,
+          einzelpreis: p.einzelpreis,
+          gesamt: calculatePositionTotal(p),
+        })),
+        summeNetto: netto,
+        mwst: calculateMwst(netto),
+        summeBrutto: calculateBrutto(netto),
+        bemerkung: rechnung.bemerkung,
+        profile: profile,
+      });
+      downloadPDF(doc, sanitizeFilename(`rechnung_${rechnung.nummer}`));
+      toast({
+        title: "PDF erstellt",
+        description: "Die Rechnung wurde erfolgreich exportiert.",
+      });
+    } catch (error) {
+      console.error("PDF Export Fehler:", error);
+      toast({
+        title: "Fehler beim Export",
+        description: "Die Rechnung konnte nicht erstellt werden.",
+        variant: "destructive",
+      });
+    }
   };
 
   const addPosition = () => {
@@ -215,6 +233,15 @@ export function RechnungenView() {
   };
 
   const handleCreateRechnung = () => {
+    if (isDemo) {
+      toast({
+        title: "Demo-Modus",
+        description: "Im Demo-Modus können keine neuen Rechnungen angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     const rechnung: Rechnung = {
       id: String(rechnungen.length + 1),
       nummer: newRechnung.nummer || "",

@@ -24,8 +24,9 @@ import {
 } from "@/components/ui/table";
 import { Save, Plus, Trash2, FileDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { generateNebenkostenPDF, downloadPDF } from "@/lib/pdf-generator";
+import { generateNebenkostenPDF, downloadPDF, sanitizeFilename } from "@/lib/pdf-generator";
 import { useAppData } from "@/context/app-data-context";
+import { useAuth } from "@/context/auth-context";
 
 interface Kostenart {
   id: string;
@@ -126,6 +127,7 @@ const verteilerschluesselOptions = [
 
 export function NebenkostenView() {
   const { objekte, wohnungen, mieter, selectedObjektId } = useAppData();
+  const { profile, isDemo } = useAuth();
   const [kostenarten, setKostenarten] =
     useState<Kostenart[]>(initialKostenarten);
   const [selectedMieterId, setSelectedMieterId] = useState<string | null>(null);
@@ -200,6 +202,15 @@ export function NebenkostenView() {
   };
 
   const addKostenart = () => {
+    if (isDemo) {
+      toast({
+        title: "Demo-Modus",
+        description: "Im Demo-Modus können keine neuen Buchungen angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     const newId = (
       Math.max(...kostenarten.map((k) => Number.parseInt(k.id))) + 1
     ).toString();
@@ -223,25 +234,39 @@ export function NebenkostenView() {
       return;
     }
 
-    const doc = generateNebenkostenPDF({
-      title,
-      dateVon,
-      dateBis,
-      introText,
-      kostenarten: kostenarten.map((k) => ({
-        name: k.name,
-        kosten: k.kosten,
-        schluessel: k.schluessel,
-      })),
-      total: calculateTotal(),
-      outroText,
-      mieterName: selectedMieter.name,
-      objektAdresse: currentObjekt?.adresse || "",
-    });
-    downloadPDF(
-      doc,
-      `nebenkostenabrechnung_${selectedMieter.name}_${dateVon}_${dateBis}`
-    );
+    try {
+      const doc = generateNebenkostenPDF({
+        title,
+        dateVon,
+        dateBis,
+        introText,
+        kostenarten: kostenarten.map((k) => ({
+          name: k.name,
+          kosten: k.kosten,
+          schluessel: k.schluessel,
+        })),
+        total: calculateTotal(),
+        outroText,
+        mieterName: selectedMieter.name,
+        objektAdresse: currentObjekt?.adresse || "",
+        profile: profile,
+      });
+      downloadPDF(
+        doc,
+        sanitizeFilename(`nebenkostenabrechnung_${selectedMieter.name}_${dateVon}_${dateBis}`)
+      );
+      toast({
+        title: "PDF erstellt",
+        description: "Die Nebenkostenabrechnung wurde erfolgreich exportiert.",
+      });
+    } catch (error) {
+      console.error("PDF Export Fehler:", error);
+      toast({
+        title: "Fehler beim Export",
+        description: "Die Nebenkostenabrechnung konnte nicht erstellt werden.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
