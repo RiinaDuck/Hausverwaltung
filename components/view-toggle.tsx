@@ -10,8 +10,11 @@ function ViewToggleContent() {
   const [view, setView] = useState<"landing" | "app">("landing");
   const { isAuthenticated, login, startDemo, logout } = useAuth();
 
-  const handleLogin = (username: string, password: string): boolean => {
-    return login(username, password);
+  const handleLogin = async (
+    email: string,
+    password: string,
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await login(email, password);
   };
 
   const handleStartDemo = () => {

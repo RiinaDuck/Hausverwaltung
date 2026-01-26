@@ -7,6 +7,8 @@ import {
   useEffect,
   ReactNode,
 } from "react";
+import { createClient } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
 
 // Profil-Interface
 export interface UserProfile {
@@ -20,12 +22,22 @@ export interface UserProfile {
 interface AuthContextType {
   isAuthenticated: boolean;
   isDemo: boolean;
+  user: User | null;
   profile: UserProfile;
-  login: (username: string, password: string) => boolean;
+  login: (
+    email: string,
+    password: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  signup: (
+    email: string,
+    password: string,
+    name: string,
+  ) => Promise<{ success: boolean; error?: string }>;
   startDemo: () => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   updateProfile: (profile: Partial<UserProfile>) => void;
   getInitials: () => string;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -48,7 +60,12 @@ const demoProfile: UserProfile = {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const STORAGE_KEY = "hausverwaltung_profile";
-  const AUTH_STORAGE_KEY = "hausverwaltung_auth";
+  const supabase = createClient();
+
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isDemo, setIsDemo] = useState(false);
+  const [profile, setProfile] = useState<UserProfile>(defaultProfile);
 
   // Helper: Load from localStorage with fallback
   const loadFromStorage = <T,>(key: string, fallback: T): T => {
@@ -62,79 +79,181 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
-    const authState = loadFromStorage(AUTH_STORAGE_KEY, {
-      isAuthenticated: false,
-      isDemo: false,
+  // Initialize auth state from Supabase
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          setProfile({
+            name:
+              session.user.user_metadata?.name ||
+              session.user.email?.split("@")[0] ||
+              "User",
+            email: session.user.email || "",
+            anschrift: session.user.user_metadata?.anschrift || "",
+            ansprechpartner:
+              session.user.user_metadata?.ansprechpartner ||
+              session.user.user_metadata?.name ||
+              "",
+          });
+        }
+      } catch (error) {
+        console.error("Error initializing auth:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initAuth();
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+
+      if (session?.user) {
+        setProfile({
+          name:
+            session.user.user_metadata?.name ||
+            session.user.email?.split("@")[0] ||
+            "User",
+          email: session.user.email || "",
+          anschrift: session.user.user_metadata?.anschrift || "",
+          ansprechpartner:
+            session.user.user_metadata?.ansprechpartner ||
+            session.user.user_metadata?.name ||
+            "",
+        });
+      }
+      setLoading(false);
     });
-    return authState.isAuthenticated;
-  });
-  const [isDemo, setIsDemo] = useState<boolean>(() => {
-    const authState = loadFromStorage(AUTH_STORAGE_KEY, {
-      isAuthenticated: false,
-      isDemo: false,
-    });
-    return authState.isDemo;
-  });
-  const [profile, setProfile] = useState<UserProfile>(() =>
-    loadFromStorage(STORAGE_KEY, defaultProfile),
-  );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   // Speichere Profil-Änderungen
   useEffect(() => {
-    if (typeof window === "undefined" || isDemo) return;
+    if (typeof window === "undefined" || isDemo || !user) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
     } catch (error) {
       console.error("Error saving profile to localStorage:", error);
     }
-  }, [profile, isDemo]);
+  }, [profile, isDemo, user]);
 
-  // Speichere Auth-Status
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  // Login mit Supabase Auth
+  const login = async (
+    email: string,
+    password: string,
+  ): Promise<{ success: boolean; error?: string }> => {
     try {
-      localStorage.setItem(
-        AUTH_STORAGE_KEY,
-        JSON.stringify({ isAuthenticated, isDemo }),
-      );
-    } catch (error) {
-      console.error("Error saving auth state to localStorage:", error);
-    }
-  }, [isAuthenticated, isDemo]);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-  // Login mit admin/admin Credentials
-  const login = (username: string, password: string): boolean => {
-    if (username === "admin" && password === "admin") {
-      setIsAuthenticated(true);
-      setIsDemo(false);
-      setProfile(loadFromStorage(STORAGE_KEY, defaultProfile));
-      return true;
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data.user) {
+        setUser(data.user);
+        setIsDemo(false);
+        return { success: true };
+      }
+
+      return { success: false, error: "Login fehlgeschlagen" };
+    } catch (error) {
+      console.error("Login error:", error);
+      return {
+        success: false,
+        error: "Ein unerwarteter Fehler ist aufgetreten",
+      };
     }
-    return false;
+  };
+
+  // Signup mit Supabase Auth
+  const signup = async (
+    email: string,
+    password: string,
+    name: string,
+  ): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            name: name,
+            anschrift: "",
+            ansprechpartner: name,
+          },
+        },
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      if (data.user) {
+        return { success: true };
+      }
+
+      return { success: false, error: "Registrierung fehlgeschlagen" };
+    } catch (error) {
+      console.error("Signup error:", error);
+      return {
+        success: false,
+        error: "Ein unerwarteter Fehler ist aufgetreten",
+      };
+    }
   };
 
   // Demo-Modus starten
   const startDemo = () => {
-    setIsAuthenticated(true);
     setIsDemo(true);
     setProfile(demoProfile);
   };
 
   // Logout
-  const logout = () => {
-    setIsAuthenticated(false);
-    setIsDemo(false);
-    // Auth-Status aus localStorage entfernen
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
+  const logout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setIsDemo(false);
+      setProfile(defaultProfile);
+    } catch (error) {
+      console.error("Logout error:", error);
     }
   };
 
   // Profil aktualisieren (nur wenn nicht im Demo-Modus)
-  const updateProfile = (updates: Partial<UserProfile>) => {
-    if (isDemo) return; // Keine Änderungen im Demo-Modus
-    setProfile((prev) => ({ ...prev, ...updates }));
+  const updateProfile = async (updates: Partial<UserProfile>) => {
+    if (isDemo || !user) return;
+
+    const updatedProfile = { ...profile, ...updates };
+    setProfile(updatedProfile);
+
+    try {
+      // Update user metadata in Supabase
+      await supabase.auth.updateUser({
+        data: {
+          name: updatedProfile.name,
+          anschrift: updatedProfile.anschrift,
+          ansprechpartner: updatedProfile.ansprechpartner,
+        },
+      });
+    } catch (error) {
+      console.error("Error updating profile:", error);
+    }
   };
 
   // Initialen aus dem Namen generieren
@@ -147,17 +266,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
   };
 
+  const isAuthenticated = !!user || isDemo;
+
   return (
     <AuthContext.Provider
       value={{
         isAuthenticated,
         isDemo,
+        user,
         profile,
         login,
+        signup,
         startDemo,
         logout,
         updateProfile,
         getInitials,
+        loading,
       }}
     >
       {children}

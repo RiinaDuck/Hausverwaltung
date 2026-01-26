@@ -8,6 +8,18 @@ Eine umfassende, benutzerfreundliche Immobilienverwaltungssoftware, die speziell
 [![React](https://img.shields.io/badge/React-19-blue)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38bdf8)](https://tailwindcss.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-Database-green)](https://supabase.com/)
+
+## 🚀 Supabase Integration
+
+Die App nutzt **Supabase** als Backend:
+
+- ✅ PostgreSQL Datenbank
+- ✅ User Authentication (Email/Password)
+- ✅ Row Level Security (RLS)
+- ✅ Realtime Subscriptions (optional)
+
+👉 **[Supabase Setup Guide](SUPABASE_SETUP.md)** - Vollständige Einrichtungsanleitung
 
 ## ✨ Features
 
@@ -88,15 +100,34 @@ cd Hausverwaltung
 pnpm install
 ```
 
-3. **Entwicklungsserver starten**
+3. **Supabase einrichten**
+
+📖 **Folge der detaillierten Anleitung**: [SUPABASE_SETUP.md](SUPABASE_SETUP.md)
+
+Kurzversion:
+
+- Erstelle ein Supabase-Projekt auf [supabase.com](https://supabase.com)
+- Kopiere `.env.example` zu `.env.local`
+- Füge deine Supabase Credentials ein
+- Führe das SQL-Schema aus (`supabase/migrations/20260126_initial_schema.sql`)
+
+4. **Entwicklungsserver starten**
 
 ```bash
 pnpm dev
 ```
 
-4. **Anwendung öffnen**
+5. **Anwendung öffnen**
 
-Öffnen Sie [http://localhost:3000](http://localhost:3000) in Ihrem Browser.
+Öffne [http://localhost:3000](http://localhost:3000) in deinem Browser.
+
+### Demo-Modus (Ohne Datenbank)
+
+Du kannst die App auch ohne Supabase im **Demo-Modus** testen:
+
+- Klicke auf "Demo starten" auf der Landing Page
+- Alle Daten werden nur im Browser gespeichert (localStorage)
+- Perfekt zum Ausprobieren der Features
 
 ## 📦 Verfügbare Scripts
 
@@ -115,6 +146,12 @@ pnpm dev
 - **[React 19](https://react.dev/)** - UI Library mit neuen Features
 - **[TypeScript](https://www.typescriptlang.org/)** - Type-Safe Development
 - **[Tailwind CSS 4](https://tailwindcss.com/)** - Utility-First CSS Framework
+
+### Backend & Database
+
+- **[Supabase](https://supabase.com/)** - PostgreSQL Database & Auth
+- **[Supabase Auth](https://supabase.com/auth)** - User Authentication
+- **Row Level Security (RLS)** - Sichere Datenisolation pro User
 
 ### UI Components
 

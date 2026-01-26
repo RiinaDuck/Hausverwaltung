@@ -47,7 +47,10 @@ import {
 
 interface LandingPageProps {
   onOpenApp: () => void;
-  onLogin: (username: string, password: string) => boolean;
+  onLogin: (
+    email: string,
+    password: string,
+  ) => Promise<{ success: boolean; error?: string }>;
   onStartDemo: () => void;
 }
 
@@ -58,20 +61,31 @@ export function LandingPage({
 }: LandingPageProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
+  const [signupDialogOpen, setSignupDialogOpen] = useState(false);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
-  const [loginUsername, setLoginUsername] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setLoginError("");
-    if (onLogin(loginUsername, loginPassword)) {
+    setLoginLoading(true);
+
+    const result = await onLogin(loginEmail, loginPassword);
+
+    setLoginLoading(false);
+
+    if (result.success) {
       setLoginDialogOpen(false);
-      setLoginUsername("");
+      setLoginEmail("");
       setLoginPassword("");
       onOpenApp();
     } else {
-      setLoginError("Ungültige Anmeldedaten. Bitte versuchen Sie es erneut.");
+      setLoginError(
+        result.error ||
+          "Ungültige Anmeldedaten. Bitte versuchen Sie es erneut.",
+      );
     }
   };
 
@@ -293,19 +307,22 @@ export function LandingPage({
               Anmelden
             </DialogTitle>
             <DialogDescription>
-              Melden Sie sich an, um auf Ihre Hausverwaltung zuzugreifen.
+              Melden Sie sich mit Ihrer E-Mail und Passwort an.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Benutzername</Label>
+              <Label htmlFor="email">E-Mail</Label>
               <Input
-                id="username"
-                type="text"
-                placeholder="Benutzername eingeben"
-                value={loginUsername}
-                onChange={(e) => setLoginUsername(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                id="email"
+                type="email"
+                placeholder="ihre-email@example.de"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && !loginLoading && handleLogin()
+                }
+                disabled={loginLoading}
               />
             </div>
             <div className="space-y-2">
@@ -316,7 +333,10 @@ export function LandingPage({
                 placeholder="Passwort eingeben"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && !loginLoading && handleLogin()
+                }
+                disabled={loginLoading}
               />
             </div>
             {loginError && (
@@ -325,9 +345,23 @@ export function LandingPage({
             <Button
               className="w-full bg-success hover:bg-success/90 text-success-foreground"
               onClick={handleLogin}
+              disabled={loginLoading}
             >
-              Anmelden
+              {loginLoading ? "Wird angemeldet..." : "Anmelden"}
             </Button>
+            <div className="text-center text-sm text-muted-foreground">
+              Noch kein Konto?{" "}
+              <button
+                type="button"
+                className="text-success hover:underline font-medium"
+                onClick={() => {
+                  setLoginDialogOpen(false);
+                  setSignupDialogOpen(true);
+                }}
+              >
+                Jetzt registrieren
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

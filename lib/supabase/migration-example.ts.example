@@ -1,0 +1,141 @@
+// Example: How to migrate app-data-context.tsx to use Supabase
+// This is a reference implementation showing how to replace localStorage with Supabase
+
+import { useAuth } from '@/context/auth-context'
+import { 
+  getObjekte, 
+  createObjekt, 
+  updateObjekt, 
+  deleteObjekt,
+  getWohnungen,
+  createWohnung,
+  // ... import other query functions
+} from '@/lib/supabase/queries'
+
+// In your AppDataProvider component:
+
+// ❌ OLD (localStorage):
+const [objekte, setObjekte] = useState<Objekt[]>(() => {
+  if (typeof window === 'undefined') return []
+  const stored = localStorage.getItem('hausverwaltung_objekte')
+  return stored ? JSON.parse(stored) : []
+})
+
+// ✅ NEW (Supabase):
+const { user } = useAuth()
+const [objekte, setObjekte] = useState<Objekt[]>([])
+const [loading, setLoading] = useState(true)
+
+useEffect(() => {
+  if (!user) return
+  
+  const loadObjekte = async () => {
+    try {
+      const data = await getObjekte(user.id)
+      setObjekte(data)
+    } catch (error) {
+      console.error('Error loading objekte:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  loadObjekte()
+}, [user])
+
+// ❌ OLD (addObjekt):
+const addObjekt = (objekt: Omit<Objekt, 'id'>) => {
+  const newObjekt = {
+    ...objekt,
+    id: crypto.randomUUID(),
+  }
+  setObjekte(prev => [...prev, newObjekt])
+}
+
+// ✅ NEW (addObjekt with Supabase):
+const addObjekt = async (objekt: Omit<Objekt, 'id'>) => {
+  if (!user) return
+  
+  try {
+    const newObjekt = await createObjekt({
+      ...objekt,
+      user_id: user.id,
+    })
+    setObjekte(prev => [...prev, newObjekt])
+  } catch (error) {
+    console.error('Error creating objekt:', error)
+    throw error
+  }
+}
+
+// ❌ OLD (updateObjekt):
+const updateObjekt = (id: string, updates: Partial<Objekt>) => {
+  setObjekte(prev => 
+    prev.map(obj => obj.id === id ? { ...obj, ...updates } : obj)
+  )
+}
+
+// ✅ NEW (updateObjekt with Supabase):
+const updateObjekt = async (id: string, updates: Partial<Objekt>) => {
+  try {
+    const updated = await updateObjekt(id, updates)
+    setObjekte(prev => 
+      prev.map(obj => obj.id === id ? updated : obj)
+    )
+  } catch (error) {
+    console.error('Error updating objekt:', error)
+    throw error
+  }
+}
+
+// ❌ OLD (deleteObjekt):
+const deleteObjekt = (id: string) => {
+  setObjekte(prev => prev.filter(obj => obj.id !== id))
+}
+
+// ✅ NEW (deleteObjekt with Supabase):
+const deleteObjekt = async (id: string) => {
+  try {
+    await deleteObjekt(id)
+    setObjekte(prev => prev.filter(obj => obj.id !== id))
+  } catch (error) {
+    console.error('Error deleting objekt:', error)
+    throw error
+  }
+}
+
+// IMPORTANT NOTES:
+// 1. All functions become async
+// 2. Add error handling (try/catch)
+// 3. Add user_id to all inserts
+// 4. Load data on mount (useEffect)
+// 5. Add loading states
+// 6. Consider adding toast notifications for errors
+
+// Example with error handling and toast:
+import { useToast } from '@/hooks/use-toast'
+
+const { toast } = useToast()
+
+const addObjekt = async (objekt: Omit<Objekt, 'id'>) => {
+  if (!user) return
+  
+  try {
+    const newObjekt = await createObjekt({
+      ...objekt,
+      user_id: user.id,
+    })
+    setObjekte(prev => [...prev, newObjekt])
+    toast({
+      title: 'Erfolg',
+      description: 'Objekt wurde erstellt',
+    })
+  } catch (error) {
+    console.error('Error creating objekt:', error)
+    toast({
+      title: 'Fehler',
+      description: 'Objekt konnte nicht erstellt werden',
+      variant: 'destructive',
+    })
+  }
+}
