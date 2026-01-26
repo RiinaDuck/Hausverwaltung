@@ -166,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           anschrift: "Admin-Straße 1, 00000 Admin",
           ansprechpartner: "Administrator",
         },
-      } as User;
+      } as unknown as User;
 
       setUser(adminUser);
       setIsDemo(false);
