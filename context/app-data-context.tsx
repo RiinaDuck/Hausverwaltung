@@ -204,7 +204,7 @@ const DEMO_MIETER: Mieter[] = [
 ];
 
 export function AppDataProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [objekte, setObjekte] = useState<Objekt[]>([]);
   const [wohnungen, setWohnungen] = useState<Wohnung[]>([]);
   const [mieter, setMieter] = useState<Mieter[]>([]);
@@ -259,8 +259,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   // Lade alle Daten von Supabase
   const refreshData = async () => {
-    if (!user) {
-      // Demo-Modus: Zeige Demo-Daten
+    // Demo-Modus oder Admin-Account: Zeige Demo-Daten
+    // Admin hat keine echte Supabase user_id und kann daher nicht auf RLS-geschützte Daten zugreifen
+    if (!user || isAdmin) {
       setObjekte(DEMO_OBJEKTE);
       setWohnungen(DEMO_WOHNUNGEN);
       setMieter(DEMO_MIETER);

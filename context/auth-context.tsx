@@ -22,6 +22,7 @@ export interface UserProfile {
 interface AuthContextType {
   isAuthenticated: boolean;
   isDemo: boolean;
+  isAdmin: boolean;
   user: User | null;
   profile: UserProfile;
   login: (
@@ -65,6 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDemo, setIsDemo] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [profile, setProfile] = useState<UserProfile>(defaultProfile);
 
   // Helper: Load from localStorage with fallback
@@ -168,6 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       setUser(adminUser);
       setIsDemo(false);
+      setIsAdmin(true);
       setProfile({
         name: "Administrator",
         email: "admin@hausverwaltung-boss.de",
@@ -177,6 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: true };
     }
 
+    // Normale Supabase-Authentifizierung
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -190,6 +194,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.user) {
         setUser(data.user);
         setIsDemo(false);
+        setIsAdmin(false);
         return { success: true };
       }
 
@@ -252,6 +257,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut();
       setUser(null);
       setIsDemo(false);
+      setIsAdmin(false);
       setProfile(defaultProfile);
     } catch (error) {
       console.error("Logout error:", error);
@@ -296,6 +302,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         isAuthenticated,
         isDemo,
+        isAdmin,
         user,
         profile,
         login,
