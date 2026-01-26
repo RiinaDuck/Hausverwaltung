@@ -208,9 +208,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [objekte, setObjekte] = useState<Objekt[]>([]);
   const [wohnungen, setWohnungen] = useState<Wohnung[]>([]);
   const [mieter, setMieter] = useState<Mieter[]>([]);
-  const [ehemaligeMieter, setEhemaligeMieter] = useState<EhemalierMieter[]>(
-    [],
-  );
+  const [ehemaligeMieter, setEhemaligeMieter] = useState<EhemalierMieter[]>([]);
   const [selectedObjektId, setSelectedObjektId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 

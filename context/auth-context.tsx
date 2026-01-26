@@ -165,7 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ansprechpartner: "Administrator",
         },
       } as User;
-      
+
       setUser(adminUser);
       setIsDemo(false);
       setProfile({

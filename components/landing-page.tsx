@@ -133,7 +133,8 @@ export function LandingPage({
       onOpenApp();
     } else {
       setSignupError(
-        result.error || "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.",
+        result.error ||
+          "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.",
       );
     }
   };
@@ -448,7 +449,9 @@ export function LandingPage({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="signup-confirm-password">Passwort wiederholen</Label>
+              <Label htmlFor="signup-confirm-password">
+                Passwort wiederholen
+              </Label>
               <Input
                 id="signup-confirm-password"
                 type="password"
