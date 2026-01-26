@@ -7,6 +7,21 @@ import {
   useEffect,
   ReactNode,
 } from "react";
+import { useAuth } from "./auth-context";
+import {
+  getObjekte,
+  createObjekt,
+  updateObjekt as updateObjektDB,
+  deleteObjekt as deleteObjektDB,
+  getWohnungen,
+  createWohnung,
+  updateWohnung as updateWohnungDB,
+  deleteWohnung as deleteWohnungDB,
+  getMieter,
+  createMieter,
+  updateMieter as updateMieterDB,
+  deleteMieter as deleteMieterDB,
+} from "@/lib/supabase/queries";
 
 // Types für die Datenstrukturen
 export interface Objekt {
@@ -66,14 +81,12 @@ export interface Mieter {
   kaltmiete: number;
   nebenkosten: number;
   kaution: number;
-  // Neue Felder für erweiterte Mieterverwaltung
   isKurzzeitvermietung: boolean;
-  kurzzeitBis?: string | null; // Enddatum für Kurzzeitvermietung
-  isAktiv: boolean; // true = aktueller Mieter, false = ehemaliger Mieter
-  prozentanteil?: number; // Verteilungsschlüssel Prozentanteil
+  kurzzeitBis?: string | null;
+  isAktiv: boolean;
+  prozentanteil?: number;
 }
 
-// Ehemalige Mieter-Datenbank (für Wiederverwendung)
 export interface EhemalierMieter {
   id: string;
   name: string;
@@ -89,26 +102,31 @@ interface AppDataContextType {
   mieter: Mieter[];
   ehemaligeMieter: EhemalierMieter[];
   selectedObjektId: string | null;
-  addObjekt: (objekt: Omit<Objekt, "id">) => void;
-  updateObjekt: (id: string, objekt: Partial<Objekt>) => void;
-  deleteObjekt: (id: string) => void;
-  addWohnung: (wohnung: Omit<Wohnung, "id">) => void;
-  updateWohnung: (id: string, wohnung: Partial<Wohnung>) => void;
-  deleteWohnung: (id: string) => void;
-  addMieter: (mieter: Omit<Mieter, "id">) => void;
-  updateMieter: (id: string, mieter: Partial<Mieter>) => void;
-  deleteMieter: (id: string) => void;
-  archiviereMieter: (id: string) => void; // Mieter als ehemalig markieren und archivieren
-  reaktiviereMieter: (ehemaligerMieterId: string, wohnungId: string) => void; // Ehemaligen Mieter wiederverwenden
+  loading: boolean;
+  addObjekt: (objekt: Omit<Objekt, "id">) => Promise<void>;
+  updateObjekt: (id: string, objekt: Partial<Objekt>) => Promise<void>;
+  deleteObjekt: (id: string) => Promise<void>;
+  addWohnung: (wohnung: Omit<Wohnung, "id">) => Promise<void>;
+  updateWohnung: (id: string, wohnung: Partial<Wohnung>) => Promise<void>;
+  deleteWohnung: (id: string) => Promise<void>;
+  addMieter: (mieter: Omit<Mieter, "id">) => Promise<void>;
+  updateMieter: (id: string, mieter: Partial<Mieter>) => Promise<void>;
+  deleteMieter: (id: string) => Promise<void>;
+  archiviereMieter: (id: string) => Promise<void>;
+  reaktiviereMieter: (
+    ehemaligerMieterId: string,
+    wohnungId: string,
+  ) => Promise<void>;
   setSelectedObjektId: (id: string | null) => void;
+  refreshData: () => Promise<void>;
 }
 
 const AppDataContext = createContext<AppDataContextType | undefined>(undefined);
 
-// Initiale Demo-Daten
-const initialObjekte: Objekt[] = [
+// Demo-Daten für nicht-eingeloggte User
+const DEMO_OBJEKTE: Objekt[] = [
   {
-    id: "1",
+    id: "demo-1",
     name: "Musterhaus Berlin",
     adresse: "Berliner Straße 42, 10115 Berlin",
     typ: "Miete",
@@ -138,81 +156,14 @@ const initialObjekte: Objekt[] = [
       anzahlEinheiten: "8",
       garagen: "4",
     },
-    notizen:
-      "Hausmeisterservice: Firma Schmidt, Tel. 030 9876543\nSchlüssel: 3x Haupteingang, 1x Keller\n\nNächste Wartung Heizung: März 2026",
-  },
-  {
-    id: "2",
-    name: "Gartenstraße 12",
-    adresse: "Gartenstraße 12, 10115 Berlin",
-    typ: "Miete",
-    einheiten: 4,
-    status: "aktiv",
-    eigentuemer: {
-      name: "Max Mustermann",
-      adresse: "Musterstraße 123, 12345 Berlin",
-      telefon: "030 12345678",
-      email: "max@mustermann.de",
-      mobil: "0170 1234567",
-    },
-    bankverbindung: {
-      kontoinhaber: "Max Mustermann",
-      bank: "Sparkasse Berlin",
-      iban: "DE89 3704 0044 0532 0130 00",
-      bic: "COBADEFFXXX",
-    },
-    objektdaten: {
-      strasse: "Gartenstraße 12",
-      plz: "10115",
-      ort: "Berlin",
-      baujahr: "1992",
-      sanierungsjahr: "2020",
-      gesamtwohnflaeche: "280,00",
-      gesamtnutzflaeche: "40,00",
-      anzahlEinheiten: "4",
-      garagen: "2",
-    },
-    notizen: "",
-  },
-  {
-    id: "3",
-    name: "WEG Parkresidenz",
-    adresse: "Parkalle 22, 10117 Berlin",
-    typ: "WEG",
-    einheiten: 12,
-    status: "aktiv",
-    eigentuemer: {
-      name: "Max Mustermann",
-      adresse: "Musterstraße 123, 12345 Berlin",
-      telefon: "030 12345678",
-      email: "max@mustermann.de",
-      mobil: "0170 1234567",
-    },
-    bankverbindung: {
-      kontoinhaber: "WEG Parkresidenz",
-      bank: "Deutsche Bank",
-      iban: "DE89 3704 0044 0532 0130 01",
-      bic: "DEUTDEFF",
-    },
-    objektdaten: {
-      strasse: "Parkalle 22",
-      plz: "10117",
-      ort: "Berlin",
-      baujahr: "2005",
-      sanierungsjahr: "",
-      gesamtwohnflaeche: "980,00",
-      gesamtnutzflaeche: "120,00",
-      anzahlEinheiten: "12",
-      garagen: "12",
-    },
-    notizen: "WEG-Verwaltung seit 2020",
+    notizen: "Demo-Objekt",
   },
 ];
 
-const initialWohnungen: Wohnung[] = [
+const DEMO_WOHNUNGEN: Wohnung[] = [
   {
-    id: "w1",
-    objektId: "1",
+    id: "demo-w1",
+    objektId: "demo-1",
     bezeichnung: "EG links",
     etage: "EG",
     flaeche: 65,
@@ -222,8 +173,8 @@ const initialWohnungen: Wohnung[] = [
     status: "vermietet",
   },
   {
-    id: "w2",
-    objektId: "1",
+    id: "demo-w2",
+    objektId: "demo-1",
     bezeichnung: "EG rechts",
     etage: "EG",
     flaeche: 70,
@@ -232,332 +183,398 @@ const initialWohnungen: Wohnung[] = [
     nebenkosten: 160,
     status: "vermietet",
   },
-  {
-    id: "w3",
-    objektId: "1",
-    bezeichnung: "1.OG links",
-    etage: "1.OG",
-    flaeche: 65,
-    zimmer: 2,
-    miete: 680,
-    nebenkosten: 150,
-    status: "vermietet",
-  },
-  {
-    id: "w4",
-    objektId: "1",
-    bezeichnung: "1.OG rechts",
-    etage: "1.OG",
-    flaeche: 70,
-    zimmer: 3,
-    miete: 720,
-    nebenkosten: 160,
-    status: "leer",
-  },
-  {
-    id: "w5",
-    objektId: "2",
-    bezeichnung: "EG",
-    etage: "EG",
-    flaeche: 80,
-    zimmer: 3,
-    miete: 850,
-    nebenkosten: 180,
-    status: "vermietet",
-  },
-  {
-    id: "w6",
-    objektId: "2",
-    bezeichnung: "1.OG",
-    etage: "1.OG",
-    flaeche: 80,
-    zimmer: 3,
-    miete: 880,
-    nebenkosten: 180,
-    status: "vermietet",
-  },
 ];
 
-const initialMieter: Mieter[] = [
+const DEMO_MIETER: Mieter[] = [
   {
-    id: "m1",
-    wohnungId: "w1",
-    name: "Schmidt, Anna",
-    email: "anna.schmidt@email.de",
-    telefon: "030 1111111",
-    einzugsDatum: "2020-01-01",
+    id: "demo-m1",
+    wohnungId: "demo-w1",
+    name: "Anna Schmidt",
+    email: "anna@example.com",
+    telefon: "030 11111111",
+    einzugsDatum: "2023-01-01",
     mieteBis: null,
     kaltmiete: 650,
     nebenkosten: 150,
     kaution: 1950,
     isKurzzeitvermietung: false,
     isAktiv: true,
-    prozentanteil: 12.5,
-  },
-  {
-    id: "m2",
-    wohnungId: "w2",
-    name: "Müller, Hans",
-    email: "hans.mueller@email.de",
-    telefon: "030 2222222",
-    einzugsDatum: "2019-06-01",
-    mieteBis: null,
-    kaltmiete: 700,
-    nebenkosten: 160,
-    kaution: 2100,
-    isKurzzeitvermietung: false,
-    isAktiv: true,
-    prozentanteil: 13.8,
-  },
-  {
-    id: "m3",
-    wohnungId: "w3",
-    name: "Weber, Peter",
-    email: "peter.weber@email.de",
-    telefon: "030 3333333",
-    einzugsDatum: "2021-03-01",
-    mieteBis: null,
-    kaltmiete: 680,
-    nebenkosten: 150,
-    kaution: 2040,
-    isKurzzeitvermietung: false,
-    isAktiv: true,
-    prozentanteil: 12.5,
-  },
-  {
-    id: "m4",
-    wohnungId: "w5",
-    name: "Fischer, Maria",
-    email: "maria.fischer@email.de",
-    telefon: "030 4444444",
-    einzugsDatum: "2022-01-01",
-    mieteBis: null,
-    kaltmiete: 850,
-    nebenkosten: 180,
-    kaution: 2550,
-    isKurzzeitvermietung: false,
-    isAktiv: true,
-    prozentanteil: 14.2,
-  },
-  {
-    id: "m5",
-    wohnungId: "w6",
-    name: "Bauer, Thomas",
-    email: "thomas.bauer@email.de",
-    telefon: "030 5555555",
-    einzugsDatum: "2023-07-01",
-    mieteBis: null,
-    kaltmiete: 880,
-    nebenkosten: 180,
-    kaution: 2640,
-    isKurzzeitvermietung: false,
-    isAktiv: true,
-    prozentanteil: 14.2,
+    prozentanteil: 12.0,
   },
 ];
 
-const initialEhemaligeMieter: EhemalierMieter[] = [];
-
 export function AppDataProvider({ children }: { children: ReactNode }) {
-  // LocalStorage Keys
-  const STORAGE_KEYS = {
-    objekte: "hausverwaltung_objekte",
-    wohnungen: "hausverwaltung_wohnungen",
-    mieter: "hausverwaltung_mieter",
-    ehemaligeMieter: "hausverwaltung_ehemalige_mieter",
-    selectedObjektId: "hausverwaltung_selectedObjektId",
-  };
-
-  // Helper: Load from localStorage with fallback
-  const loadFromStorage = <T,>(key: string, fallback: T): T => {
-    if (typeof window === "undefined") return fallback;
-    try {
-      const stored = localStorage.getItem(key);
-      return stored ? JSON.parse(stored) : fallback;
-    } catch (error) {
-      console.error(`Error loading ${key} from localStorage:`, error);
-      return fallback;
-    }
-  };
-
-  // Initialize state with localStorage or fallback to initial data
-  const [objekte, setObjekte] = useState<Objekt[]>(() =>
-    loadFromStorage(STORAGE_KEYS.objekte, initialObjekte),
-  );
-  const [wohnungen, setWohnungen] = useState<Wohnung[]>(() =>
-    loadFromStorage(STORAGE_KEYS.wohnungen, initialWohnungen),
-  );
-  const [mieter, setMieter] = useState<Mieter[]>(() =>
-    loadFromStorage(STORAGE_KEYS.mieter, initialMieter),
-  );
+  const { user } = useAuth();
+  const [objekte, setObjekte] = useState<Objekt[]>([]);
+  const [wohnungen, setWohnungen] = useState<Wohnung[]>([]);
+  const [mieter, setMieter] = useState<Mieter[]>([]);
   const [ehemaligeMieter, setEhemaligeMieter] = useState<EhemalierMieter[]>(
-    () => loadFromStorage(STORAGE_KEYS.ehemaligeMieter, initialEhemaligeMieter),
+    [],
   );
-  const [selectedObjektId, setSelectedObjektId] = useState<string | null>(() =>
-    loadFromStorage(STORAGE_KEYS.selectedObjektId, "1"),
-  );
+  const [selectedObjektId, setSelectedObjektId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Auto-save to localStorage whenever data changes
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      localStorage.setItem(STORAGE_KEYS.objekte, JSON.stringify(objekte));
-    } catch (error) {
-      console.error("Error saving objekte to localStorage:", error);
+  // Konvertiert DB-Format zu App-Format
+  const mapDBToObjekt = (dbObjekt: any): Objekt => ({
+    id: dbObjekt.id,
+    name: dbObjekt.name,
+    adresse: dbObjekt.adresse,
+    typ: dbObjekt.typ,
+    einheiten: dbObjekt.einheiten,
+    status: dbObjekt.status,
+    eigentuemer: dbObjekt.eigentuemer,
+    bankverbindung: dbObjekt.bankverbindung,
+    objektdaten: dbObjekt.objektdaten,
+    notizen: dbObjekt.notizen || "",
+  });
+
+  const mapDBToWohnung = (dbWohnung: any): Wohnung => ({
+    id: dbWohnung.id,
+    objektId: dbWohnung.objekt_id,
+    bezeichnung: dbWohnung.bezeichnung,
+    etage: dbWohnung.etage,
+    flaeche: Number(dbWohnung.flaeche),
+    zimmer: dbWohnung.zimmer,
+    miete: Number(dbWohnung.miete),
+    nebenkosten: Number(dbWohnung.nebenkosten),
+    status: dbWohnung.status,
+  });
+
+  const mapDBToMieter = (dbMieter: any): Mieter => ({
+    id: dbMieter.id,
+    wohnungId: dbMieter.wohnung_id,
+    name: dbMieter.name,
+    email: dbMieter.email,
+    telefon: dbMieter.telefon,
+    einzugsDatum: dbMieter.einzugs_datum,
+    mieteBis: dbMieter.miete_bis,
+    kaltmiete: Number(dbMieter.kaltmiete),
+    nebenkosten: Number(dbMieter.nebenkosten),
+    kaution: Number(dbMieter.kaution),
+    isKurzzeitvermietung: dbMieter.is_kurzzeitvermietung,
+    kurzzeitBis: dbMieter.kurzzeit_bis,
+    isAktiv: dbMieter.is_aktiv,
+    prozentanteil: dbMieter.prozentanteil
+      ? Number(dbMieter.prozentanteil)
+      : undefined,
+  });
+
+  // Lade alle Daten von Supabase
+  const refreshData = async () => {
+    if (!user) {
+      // Demo-Modus: Zeige Demo-Daten
+      setObjekte(DEMO_OBJEKTE);
+      setWohnungen(DEMO_WOHNUNGEN);
+      setMieter(DEMO_MIETER);
+      setEhemaligeMieter([]);
+      setSelectedObjektId(DEMO_OBJEKTE[0]?.id || null);
+      setLoading(false);
+      return;
     }
-  }, [objekte]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
     try {
-      localStorage.setItem(STORAGE_KEYS.wohnungen, JSON.stringify(wohnungen));
+      setLoading(true);
+      const [objekteData, wohnungenData, mieterData] = await Promise.all([
+        getObjekte(user.id),
+        getWohnungen(user.id),
+        getMieter(user.id),
+      ]);
+
+      setObjekte(objekteData.map(mapDBToObjekt));
+      setWohnungen(wohnungenData.map(mapDBToWohnung));
+
+      const allMieter = mieterData.map(mapDBToMieter);
+      setMieter(allMieter.filter((m) => m.isAktiv));
+
+      // Ehemalige Mieter (inaktive)
+      const ehemalige = allMieter
+        .filter((m) => !m.isAktiv)
+        .map((m) => ({
+          id: m.id,
+          name: m.name,
+          email: m.email,
+          telefon: m.telefon,
+          letzteWohnungId: m.wohnungId,
+          letztesAuszugsDatum: m.mieteBis || m.einzugsDatum,
+        }));
+      setEhemaligeMieter(ehemalige);
+
+      // Wähle erstes Objekt aus wenn noch keins gewählt
+      if (!selectedObjektId && objekteData.length > 0) {
+        setSelectedObjektId(objekteData[0].id);
+      }
     } catch (error) {
-      console.error("Error saving wohnungen to localStorage:", error);
+      console.error("Error loading data from Supabase:", error);
+    } finally {
+      setLoading(false);
     }
-  }, [wohnungen]);
+  };
 
+  // Lade Daten wenn User sich einloggt
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    refreshData();
+  }, [user?.id]);
+
+  const addObjekt = async (objekt: Omit<Objekt, "id">) => {
+    if (!user) return;
+
     try {
-      localStorage.setItem(STORAGE_KEYS.mieter, JSON.stringify(mieter));
+      const newObjekt = await createObjekt({
+        user_id: user.id,
+        name: objekt.name,
+        adresse: objekt.adresse,
+        typ: objekt.typ,
+        einheiten: objekt.einheiten,
+        status: objekt.status,
+        eigentuemer: objekt.eigentuemer,
+        bankverbindung: objekt.bankverbindung,
+        objektdaten: objekt.objektdaten,
+        notizen: objekt.notizen,
+      });
+
+      const mapped = mapDBToObjekt(newObjekt);
+      setObjekte((prev) => [...prev, mapped]);
+      setSelectedObjektId(mapped.id);
     } catch (error) {
-      console.error("Error saving mieter to localStorage:", error);
+      console.error("Error adding objekt:", error);
+      throw error;
     }
-  }, [mieter]);
+  };
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const updateObjekt = async (id: string, updates: Partial<Objekt>) => {
     try {
-      localStorage.setItem(
-        STORAGE_KEYS.ehemaligeMieter,
-        JSON.stringify(ehemaligeMieter),
+      const dbUpdates: any = {};
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.adresse !== undefined) dbUpdates.adresse = updates.adresse;
+      if (updates.typ !== undefined) dbUpdates.typ = updates.typ;
+      if (updates.einheiten !== undefined)
+        dbUpdates.einheiten = updates.einheiten;
+      if (updates.status !== undefined) dbUpdates.status = updates.status;
+      if (updates.eigentuemer !== undefined)
+        dbUpdates.eigentuemer = updates.eigentuemer;
+      if (updates.bankverbindung !== undefined)
+        dbUpdates.bankverbindung = updates.bankverbindung;
+      if (updates.objektdaten !== undefined)
+        dbUpdates.objektdaten = updates.objektdaten;
+      if (updates.notizen !== undefined) dbUpdates.notizen = updates.notizen;
+
+      const updated = await updateObjektDB(id, dbUpdates);
+      setObjekte((prev) =>
+        prev.map((obj) => (obj.id === id ? mapDBToObjekt(updated) : obj)),
       );
     } catch (error) {
-      console.error("Error saving ehemaligeMieter to localStorage:", error);
+      console.error("Error updating objekt:", error);
+      throw error;
     }
-  }, [ehemaligeMieter]);
+  };
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
+  const deleteObjekt = async (id: string) => {
     try {
-      localStorage.setItem(
-        STORAGE_KEYS.selectedObjektId,
-        JSON.stringify(selectedObjektId),
+      await deleteObjektDB(id);
+      setObjekte((prev) => prev.filter((obj) => obj.id !== id));
+      // DB CASCADE löscht automatisch Wohnungen und Mieter
+      setWohnungen((prev) => prev.filter((w) => w.objektId !== id));
+      setMieter((prev) =>
+        prev.filter(
+          (m) =>
+            !wohnungen.find((w) => w.id === m.wohnungId && w.objektId === id),
+        ),
       );
     } catch (error) {
-      console.error("Error saving selectedObjektId to localStorage:", error);
+      console.error("Error deleting objekt:", error);
+      throw error;
     }
-  }, [selectedObjektId]);
-
-  const generateId = () => Math.random().toString(36).substr(2, 9);
-
-  const addObjekt = (objekt: Omit<Objekt, "id">) => {
-    const newId = generateId();
-    const newObjekt = { ...objekt, id: newId };
-    setObjekte((prev) => [...prev, newObjekt]);
-    // Automatisch das neue Objekt auswählen
-    setSelectedObjektId(newId);
   };
 
-  const updateObjekt = (id: string, updates: Partial<Objekt>) => {
-    setObjekte((prev) =>
-      prev.map((obj) => (obj.id === id ? { ...obj, ...updates } : obj)),
-    );
+  const addWohnung = async (wohnung: Omit<Wohnung, "id">) => {
+    if (!user) return;
+
+    try {
+      const newWohnung = await createWohnung({
+        user_id: user.id,
+        objekt_id: wohnung.objektId,
+        bezeichnung: wohnung.bezeichnung,
+        etage: wohnung.etage,
+        flaeche: wohnung.flaeche,
+        zimmer: wohnung.zimmer,
+        miete: wohnung.miete,
+        nebenkosten: wohnung.nebenkosten,
+        status: wohnung.status,
+      });
+
+      setWohnungen((prev) => [...prev, mapDBToWohnung(newWohnung)]);
+    } catch (error) {
+      console.error("Error adding wohnung:", error);
+      throw error;
+    }
   };
 
-  const deleteObjekt = (id: string) => {
-    setObjekte((prev) => prev.filter((obj) => obj.id !== id));
-    // Auch zugehörige Wohnungen und Mieter löschen
-    setWohnungen((prev) => prev.filter((w) => w.objektId !== id));
+  const updateWohnung = async (id: string, updates: Partial<Wohnung>) => {
+    try {
+      const dbUpdates: any = {};
+      if (updates.bezeichnung !== undefined)
+        dbUpdates.bezeichnung = updates.bezeichnung;
+      if (updates.etage !== undefined) dbUpdates.etage = updates.etage;
+      if (updates.flaeche !== undefined) dbUpdates.flaeche = updates.flaeche;
+      if (updates.zimmer !== undefined) dbUpdates.zimmer = updates.zimmer;
+      if (updates.miete !== undefined) dbUpdates.miete = updates.miete;
+      if (updates.nebenkosten !== undefined)
+        dbUpdates.nebenkosten = updates.nebenkosten;
+      if (updates.status !== undefined) dbUpdates.status = updates.status;
+
+      const updated = await updateWohnungDB(id, dbUpdates);
+      setWohnungen((prev) =>
+        prev.map((w) => (w.id === id ? mapDBToWohnung(updated) : w)),
+      );
+    } catch (error) {
+      console.error("Error updating wohnung:", error);
+      throw error;
+    }
   };
 
-  const addWohnung = (wohnung: Omit<Wohnung, "id">) => {
-    const newWohnung = { ...wohnung, id: generateId() };
-    setWohnungen((prev) => [...prev, newWohnung]);
+  const deleteWohnung = async (id: string) => {
+    try {
+      await deleteWohnungDB(id);
+      setWohnungen((prev) => prev.filter((w) => w.id !== id));
+      // DB CASCADE löscht automatisch Mieter
+      setMieter((prev) => prev.filter((m) => m.wohnungId !== id));
+    } catch (error) {
+      console.error("Error deleting wohnung:", error);
+      throw error;
+    }
   };
 
-  const updateWohnung = (id: string, updates: Partial<Wohnung>) => {
-    setWohnungen((prev) =>
-      prev.map((w) => (w.id === id ? { ...w, ...updates } : w)),
-    );
+  const addMieter = async (newMieter: Omit<Mieter, "id">) => {
+    if (!user) return;
+
+    try {
+      const created = await createMieter({
+        user_id: user.id,
+        wohnung_id: newMieter.wohnungId,
+        name: newMieter.name,
+        email: newMieter.email,
+        telefon: newMieter.telefon,
+        einzugs_datum: newMieter.einzugsDatum,
+        miete_bis: newMieter.mieteBis,
+        kaltmiete: newMieter.kaltmiete,
+        nebenkosten: newMieter.nebenkosten,
+        kaution: newMieter.kaution,
+        is_kurzzeitvermietung: newMieter.isKurzzeitvermietung,
+        kurzzeit_bis: newMieter.kurzzeitBis,
+        is_aktiv: newMieter.isAktiv,
+        prozentanteil: newMieter.prozentanteil,
+      });
+
+      setMieter((prev) => [...prev, mapDBToMieter(created)]);
+    } catch (error) {
+      console.error("Error adding mieter:", error);
+      throw error;
+    }
   };
 
-  const deleteWohnung = (id: string) => {
-    setWohnungen((prev) => prev.filter((w) => w.id !== id));
-    // Auch zugehörige Mieter löschen
-    setMieter((prev) => prev.filter((m) => m.wohnungId !== id));
+  const updateMieter = async (id: string, updates: Partial<Mieter>) => {
+    try {
+      const dbUpdates: any = {};
+      if (updates.name !== undefined) dbUpdates.name = updates.name;
+      if (updates.email !== undefined) dbUpdates.email = updates.email;
+      if (updates.telefon !== undefined) dbUpdates.telefon = updates.telefon;
+      if (updates.einzugsDatum !== undefined)
+        dbUpdates.einzugs_datum = updates.einzugsDatum;
+      if (updates.mieteBis !== undefined)
+        dbUpdates.miete_bis = updates.mieteBis;
+      if (updates.kaltmiete !== undefined)
+        dbUpdates.kaltmiete = updates.kaltmiete;
+      if (updates.nebenkosten !== undefined)
+        dbUpdates.nebenkosten = updates.nebenkosten;
+      if (updates.kaution !== undefined) dbUpdates.kaution = updates.kaution;
+      if (updates.isKurzzeitvermietung !== undefined)
+        dbUpdates.is_kurzzeitvermietung = updates.isKurzzeitvermietung;
+      if (updates.kurzzeitBis !== undefined)
+        dbUpdates.kurzzeit_bis = updates.kurzzeitBis;
+      if (updates.isAktiv !== undefined) dbUpdates.is_aktiv = updates.isAktiv;
+      if (updates.prozentanteil !== undefined)
+        dbUpdates.prozentanteil = updates.prozentanteil;
+
+      const updated = await updateMieterDB(id, dbUpdates);
+      const mapped = mapDBToMieter(updated);
+
+      if (mapped.isAktiv) {
+        setMieter((prev) => prev.map((m) => (m.id === id ? mapped : m)));
+      } else {
+        // Wenn inaktiv, von aktiven zu ehemaligen verschieben
+        setMieter((prev) => prev.filter((m) => m.id !== id));
+        setEhemaligeMieter((prev) => [
+          ...prev,
+          {
+            id: mapped.id,
+            name: mapped.name,
+            email: mapped.email,
+            telefon: mapped.telefon,
+            letzteWohnungId: mapped.wohnungId,
+            letztesAuszugsDatum: mapped.mieteBis || mapped.einzugsDatum,
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Error updating mieter:", error);
+      throw error;
+    }
   };
 
-  const addMieter = (newMieter: Omit<Mieter, "id">) => {
-    const mieterWithId = { ...newMieter, id: generateId() };
-    setMieter((prev) => [...prev, mieterWithId]);
+  const deleteMieter = async (id: string) => {
+    try {
+      await deleteMieterDB(id);
+      setMieter((prev) => prev.filter((m) => m.id !== id));
+    } catch (error) {
+      console.error("Error deleting mieter:", error);
+      throw error;
+    }
   };
 
-  const updateMieter = (id: string, updates: Partial<Mieter>) => {
-    setMieter((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, ...updates } : m)),
-    );
-  };
-
-  const deleteMieter = (id: string) => {
-    setMieter((prev) => prev.filter((m) => m.id !== id));
-  };
-
-  // Archiviert einen aktiven Mieter und fügt ihn zur ehemaligen Mieter-Datenbank hinzu
-  const archiviereMieter = (id: string) => {
+  const archiviereMieter = async (id: string) => {
     const mieterToArchive = mieter.find((m) => m.id === id);
     if (!mieterToArchive) return;
 
-    // Füge zur ehemaligen Mieter-Datenbank hinzu
-    const ehemaligerMieter: EhemalierMieter = {
-      id: generateId(),
-      name: mieterToArchive.name,
-      email: mieterToArchive.email,
-      telefon: mieterToArchive.telefon,
-      letzteWohnungId: mieterToArchive.wohnungId,
-      letztesAuszugsDatum:
-        mieterToArchive.mieteBis || new Date().toISOString().split("T")[0],
-    };
-    setEhemaligeMieter((prev) => [...prev, ehemaligerMieter]);
-
-    // Markiere als inaktiv statt zu löschen (für Historie)
-    setMieter((prev) =>
-      prev.map((m) =>
-        m.id === id
-          ? {
-              ...m,
-              isAktiv: false,
-              mieteBis: m.mieteBis || new Date().toISOString().split("T")[0],
-            }
-          : m,
-      ),
-    );
+    try {
+      await updateMieter(id, {
+        isAktiv: false,
+        mieteBis:
+          mieterToArchive.mieteBis || new Date().toISOString().split("T")[0],
+      });
+    } catch (error) {
+      console.error("Error archiving mieter:", error);
+      throw error;
+    }
   };
 
-  // Reaktiviert einen ehemaligen Mieter für eine neue Wohnung
-  const reaktiviereMieter = (ehemaligerMieterId: string, wohnungId: string) => {
+  const reaktiviereMieter = async (
+    ehemaligerMieterId: string,
+    wohnungId: string,
+  ) => {
     const ehemaligerMieterData = ehemaligeMieter.find(
       (m) => m.id === ehemaligerMieterId,
     );
-    if (!ehemaligerMieterData) return;
+    if (!ehemaligerMieterData || !user) return;
 
-    // Erstelle neuen aktiven Mieter basierend auf ehemaligen Daten
-    const neuerMieter: Mieter = {
-      id: generateId(),
-      wohnungId,
-      name: ehemaligerMieterData.name,
-      email: ehemaligerMieterData.email,
-      telefon: ehemaligerMieterData.telefon,
-      einzugsDatum: new Date().toISOString().split("T")[0],
-      mieteBis: null,
-      kaltmiete: 0,
-      nebenkosten: 0,
-      kaution: 0,
-      isKurzzeitvermietung: false,
-      isAktiv: true,
-      prozentanteil: 0,
-    };
-    setMieter((prev) => [...prev, neuerMieter]);
+    try {
+      await addMieter({
+        wohnungId,
+        name: ehemaligerMieterData.name,
+        email: ehemaligerMieterData.email,
+        telefon: ehemaligerMieterData.telefon,
+        einzugsDatum: new Date().toISOString().split("T")[0],
+        mieteBis: null,
+        kaltmiete: 0,
+        nebenkosten: 0,
+        kaution: 0,
+        isKurzzeitvermietung: false,
+        isAktiv: true,
+        prozentanteil: 0,
+      });
+    } catch (error) {
+      console.error("Error reactivating mieter:", error);
+      throw error;
+    }
   };
 
   return (
@@ -568,6 +585,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         mieter,
         ehemaligeMieter,
         selectedObjektId,
+        loading,
         addObjekt,
         updateObjekt,
         deleteObjekt,
@@ -580,6 +598,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         archiviereMieter,
         reaktiviereMieter,
         setSelectedObjektId,
+        refreshData,
       }}
     >
       {children}

@@ -296,3 +296,59 @@ export async function deleteRechnung(id: string) {
 
   if (error) throw error;
 }
+
+// ============================================
+// HAUSMANAGER STAMMDATEN
+// ============================================
+
+export async function getHausmanagerStammdaten(userId: string, typ?: string) {
+  const supabase = createClient();
+  let query = supabase
+    .from("hausmanager_stammdaten")
+    .select("*")
+    .eq("user_id", userId);
+
+  if (typ) {
+    query = query.eq("typ", typ);
+  }
+
+  const { data, error } = await query.order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createHausmanagerStammdaten(stammdaten: any) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("hausmanager_stammdaten")
+    .insert(stammdaten)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateHausmanagerStammdaten(id: string, updates: any) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("hausmanager_stammdaten")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteHausmanagerStammdaten(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("hausmanager_stammdaten")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw error;
+}

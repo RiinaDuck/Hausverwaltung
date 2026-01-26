@@ -51,12 +51,18 @@ interface LandingPageProps {
     email: string,
     password: string,
   ) => Promise<{ success: boolean; error?: string }>;
+  onSignup: (
+    email: string,
+    password: string,
+    name: string,
+  ) => Promise<{ success: boolean; error?: string }>;
   onStartDemo: () => void;
 }
 
 export function LandingPage({
   onOpenApp,
   onLogin,
+  onSignup,
   onStartDemo,
 }: LandingPageProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -67,6 +73,11 @@ export function LandingPage({
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+  const [signupError, setSignupError] = useState("");
+  const [signupLoading, setSignupLoading] = useState(false);
 
   const handleLogin = async () => {
     setLoginError("");
@@ -85,6 +96,44 @@ export function LandingPage({
       setLoginError(
         result.error ||
           "Ungültige Anmeldedaten. Bitte versuchen Sie es erneut.",
+      );
+    }
+  };
+
+  const handleSignup = async () => {
+    setSignupError("");
+
+    // Validierung
+    if (!signupEmail || !signupPassword) {
+      setSignupError("Bitte füllen Sie alle Felder aus.");
+      return;
+    }
+
+    if (signupPassword !== signupConfirmPassword) {
+      setSignupError("Die Passwörter stimmen nicht überein.");
+      return;
+    }
+
+    if (signupPassword.length < 6) {
+      setSignupError("Das Passwort muss mindestens 6 Zeichen lang sein.");
+      return;
+    }
+
+    setSignupLoading(true);
+    // Verwende E-Mail-Präfix als Namen (vor dem @)
+    const name = signupEmail.split("@")[0] || "Benutzer";
+    const result = await onSignup(signupEmail, signupPassword, name);
+    setSignupLoading(false);
+
+    if (result.success) {
+      setSignupDialogOpen(false);
+      setSignupEmail("");
+      setSignupPassword("");
+      setSignupConfirmPassword("");
+      onOpenApp();
+    } else {
+      setSignupError(
+        result.error || "Registrierung fehlgeschlagen. Bitte versuchen Sie es erneut.",
       );
     }
   };
@@ -330,7 +379,113 @@ export function LandingPage({
               <Input
                 id="password"
                 type="password"
-                placeholder="Passwort eingeben"
+                placeholder="Ihr Passwort"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && !loginLoading && handleLogin()
+                }
+                disabled={loginLoading}
+              />
+            </div>
+            {loginError && (
+              <div className="text-sm text-destructive">{loginError}</div>
+            )}
+            <Button
+              className="w-full"
+              onClick={handleLogin}
+              disabled={loginLoading}
+            >
+              {loginLoading ? "Anmelden..." : "Anmelden"}
+            </Button>
+            <div className="text-center text-sm text-muted-foreground">
+              Noch kein Konto?{" "}
+              <button
+                type="button"
+                className="text-success hover:underline font-medium"
+                onClick={() => {
+                  setLoginDialogOpen(false);
+                  setSignupDialogOpen(true);
+                }}
+              >
+                Jetzt registrieren
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Signup Dialog */}
+      <Dialog open={signupDialogOpen} onOpenChange={setSignupDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Konto erstellen</DialogTitle>
+            <DialogDescription>
+              Erstellen Sie ein kostenloses Konto und starten Sie sofort.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="signup-email">E-Mail</Label>
+              <Input
+                id="signup-email"
+                type="email"
+                placeholder="ihre@email.de"
+                value={signupEmail}
+                onChange={(e) => setSignupEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSignup()}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="signup-password">Passwort</Label>
+              <Input
+                id="signup-password"
+                type="password"
+                placeholder="Mindestens 6 Zeichen"
+                value={signupPassword}
+                onChange={(e) => setSignupPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSignup()}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="signup-confirm-password">Passwort wiederholen</Label>
+              <Input
+                id="signup-confirm-password"
+                type="password"
+                placeholder="Passwort bestätigen"
+                value={signupConfirmPassword}
+                onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSignup()}
+              />
+            </div>
+            {signupError && (
+              <div className="text-sm text-destructive">{signupError}</div>
+            )}
+            <Button
+              className="w-full"
+              onClick={handleSignup}
+              disabled={signupLoading}
+            >
+              {signupLoading ? "Wird erstellt..." : "Konto erstellen"}
+            </Button>
+            <div className="text-center text-sm text-muted-foreground">
+              Bereits ein Konto?{" "}
+              <button
+                type="button"
+                className="text-success hover:underline font-medium"
+                onClick={() => {
+                  setSignupDialogOpen(false);
+                  setLoginDialogOpen(true);
+                }}
+              >
+                Jetzt anmelden
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/*       placeholder="Passwort eingeben"
                 value={loginPassword}
                 onChange={(e) => setLoginPassword(e.target.value)}
                 onKeyDown={(e) =>

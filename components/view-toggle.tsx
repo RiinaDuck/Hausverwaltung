@@ -8,13 +8,21 @@ import { AuthProvider, useAuth } from "@/context/auth-context";
 
 function ViewToggleContent() {
   const [view, setView] = useState<"landing" | "app">("landing");
-  const { isAuthenticated, login, startDemo, logout } = useAuth();
+  const { isAuthenticated, login, signup, startDemo, logout } = useAuth();
 
   const handleLogin = async (
     email: string,
     password: string,
   ): Promise<{ success: boolean; error?: string }> => {
     return await login(email, password);
+  };
+
+  const handleSignup = async (
+    email: string,
+    password: string,
+    name: string,
+  ): Promise<{ success: boolean; error?: string }> => {
+    return await signup(email, password, name);
   };
 
   const handleStartDemo = () => {
@@ -36,6 +44,7 @@ function ViewToggleContent() {
         <LandingPage
           onOpenApp={() => setView("app")}
           onLogin={handleLogin}
+          onSignup={handleSignup}
           onStartDemo={handleStartDemo}
         />
       ) : (

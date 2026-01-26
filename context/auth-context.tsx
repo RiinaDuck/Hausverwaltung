@@ -154,6 +154,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string,
   ): Promise<{ success: boolean; error?: string }> => {
+    // Hardcoded Admin-Account
+    if (email === "admin" && password === "admin") {
+      const adminUser = {
+        id: "admin-user",
+        email: "admin@hausverwaltung-boss.de",
+        user_metadata: {
+          name: "Administrator",
+          anschrift: "Admin-Straße 1, 00000 Admin",
+          ansprechpartner: "Administrator",
+        },
+      } as User;
+      
+      setUser(adminUser);
+      setIsDemo(false);
+      setProfile({
+        name: "Administrator",
+        email: "admin@hausverwaltung-boss.de",
+        anschrift: "Admin-Straße 1, 00000 Admin",
+        ansprechpartner: "Administrator",
+      });
+      return { success: true };
+    }
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,

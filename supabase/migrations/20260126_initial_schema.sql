@@ -34,18 +34,22 @@ CREATE INDEX IF NOT EXISTS idx_objekte_status ON objekte(status);
 -- Row Level Security für objekte
 ALTER TABLE objekte ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own objekte" ON objekte;
 CREATE POLICY "Users can view their own objekte"
   ON objekte FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own objekte" ON objekte;
 CREATE POLICY "Users can insert their own objekte"
   ON objekte FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own objekte" ON objekte;
 CREATE POLICY "Users can update their own objekte"
   ON objekte FOR UPDATE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own objekte" ON objekte;
 CREATE POLICY "Users can delete their own objekte"
   ON objekte FOR DELETE
   USING (auth.uid() = user_id);
@@ -77,18 +81,22 @@ CREATE INDEX IF NOT EXISTS idx_wohnungen_status ON wohnungen(status);
 -- Row Level Security für wohnungen
 ALTER TABLE wohnungen ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can view their own wohnungen" ON wohnungen;
 CREATE POLICY "Users can view their own wohnungen"
   ON wohnungen FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own wohnungen" ON wohnungen;
 CREATE POLICY "Users can insert their own wohnungen"
   ON wohnungen FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own wohnungen" ON wohnungen;
 CREATE POLICY "Users can update their own wohnungen"
   ON wohnungen FOR UPDATE
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete their own wohnungen" ON wohnungen;
 CREATE POLICY "Users can delete their own wohnungen"
   ON wohnungen FOR DELETE
   USING (auth.uid() = user_id);
@@ -123,18 +131,22 @@ CREATE TABLE IF NOT EXISTS mieter (
 CREATE INDEX IF NOT EXISTS idx_mieter_user_id ON mieter(user_id);
 CREATE INDEX IF NOT EXISTS idx_mieter_wohnung_id ON mieter(wohnung_id);
 CREATE INDEX IF NOT EXISTS idx_mieter_is_aktiv ON mieter(is_aktiv);
-
--- Row Level Security für mieter
-ALTER TABLE mieter ENABLE ROW LEVEL SECURITY;
-
+DROP POLICY IF EXISTS "Users can view their own mieter" ON mieter;
 CREATE POLICY "Users can view their own mieter"
   ON mieter FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own mieter" ON mieter;
 CREATE POLICY "Users can insert their own mieter"
   ON mieter FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own mieter" ON mieter;
+CREATE POLICY "Users can update their own mieter"
+  ON mieter FOR UPDATE
+  USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete their own mieter" ON mieter;
 CREATE POLICY "Users can update their own mieter"
   ON mieter FOR UPDATE
   USING (auth.uid() = user_id);
@@ -166,18 +178,22 @@ CREATE TABLE IF NOT EXISTS zaehler (
 
 CREATE INDEX IF NOT EXISTS idx_zaehler_user_id ON zaehler(user_id);
 CREATE INDEX IF NOT EXISTS idx_zaehler_wohnung_id ON zaehler(wohnung_id);
-
--- Row Level Security für zaehler
-ALTER TABLE zaehler ENABLE ROW LEVEL SECURITY;
-
+DROP POLICY IF EXISTS "Users can view their own zaehler" ON zaehler;
 CREATE POLICY "Users can view their own zaehler"
   ON zaehler FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own zaehler" ON zaehler;
 CREATE POLICY "Users can insert their own zaehler"
   ON zaehler FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own zaehler" ON zaehler;
+CREATE POLICY "Users can update their own zaehler"
+  ON zaehler FOR UPDATE
+  USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete their own zaehler" ON zaehler;
 CREATE POLICY "Users can update their own zaehler"
   ON zaehler FOR UPDATE
   USING (auth.uid() = user_id);
@@ -209,18 +225,22 @@ CREATE TABLE IF NOT EXISTS rauchmelder (
 
 CREATE INDEX IF NOT EXISTS idx_rauchmelder_user_id ON rauchmelder(user_id);
 CREATE INDEX IF NOT EXISTS idx_rauchmelder_wohnung_id ON rauchmelder(wohnung_id);
-
--- Row Level Security für rauchmelder
-ALTER TABLE rauchmelder ENABLE ROW LEVEL SECURITY;
-
+DROP POLICY IF EXISTS "Users can view their own rauchmelder" ON rauchmelder;
 CREATE POLICY "Users can view their own rauchmelder"
   ON rauchmelder FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own rauchmelder" ON rauchmelder;
 CREATE POLICY "Users can insert their own rauchmelder"
   ON rauchmelder FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update their own rauchmelder" ON rauchmelder;
+CREATE POLICY "Users can update their own rauchmelder"
+  ON rauchmelder FOR UPDATE
+  USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete their own rauchmelder" ON rauchmelder;
 CREATE POLICY "Users can update their own rauchmelder"
   ON rauchmelder FOR UPDATE
   USING (auth.uid() = user_id);
@@ -250,18 +270,22 @@ CREATE TABLE IF NOT EXISTS rechnungen (
   -- Unique constraint für Rechnungsnummer pro User
   UNIQUE(user_id, nummer)
 );
-
-CREATE INDEX IF NOT EXISTS idx_rechnungen_user_id ON rechnungen(user_id);
-CREATE INDEX IF NOT EXISTS idx_rechnungen_status ON rechnungen(status);
-CREATE INDEX IF NOT EXISTS idx_rechnungen_datum ON rechnungen(datum);
-
--- Row Level Security für rechnungen
-ALTER TABLE rechnungen ENABLE ROW LEVEL SECURITY;
-
+DROP POLICY IF EXISTS "Users can view their own rechnungen" ON rechnungen;
 CREATE POLICY "Users can view their own rechnungen"
   ON rechnungen FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert their own rechnungen" ON rechnungen;
+CREATE POLICY "Users can insert their own rechnungen"
+  ON rechnungen FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update their own rechnungen" ON rechnungen;
+CREATE POLICY "Users can update their own rechnungen"
+  ON rechnungen FOR UPDATE
+  USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete their own rechnungen" ON rechnungen;
 CREATE POLICY "Users can insert their own rechnungen"
   ON rechnungen FOR INSERT
   WITH CHECK (auth.uid() = user_id);
@@ -302,6 +326,67 @@ CREATE TRIGGER update_rauchmelder_updated_at BEFORE UPDATE ON rauchmelder
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_rechnungen_updated_at BEFORE UPDATE ON rechnungen
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================
+-- TABLE: hausmanager_stammdaten
+-- Flexible Tabelle für alle Hausmanager-Daten (Finanzamt, Steuerberater, etc.)
+-- ============================================
+CREATE TABLE IF NOT EXISTS hausmanager_stammdaten (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  
+  -- Typ der Stammdaten
+  typ TEXT NOT NULL CHECK (typ IN (
+    'finanzamt', 
+    'steuerberater', 
+    'grundbesitzabgabe',
+    'energielieferant',
+    'messdienst',
+    'finanzierungspartner',
+    'versicherung',
+    'dienstleister',
+    'rechtsberatung'
+  )),
+  
+  -- Grunddaten (für alle Typen)
+  name TEXT NOT NULL,
+  
+  -- Flexible Daten als JSONB (typ-spezifische Felder)
+  daten JSONB NOT NULL DEFAULT '{}'::jsonb,
+  
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+DROP POLICY IF EXISTS "Users can view their own hausmanager_stammdaten" ON hausmanager_stammdaten;
+CREATE POLICY "Users can view their own hausmanager_stammdaten"
+  ON hausmanager_stammdaten FOR SELECT
+  USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can insert their own hausmanager_stammdaten" ON hausmanager_stammdaten;
+CREATE POLICY "Users can insert their own hausmanager_stammdaten"
+  ON hausmanager_stammdaten FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update their own hausmanager_stammdaten" ON hausmanager_stammdaten;
+CREATE POLICY "Users can update their own hausmanager_stammdaten"
+  ON hausmanager_stammdaten FOR UPDATE
+  USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can delete their own hausmanager_stammdaten" ON hausmanager_stammdaten;
+CREATE POLICY "Users can insert their own hausmanager_stammdaten"
+  ON hausmanager_stammdaten FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own hausmanager_stammdaten"
+  ON hausmanager_stammdaten FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own hausmanager_stammdaten"
+  ON hausmanager_stammdaten FOR DELETE
+  USING (auth.uid() = user_id);
+
+CREATE TRIGGER update_hausmanager_stammdaten_updated_at BEFORE UPDATE ON hausmanager_stammdaten
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- ============================================
