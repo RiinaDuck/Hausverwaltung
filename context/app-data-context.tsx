@@ -298,9 +298,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         }));
       setEhemaligeMieter(ehemalige);
 
-      // Wähle erstes Objekt aus wenn noch keins gewählt
-      if (!selectedObjektId && objekteData.length > 0) {
-        setSelectedObjektId(objekteData[0].id);
+      // Wähle erstes Objekt aus wenn noch keins gewählt oder das gewählte nicht existiert
+      if (
+        !selectedObjektId ||
+        !objekteData.find((o) => o.id === selectedObjektId)
+      ) {
+        setSelectedObjektId(objekteData[0]?.id || null);
       }
     } catch (error) {
       console.error("Error loading data from Supabase:", error);
