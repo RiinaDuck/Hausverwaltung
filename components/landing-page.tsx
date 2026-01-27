@@ -653,7 +653,7 @@ export function LandingPage({
                       <p className="text-xs text-muted-foreground">
                         Einnahmen YTD
                       </p>
-                      <p className="text-xl font-bold text-success">€48.250</p>
+                      <p className="text-xl font-bold text-success">€4.950</p>
                     </div>
                     <div className="p-4 rounded-lg bg-secondary">
                       <p className="text-xs text-muted-foreground">Offen</p>
