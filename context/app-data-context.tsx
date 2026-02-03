@@ -54,6 +54,24 @@ export interface Objekt {
     gesamtnutzflaeche: string;
     anzahlEinheiten: string;
     garagen: string;
+    // Energieausweis
+    energieArt?: string;
+    energieWert?: string;
+    energietraeger?: string;
+    energieBaujahr?: string;
+    energieKlasse?: string;
+    // Grundstück
+    flur?: string;
+    flurstueck?: string;
+    grundstueckGroesse?: string;
+    gemarkung?: string;
+    // Grundbuch
+    amtsgericht?: string;
+    blatt?: string;
+    lastenAbt2?: string;
+    lastenAbt3?: string;
+    // Kontakt
+    finanzamt?: string;
   };
   notizen: string;
 }
@@ -155,8 +173,22 @@ const DEMO_OBJEKTE: Objekt[] = [
       gesamtnutzflaeche: "68,00",
       anzahlEinheiten: "8",
       garagen: "4",
+      energieArt: "bedarf",
+      energieWert: "128",
+      energietraeger: "gas",
+      energieBaujahr: "2018",
+      energieKlasse: "d",
+      flur: "12",
+      flurstueck: "145/2",
+      grundstueckGroesse: "850",
+      gemarkung: "Berlin-Mitte",
+      amtsgericht: "Berlin-Mitte",
+      blatt: "1234/56",
+      lastenAbt2: "",
+      lastenAbt3: "Grundschuld über 200.000 EUR zugunsten Sparkasse Berlin",
+      finanzamt: "Berlin Mitte",
     },
-    notizen: "Demo-Objekt",
+    notizen: "Hausmeisterservice: Firma Schmidt, Tel. 030 9876543\nSchlüssel: 3x Haupteingang, 1x Keller\nNächste Wartung Heizung: März 2026",
   },
 ];
 
@@ -318,7 +350,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, [user?.id]);
 
   const addObjekt = async (objekt: Omit<Objekt, "id">) => {
-    if (!user) return;
+    // Demo-Modus oder kein User: Lokales Erstellen
+    if (!user || isAdmin) {
+      const newObjekt: Objekt = {
+        ...objekt,
+        id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      };
+      setObjekte((prev) => [...prev, newObjekt]);
+      setSelectedObjektId(newObjekt.id);
+      return;
+    }
 
     try {
       const newObjekt = await createObjekt({
@@ -333,6 +374,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         objektdaten: objekt.objektdaten,
         notizen: objekt.notizen,
       });
+
+      if (!newObjekt || !newObjekt.id) {
+        throw new Error("Failed to create objekt: No data returned from database");
+      }
 
       const mapped = mapDBToObjekt(newObjekt);
       setObjekte((prev) => [...prev, mapped]);
@@ -403,7 +448,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   };
 
   const addWohnung = async (wohnung: Omit<Wohnung, "id">) => {
-    if (!user) return;
+    // Demo-Modus oder kein User: Lokales Erstellen
+    if (!user || isAdmin) {
+      const newWohnung: Wohnung = {
+        ...wohnung,
+        id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      };
+      setWohnungen((prev) => [...prev, newWohnung]);
+      return;
+    }
 
     try {
       const newWohnung = await createWohnung({
@@ -469,7 +522,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   };
 
   const addMieter = async (newMieter: Omit<Mieter, "id">) => {
-    if (!user) return;
+    // Demo-Modus oder kein User: Lokales Erstellen
+    if (!user || isAdmin) {
+      const mieter: Mieter = {
+        ...newMieter,
+        id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      };
+      setMieter((prev) => [...prev, mieter]);
+      return;
+    }
 
     try {
       const created = await createMieter({

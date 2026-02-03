@@ -329,7 +329,7 @@ export function WohnungsdatenView() {
     kabel: true,
   });
   const [isNewUnitOpen, setIsNewUnitOpen] = useState(false);
-  const [newUnit, setNewUnit] = useState<Partial<Unit>>({
+  const initialNewUnit = {
     lage: "",
     wohnflaeche: 0,
     nutzflaeche: 0,
@@ -337,8 +337,9 @@ export function WohnungsdatenView() {
     miete: 0,
     punkte: 0,
     prozent: 0,
-    status: "frei",
-  });
+    status: "frei" as const,
+  };
+  const [newUnit, setNewUnit] = useState(initialNewUnit);
   const { toast } = useToast();
 
   // Aktualisiere selectedUnit wenn sich units ändert
@@ -410,21 +411,21 @@ export function WohnungsdatenView() {
   };
 
   const handleCreateUnit = () => {
+    if (!selectedObjektId) {
+      toast({
+        title: "Fehler",
+        description: "Bitte wählen Sie zuerst ein Objekt aus.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Demo-Modus Einschränkung
     if (isDemo) {
       toast({
         title: "Demo-Modus",
         description:
           "Im Demo-Modus können keine neuen Wohnungen angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!selectedObjektId) {
-      toast({
-        title: "Fehler",
-        description: "Bitte wählen Sie zuerst ein Objekt aus.",
         variant: "destructive",
       });
       return;
@@ -442,15 +443,7 @@ export function WohnungsdatenView() {
     });
 
     setIsNewUnitOpen(false);
-    setNewUnit({
-      lage: "",
-      wohnflaeche: 0,
-      nutzflaeche: 0,
-      raeume: 2,
-      punkte: 0,
-      prozent: 0,
-      status: "frei",
-    });
+    setNewUnit(initialNewUnit);
     toast({
       title: "Einheit erstellt",
       description: `Wohneinheit "${
@@ -525,7 +518,10 @@ export function WohnungsdatenView() {
         </Card>
 
         {/* New Unit Dialog */}
-        <Dialog open={isNewUnitOpen} onOpenChange={setIsNewUnitOpen}>
+        <Dialog open={isNewUnitOpen} onOpenChange={(open) => {
+          setIsNewUnitOpen(open);
+          if (!open) setNewUnit(initialNewUnit);
+        }}>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Neue Einheit anlegen</DialogTitle>
@@ -1052,7 +1048,10 @@ export function WohnungsdatenView() {
       )}
 
       {/* New Unit Dialog */}
-      <Dialog open={isNewUnitOpen} onOpenChange={setIsNewUnitOpen}>
+      <Dialog open={isNewUnitOpen} onOpenChange={(open) => {
+        setIsNewUnitOpen(open);
+        if (!open) setNewUnit(initialNewUnit);
+      }}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Neue Einheit anlegen</DialogTitle>

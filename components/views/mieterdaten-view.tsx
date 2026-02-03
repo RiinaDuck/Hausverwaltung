@@ -461,22 +461,22 @@ export function MieterdatenView() {
   };
 
   const handleCreateMieter = () => {
+    if (!newMieter.wohnungId || !newMieter.name) {
+      toast({
+        title: "Fehler",
+        description:
+          "Bitte wählen Sie eine Wohnung und geben Sie einen Namen ein.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Demo-Modus Einschränkung
     if (isDemo) {
       toast({
         title: "Demo-Modus",
         description:
           "Im Demo-Modus können keine neuen Mieter angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!newMieter.wohnungId || !newMieter.name) {
-      toast({
-        title: "Fehler",
-        description:
-          "Bitte wählen Sie eine Wohnung und geben Sie einen Namen ein.",
         variant: "destructive",
       });
       return;

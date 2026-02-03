@@ -87,21 +87,21 @@ export function ObjektdatenView() {
   };
 
   const handleNeuesObjekt = () => {
+    if (!validateForm()) {
+      toast({
+        title: "Validierungsfehler",
+        description: "Bitte überprüfen Sie Ihre Eingaben.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Demo-Modus Einschränkung
     if (isDemo && !editingObjektId) {
       toast({
         title: "Demo-Modus",
         description:
           "Im Demo-Modus können keine neuen Objekte angelegt werden. Bitte melden Sie sich an, um diese Funktion zu nutzen.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!validateForm()) {
-      toast({
-        title: "Validierungsfehler",
-        description: "Bitte überprüfen Sie Ihre Eingaben.",
         variant: "destructive",
       });
       return;
@@ -529,7 +529,18 @@ export function ObjektdatenView() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="finanzamt">Finanzamt</Label>
-                      <Input id="finanzamt" defaultValue="Berlin Mitte" />
+                      <Input 
+                        id="finanzamt" 
+                        value={selectedObjekt.objektdaten.finanzamt || ""}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            objektdaten: {
+                              ...selectedObjekt.objektdaten,
+                              finanzamt: e.target.value,
+                            },
+                          })
+                        }
+                      />
                     </div>
                   </div>
                 </CardContent>
@@ -609,16 +620,49 @@ export function ObjektdatenView() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="obj-strasse">Straße</Label>
-                    <Input id="obj-strasse" defaultValue="Berliner Straße 42" />
+                    <Input 
+                      id="obj-strasse" 
+                      value={selectedObjekt.objektdaten.strasse}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            strasse: e.target.value,
+                          },
+                        })
+                      }
+                    />
                   </div>
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="obj-plz">PLZ</Label>
-                      <Input id="obj-plz" defaultValue="10115" />
+                      <Input 
+                        id="obj-plz" 
+                        value={selectedObjekt.objektdaten.plz}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            objektdaten: {
+                              ...selectedObjekt.objektdaten,
+                              plz: e.target.value,
+                            },
+                          })
+                        }
+                      />
                     </div>
                     <div className="col-span-2 space-y-2">
                       <Label htmlFor="obj-ort">Ort</Label>
-                      <Input id="obj-ort" defaultValue="Berlin" />
+                      <Input 
+                        id="obj-ort" 
+                        value={selectedObjekt.objektdaten.ort}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            objektdaten: {
+                              ...selectedObjekt.objektdaten,
+                              ort: e.target.value,
+                            },
+                          })
+                        }
+                      />
                     </div>
                   </div>
                 </CardContent>
@@ -636,17 +680,50 @@ export function ObjektdatenView() {
                     <Label htmlFor="gesamtwohnflaeche">
                       Gesamtwohnfläche (m²)
                     </Label>
-                    <Input id="gesamtwohnflaeche" defaultValue="542,50" />
+                    <Input 
+                      id="gesamtwohnflaeche" 
+                      value={selectedObjekt.objektdaten.gesamtwohnflaeche}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            gesamtwohnflaeche: e.target.value,
+                          },
+                        })
+                      }
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="gesamtnutzflaeche">
                       Gesamtnutzfläche (m²)
                     </Label>
-                    <Input id="gesamtnutzflaeche" defaultValue="68,00" />
+                    <Input 
+                      id="gesamtnutzflaeche" 
+                      value={selectedObjekt.objektdaten.gesamtnutzflaeche}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            gesamtnutzflaeche: e.target.value,
+                          },
+                        })
+                      }
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="anzahl-einheiten">Anzahl Einheiten</Label>
-                    <Input id="anzahl-einheiten" defaultValue="8" />
+                    <Input 
+                      id="anzahl-einheiten" 
+                      value={selectedObjekt.objektdaten.anzahlEinheiten}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            anzahlEinheiten: e.target.value,
+                          },
+                        })
+                      }
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -660,16 +737,49 @@ export function ObjektdatenView() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="baujahr">Baujahr</Label>
-                      <Input id="baujahr" defaultValue="1985" />
+                      <Input 
+                        id="baujahr" 
+                        value={selectedObjekt.objektdaten.baujahr}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            objektdaten: {
+                              ...selectedObjekt.objektdaten,
+                              baujahr: e.target.value,
+                            },
+                          })
+                        }
+                      />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="sanierungsjahr">Sanierungsjahr</Label>
-                      <Input id="sanierungsjahr" defaultValue="2018" />
+                      <Input 
+                        id="sanierungsjahr" 
+                        value={selectedObjekt.objektdaten.sanierungsjahr}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            objektdaten: {
+                              ...selectedObjekt.objektdaten,
+                              sanierungsjahr: e.target.value,
+                            },
+                          })
+                        }
+                      />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="garagen">Garagen/Stellplätze</Label>
-                    <Input id="garagen" defaultValue="4" />
+                    <Input 
+                      id="garagen" 
+                      value={selectedObjekt.objektdaten.garagen}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            garagen: e.target.value,
+                          },
+                        })
+                      }
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -685,7 +795,17 @@ export function ObjektdatenView() {
                       <Label htmlFor="energie-art">
                         Art (Bedarf/Verbrauch)
                       </Label>
-                      <Select defaultValue="bedarf">
+                      <Select 
+                        value={selectedObjekt.objektdaten.energieArt || "bedarf"}
+                        onValueChange={(value) =>
+                          updateObjekt(selectedObjekt.id, {
+                            objektdaten: {
+                              ...selectedObjekt.objektdaten,
+                              energieArt: value,
+                            },
+                          })
+                        }
+                      >
                         <SelectTrigger id="energie-art">
                           <SelectValue />
                         </SelectTrigger>
@@ -699,13 +819,34 @@ export function ObjektdatenView() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="energie-wert">Wert (kWh/m²)</Label>
-                      <Input id="energie-wert" defaultValue="128" />
+                      <Input 
+                        id="energie-wert" 
+                        value={selectedObjekt.objektdaten.energieWert || ""}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            objektdaten: {
+                              ...selectedObjekt.objektdaten,
+                              energieWert: e.target.value,
+                            },
+                          })
+                        }
+                      />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="energietraeger">Energieträger</Label>
-                      <Select defaultValue="gas">
+                      <Select 
+                        value={selectedObjekt.objektdaten.energietraeger || "gas"}
+                        onValueChange={(value) =>
+                          updateObjekt(selectedObjekt.id, {
+                            objektdaten: {
+                              ...selectedObjekt.objektdaten,
+                              energietraeger: value,
+                            },
+                          })
+                        }
+                      >
                         <SelectTrigger id="energietraeger">
                           <SelectValue />
                         </SelectTrigger>
@@ -722,12 +863,33 @@ export function ObjektdatenView() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="energie-baujahr">Baujahr Heizung</Label>
-                      <Input id="energie-baujahr" defaultValue="2018" />
+                      <Input 
+                        id="energie-baujahr" 
+                        value={selectedObjekt.objektdaten.energieBaujahr || ""}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            objektdaten: {
+                              ...selectedObjekt.objektdaten,
+                              energieBaujahr: e.target.value,
+                            },
+                          })
+                        }
+                      />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="energie-klasse">Klasse (A-H)</Label>
-                    <Select defaultValue="d">
+                    <Select 
+                      value={selectedObjekt.objektdaten.energieKlasse || "d"}
+                      onValueChange={(value) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            energieKlasse: value,
+                          },
+                        })
+                      }
+                    >
                       <SelectTrigger id="energie-klasse">
                         <SelectValue />
                       </SelectTrigger>
@@ -760,10 +922,12 @@ export function ObjektdatenView() {
                 <Textarea
                   placeholder="Fügen Sie hier allgemeine Notizen zum Objekt hinzu..."
                   rows={6}
-                  defaultValue="Hausmeisterservice: Firma Schmidt, Tel. 030 9876543
-Schlüssel: 3x Haupteingang, 1x Keller
-
-Nächste Wartung Heizung: März 2026"
+                  value={selectedObjekt.notizen}
+                  onChange={(e) =>
+                    updateObjekt(selectedObjekt.id, {
+                      notizen: e.target.value,
+                    })
+                  }
                 />
               </CardContent>
             </Card>
@@ -779,21 +943,65 @@ Nächste Wartung Heizung: März 2026"
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="flur">Flur</Label>
-                    <Input id="flur" defaultValue="12" />
+                    <Input 
+                      id="flur" 
+                      value={selectedObjekt.objektdaten.flur || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            flur: e.target.value,
+                          },
+                        })
+                      }
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="flurstueck">Flurstück</Label>
-                    <Input id="flurstueck" defaultValue="145/2" />
+                    <Input 
+                      id="flurstueck" 
+                      value={selectedObjekt.objektdaten.flurstueck || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            flurstueck: e.target.value,
+                          },
+                        })
+                      }
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="grundstueck-groesse">Größe (m²)</Label>
-                    <Input id="grundstueck-groesse" defaultValue="850" />
+                    <Input 
+                      id="grundstueck-groesse" 
+                      value={selectedObjekt.objektdaten.grundstueckGroesse || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            grundstueckGroesse: e.target.value,
+                          },
+                        })
+                      }
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="gemarkung">Gemarkung</Label>
-                    <Input id="gemarkung" defaultValue="Berlin-Mitte" />
+                    <Input 
+                      id="gemarkung" 
+                      value={selectedObjekt.objektdaten.gemarkung || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            gemarkung: e.target.value,
+                          },
+                        })
+                      }
+                    />
                   </div>
                 </div>
               </CardContent>
@@ -809,11 +1017,33 @@ Nächste Wartung Heizung: März 2026"
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="amtsgericht">Amtsgericht</Label>
-                  <Input id="amtsgericht" defaultValue="Berlin-Mitte" />
+                  <Input 
+                    id="amtsgericht" 
+                    value={selectedObjekt.objektdaten.amtsgericht || ""}
+                    onChange={(e) =>
+                      updateObjekt(selectedObjekt.id, {
+                        objektdaten: {
+                          ...selectedObjekt.objektdaten,
+                          amtsgericht: e.target.value,
+                        },
+                      })
+                    }
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="blatt">Blatt</Label>
-                  <Input id="blatt" defaultValue="1234/56" />
+                  <Input 
+                    id="blatt" 
+                    value={selectedObjekt.objektdaten.blatt || ""}
+                    onChange={(e) =>
+                      updateObjekt(selectedObjekt.id, {
+                        objektdaten: {
+                          ...selectedObjekt.objektdaten,
+                          blatt: e.target.value,
+                        },
+                      })
+                    }
+                  />
                 </div>
               </div>
               <div className="grid lg:grid-cols-2 gap-4">
@@ -823,6 +1053,15 @@ Nächste Wartung Heizung: März 2026"
                     id="lasten-abt2"
                     placeholder="z.B. Wegerechte, Wohnrechte..."
                     rows={4}
+                    value={selectedObjekt.objektdaten.lastenAbt2 || ""}
+                    onChange={(e) =>
+                      updateObjekt(selectedObjekt.id, {
+                        objektdaten: {
+                          ...selectedObjekt.objektdaten,
+                          lastenAbt2: e.target.value,
+                        },
+                      })
+                    }
                   />
                 </div>
                 <div className="space-y-2">
@@ -830,7 +1069,15 @@ Nächste Wartung Heizung: März 2026"
                   <Textarea
                     id="lasten-abt3"
                     rows={4}
-                    defaultValue="Grundschuld über 200.000 EUR zugunsten Sparkasse Berlin"
+                    value={selectedObjekt.objektdaten.lastenAbt3 || ""}
+                    onChange={(e) =>
+                      updateObjekt(selectedObjekt.id, {
+                        objektdaten: {
+                          ...selectedObjekt.objektdaten,
+                          lastenAbt3: e.target.value,
+                        },
+                      })
+                    }
                   />
                 </div>
               </div>
