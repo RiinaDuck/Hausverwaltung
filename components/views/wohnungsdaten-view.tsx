@@ -329,7 +329,16 @@ export function WohnungsdatenView() {
     kabel: true,
   });
   const [isNewUnitOpen, setIsNewUnitOpen] = useState(false);
-  const initialNewUnit = {
+  const initialNewUnit: {
+    lage: string;
+    wohnflaeche: number;
+    nutzflaeche: number;
+    raeume: number;
+    miete: number;
+    punkte: number;
+    prozent: number;
+    status: "frei" | "vermietet";
+  } = {
     lage: "",
     wohnflaeche: 0,
     nutzflaeche: 0,
@@ -337,7 +346,7 @@ export function WohnungsdatenView() {
     miete: 0,
     punkte: 0,
     prozent: 0,
-    status: "frei" as const,
+    status: "frei",
   };
   const [newUnit, setNewUnit] = useState(initialNewUnit);
   const { toast } = useToast();
