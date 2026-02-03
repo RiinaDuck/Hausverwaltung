@@ -346,6 +346,12 @@ export function WohnungsdatenView() {
     if (units.length > 0) {
       if (!selectedUnit || !units.find((u) => u.id === selectedUnit.id)) {
         setSelectedUnit(units[0]);
+      } else {
+        // Aktualisiere selectedUnit mit neuen Daten aus units
+        const updatedUnit = units.find((u) => u.id === selectedUnit.id);
+        if (updatedUnit) {
+          setSelectedUnit(updatedUnit);
+        }
       }
     } else {
       setSelectedUnit(null);
@@ -374,11 +380,11 @@ export function WohnungsdatenView() {
     setEditedUnit((prev) => (prev ? { ...prev, [field]: value } : null));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedUnit || !editedUnit) return;
 
     // Update in Context (konvertiere zurück zu Wohnung Format)
-    updateWohnung(selectedUnit.id, {
+    await updateWohnung(selectedUnit.id, {
       bezeichnung: editedUnit.lage,
       flaeche: editedUnit.wohnflaeche,
       zimmer: editedUnit.raeume,
@@ -391,8 +397,7 @@ export function WohnungsdatenView() {
             : "vermietet",
     });
 
-    // Aktualisiere auch selectedUnit
-    setSelectedUnit(editedUnit);
+    // selectedUnit wird automatisch durch useEffect aktualisiert
 
     toast({
       title: "Gespeichert",

@@ -219,6 +219,14 @@ export function MieterdatenView() {
         !mieterData.find((m) => m.id === selectedMieter.id)
       ) {
         setSelectedMieter(mieterData[0]);
+      } else {
+        // Aktualisiere selectedMieter mit neuen Daten aus mieterData
+        const updatedMieter = mieterData.find(
+          (m) => m.id === selectedMieter.id,
+        );
+        if (updatedMieter) {
+          setSelectedMieter(updatedMieter);
+        }
       }
     } else {
       setSelectedMieter(null);
@@ -253,11 +261,11 @@ export function MieterdatenView() {
     return wohnungen.filter((w) => w.objektId === selectedObjektId);
   }, [wohnungen, selectedObjektId]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedMieter || !editedMieter) return;
 
     // Update in Context
-    updateMieter(selectedMieter.id, {
+    await updateMieter(selectedMieter.id, {
       name: editedMieter.name,
       email: editedMieter.email,
       telefon: editedMieter.telefon,
@@ -270,6 +278,8 @@ export function MieterdatenView() {
       kurzzeitBis: editedMieter.kurzzeitBis,
       prozentanteil: editedMieter.prozentanteil,
     });
+
+    // selectedMieter wird automatisch durch useEffect aktualisiert
 
     toast({
       title: "Gespeichert",
