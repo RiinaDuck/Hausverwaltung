@@ -529,8 +529,8 @@ export function ObjektdatenView() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="finanzamt">Finanzamt</Label>
-                      <Input 
-                        id="finanzamt" 
+                      <Input
+                        id="finanzamt"
                         value={selectedObjekt.objektdaten.finanzamt || ""}
                         onChange={(e) =>
                           updateObjekt(selectedObjekt.id, {
@@ -620,8 +620,8 @@ export function ObjektdatenView() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="obj-strasse">Straße</Label>
-                    <Input 
-                      id="obj-strasse" 
+                    <Input
+                      id="obj-strasse"
                       value={selectedObjekt.objektdaten.strasse}
                       onChange={(e) =>
                         updateObjekt(selectedObjekt.id, {
@@ -636,8 +636,8 @@ export function ObjektdatenView() {
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="obj-plz">PLZ</Label>
-                      <Input 
-                        id="obj-plz" 
+                      <Input
+                        id="obj-plz"
                         value={selectedObjekt.objektdaten.plz}
                         onChange={(e) =>
                           updateObjekt(selectedObjekt.id, {
@@ -651,8 +651,8 @@ export function ObjektdatenView() {
                     </div>
                     <div className="col-span-2 space-y-2">
                       <Label htmlFor="obj-ort">Ort</Label>
-                      <Input 
-                        id="obj-ort" 
+                      <Input
+                        id="obj-ort"
                         value={selectedObjekt.objektdaten.ort}
                         onChange={(e) =>
                           updateObjekt(selectedObjekt.id, {
@@ -680,8 +680,8 @@ export function ObjektdatenView() {
                     <Label htmlFor="gesamtwohnflaeche">
                       Gesamtwohnfläche (m²)
                     </Label>
-                    <Input 
-                      id="gesamtwohnflaeche" 
+                    <Input
+                      id="gesamtwohnflaeche"
                       value={selectedObjekt.objektdaten.gesamtwohnflaeche}
                       onChange={(e) =>
                         updateObjekt(selectedObjekt.id, {
@@ -697,8 +697,8 @@ export function ObjektdatenView() {
                     <Label htmlFor="gesamtnutzflaeche">
                       Gesamtnutzfläche (m²)
                     </Label>
-                    <Input 
-                      id="gesamtnutzflaeche" 
+                    <Input
+                      id="gesamtnutzflaeche"
                       value={selectedObjekt.objektdaten.gesamtnutzflaeche}
                       onChange={(e) =>
                         updateObjekt(selectedObjekt.id, {
@@ -712,8 +712,8 @@ export function ObjektdatenView() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="anzahl-einheiten">Anzahl Einheiten</Label>
-                    <Input 
-                      id="anzahl-einheiten" 
+                    <Input
+                      id="anzahl-einheiten"
                       value={selectedObjekt.objektdaten.anzahlEinheiten}
                       onChange={(e) =>
                         updateObjekt(selectedObjekt.id, {
@@ -737,8 +737,8 @@ export function ObjektdatenView() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="baujahr">Baujahr</Label>
-                      <Input 
-                        id="baujahr" 
+                      <Input
+                        id="baujahr"
                         value={selectedObjekt.objektdaten.baujahr}
                         onChange={(e) =>
                           updateObjekt(selectedObjekt.id, {
@@ -752,8 +752,8 @@ export function ObjektdatenView() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="sanierungsjahr">Sanierungsjahr</Label>
-                      <Input 
-                        id="sanierungsjahr" 
+                      <Input
+                        id="sanierungsjahr"
                         value={selectedObjekt.objektdaten.sanierungsjahr}
                         onChange={(e) =>
                           updateObjekt(selectedObjekt.id, {
@@ -768,8 +768,8 @@ export function ObjektdatenView() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="garagen">Garagen/Stellplätze</Label>
-                    <Input 
-                      id="garagen" 
+                    <Input
+                      id="garagen"
                       value={selectedObjekt.objektdaten.garagen}
                       onChange={(e) =>
                         updateObjekt(selectedObjekt.id, {
@@ -795,8 +795,10 @@ export function ObjektdatenView() {
                       <Label htmlFor="energie-art">
                         Art (Bedarf/Verbrauch)
                       </Label>
-                      <Select 
-                        value={selectedObjekt.objektdaten.energieArt || "bedarf"}
+                      <Select
+                        value={
+                          selectedObjekt.objektdaten.energieArt || "bedarf"
+                        }
                         onValueChange={(value) =>
                           updateObjekt(selectedObjekt.id, {
                             objektdaten: {
@@ -819,8 +821,8 @@ export function ObjektdatenView() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="energie-wert">Wert (kWh/m²)</Label>
-                      <Input 
-                        id="energie-wert" 
+                      <Input
+                        id="energie-wert"
                         value={selectedObjekt.objektdaten.energieWert || ""}
                         onChange={(e) =>
                           updateObjekt(selectedObjekt.id, {
@@ -836,8 +838,10 @@ export function ObjektdatenView() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="energietraeger">Energieträger</Label>
-                      <Select 
-                        value={selectedObjekt.objektdaten.energietraeger || "gas"}
+                      <Select
+                        value={
+                          selectedObjekt.objektdaten.energietraeger || "gas"
+                        }
                         onValueChange={(value) =>
                           updateObjekt(selectedObjekt.id, {
                             objektdaten: {
@@ -863,8 +867,8 @@ export function ObjektdatenView() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="energie-baujahr">Baujahr Heizung</Label>
-                      <Input 
-                        id="energie-baujahr" 
+                      <Input
+                        id="energie-baujahr"
                         value={selectedObjekt.objektdaten.energieBaujahr || ""}
                         onChange={(e) =>
                           updateObjekt(selectedObjekt.id, {
@@ -879,7 +883,7 @@ export function ObjektdatenView() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="energie-klasse">Klasse (A-H)</Label>
-                    <Select 
+                    <Select
                       value={selectedObjekt.objektdaten.energieKlasse || "d"}
                       onValueChange={(value) =>
                         updateObjekt(selectedObjekt.id, {
@@ -943,8 +947,8 @@ export function ObjektdatenView() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="flur">Flur</Label>
-                    <Input 
-                      id="flur" 
+                    <Input
+                      id="flur"
                       value={selectedObjekt.objektdaten.flur || ""}
                       onChange={(e) =>
                         updateObjekt(selectedObjekt.id, {
@@ -958,8 +962,8 @@ export function ObjektdatenView() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="flurstueck">Flurstück</Label>
-                    <Input 
-                      id="flurstueck" 
+                    <Input
+                      id="flurstueck"
                       value={selectedObjekt.objektdaten.flurstueck || ""}
                       onChange={(e) =>
                         updateObjekt(selectedObjekt.id, {
@@ -975,9 +979,11 @@ export function ObjektdatenView() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="grundstueck-groesse">Größe (m²)</Label>
-                    <Input 
-                      id="grundstueck-groesse" 
-                      value={selectedObjekt.objektdaten.grundstueckGroesse || ""}
+                    <Input
+                      id="grundstueck-groesse"
+                      value={
+                        selectedObjekt.objektdaten.grundstueckGroesse || ""
+                      }
                       onChange={(e) =>
                         updateObjekt(selectedObjekt.id, {
                           objektdaten: {
@@ -990,8 +996,8 @@ export function ObjektdatenView() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="gemarkung">Gemarkung</Label>
-                    <Input 
-                      id="gemarkung" 
+                    <Input
+                      id="gemarkung"
                       value={selectedObjekt.objektdaten.gemarkung || ""}
                       onChange={(e) =>
                         updateObjekt(selectedObjekt.id, {
@@ -1017,8 +1023,8 @@ export function ObjektdatenView() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="amtsgericht">Amtsgericht</Label>
-                  <Input 
-                    id="amtsgericht" 
+                  <Input
+                    id="amtsgericht"
                     value={selectedObjekt.objektdaten.amtsgericht || ""}
                     onChange={(e) =>
                       updateObjekt(selectedObjekt.id, {
@@ -1032,8 +1038,8 @@ export function ObjektdatenView() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="blatt">Blatt</Label>
-                  <Input 
-                    id="blatt" 
+                  <Input
+                    id="blatt"
                     value={selectedObjekt.objektdaten.blatt || ""}
                     onChange={(e) =>
                       updateObjekt(selectedObjekt.id, {

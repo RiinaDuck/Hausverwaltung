@@ -518,10 +518,13 @@ export function WohnungsdatenView() {
         </Card>
 
         {/* New Unit Dialog */}
-        <Dialog open={isNewUnitOpen} onOpenChange={(open) => {
-          setIsNewUnitOpen(open);
-          if (!open) setNewUnit(initialNewUnit);
-        }}>
+        <Dialog
+          open={isNewUnitOpen}
+          onOpenChange={(open) => {
+            setIsNewUnitOpen(open);
+            if (!open) setNewUnit(initialNewUnit);
+          }}
+        >
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>
               <DialogTitle>Neue Einheit anlegen</DialogTitle>
@@ -1048,10 +1051,13 @@ export function WohnungsdatenView() {
       )}
 
       {/* New Unit Dialog */}
-      <Dialog open={isNewUnitOpen} onOpenChange={(open) => {
-        setIsNewUnitOpen(open);
-        if (!open) setNewUnit(initialNewUnit);
-      }}>
+      <Dialog
+        open={isNewUnitOpen}
+        onOpenChange={(open) => {
+          setIsNewUnitOpen(open);
+          if (!open) setNewUnit(initialNewUnit);
+        }}
+      >
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Neue Einheit anlegen</DialogTitle>

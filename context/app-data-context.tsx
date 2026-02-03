@@ -188,7 +188,8 @@ const DEMO_OBJEKTE: Objekt[] = [
       lastenAbt3: "Grundschuld über 200.000 EUR zugunsten Sparkasse Berlin",
       finanzamt: "Berlin Mitte",
     },
-    notizen: "Hausmeisterservice: Firma Schmidt, Tel. 030 9876543\nSchlüssel: 3x Haupteingang, 1x Keller\nNächste Wartung Heizung: März 2026",
+    notizen:
+      "Hausmeisterservice: Firma Schmidt, Tel. 030 9876543\nSchlüssel: 3x Haupteingang, 1x Keller\nNächste Wartung Heizung: März 2026",
   },
 ];
 
@@ -376,7 +377,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       });
 
       if (!newObjekt || !newObjekt.id) {
-        throw new Error("Failed to create objekt: No data returned from database");
+        throw new Error(
+          "Failed to create objekt: No data returned from database",
+        );
       }
 
       const mapped = mapDBToObjekt(newObjekt);
