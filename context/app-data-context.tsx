@@ -344,6 +344,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   };
 
   const updateObjekt = async (id: string, updates: Partial<Objekt>) => {
+    // Demo-Modus oder kein User: Lokales Update
+    if (!user || isAdmin) {
+      setObjekte((prev) =>
+        prev.map((obj: Objekt) =>
+          obj.id === id ? { ...obj, ...updates } : obj,
+        ),
+      );
+      return;
+    }
+
     try {
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
@@ -416,6 +426,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   };
 
   const updateWohnung = async (id: string, updates: Partial<Wohnung>) => {
+    // Demo-Modus oder kein User: Lokales Update
+    if (!user || isAdmin) {
+      setWohnungen((prev) =>
+        prev.map((w: Wohnung) =>
+          w.id === id ? { ...w, ...updates } : w,
+        ),
+      );
+      return;
+    }
+
     try {
       const dbUpdates: any = {};
       if (updates.bezeichnung !== undefined)
@@ -479,6 +499,35 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   };
 
   const updateMieter = async (id: string, updates: Partial<Mieter>) => {
+    // Demo-Modus oder kein User: Lokales Update
+    if (!user || isAdmin) {
+      const updatedMieter = mieter.find((m) => m.id === id);
+      if (!updatedMieter) return;
+
+      const mapped = { ...updatedMieter, ...updates };
+
+      if (mapped.isAktiv) {
+        setMieter((prev) =>
+          prev.map((m: Mieter) => (m.id === id ? mapped : m)),
+        );
+      } else {
+        // Wenn inaktiv, von aktiven zu ehemaligen verschieben
+        setMieter((prev) => prev.filter((m: Mieter) => m.id !== id));
+        setEhemaligeMieter((prev) => [
+          ...prev,
+          {
+            id: mapped.id,
+            name: mapped.name,
+            email: mapped.email,
+            telefon: mapped.telefon,
+            letzteWohnungId: mapped.wohnungId,
+            letztesAuszugsDatum: mapped.mieteBis || mapped.einzugsDatum,
+          },
+        ]);
+      }
+      return;
+    }
+
     try {
       const dbUpdates: any = {};
       if (updates.name !== undefined) dbUpdates.name = updates.name;
