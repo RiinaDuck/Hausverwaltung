@@ -283,12 +283,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setWohnungen(wohnungenData.map(mapDBToWohnung));
 
       const allMieter = mieterData.map(mapDBToMieter);
-      setMieter(allMieter.filter((m) => m.isAktiv));
+      setMieter(allMieter.filter((m: Mieter) => m.isAktiv));
 
       // Ehemalige Mieter (inaktive)
       const ehemalige = allMieter
-        .filter((m) => !m.isAktiv)
-        .map((m) => ({
+        .filter((m: Mieter) => !m.isAktiv)
+        .map((m: Mieter) => ({
           id: m.id,
           name: m.name,
           email: m.email,
@@ -301,7 +301,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       // Wähle erstes Objekt aus wenn noch keins gewählt oder das gewählte nicht existiert
       if (
         !selectedObjektId ||
-        !objekteData.find((o) => o.id === selectedObjektId)
+        !objekteData.find((o: any) => o.id === selectedObjektId)
       ) {
         setSelectedObjektId(objekteData[0]?.id || null);
       }
@@ -362,7 +362,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
       const updated = await updateObjektDB(id, dbUpdates);
       setObjekte((prev) =>
-        prev.map((obj) => (obj.id === id ? mapDBToObjekt(updated) : obj)),
+        prev.map((obj: Objekt) =>
+          obj.id === id ? mapDBToObjekt(updated) : obj,
+        ),
       );
     } catch (error) {
       console.error("Error updating objekt:", error);
@@ -373,13 +375,15 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const deleteObjekt = async (id: string) => {
     try {
       await deleteObjektDB(id);
-      setObjekte((prev) => prev.filter((obj) => obj.id !== id));
+      setObjekte((prev) => prev.filter((obj: Objekt) => obj.id !== id));
       // DB CASCADE löscht automatisch Wohnungen und Mieter
-      setWohnungen((prev) => prev.filter((w) => w.objektId !== id));
+      setWohnungen((prev) => prev.filter((w: Wohnung) => w.objektId !== id));
       setMieter((prev) =>
         prev.filter(
-          (m) =>
-            !wohnungen.find((w) => w.id === m.wohnungId && w.objektId === id),
+          (m: Mieter) =>
+            !wohnungen.find(
+              (w: Wohnung) => w.id === m.wohnungId && w.objektId === id,
+            ),
         ),
       );
     } catch (error) {
@@ -426,7 +430,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
       const updated = await updateWohnungDB(id, dbUpdates);
       setWohnungen((prev) =>
-        prev.map((w) => (w.id === id ? mapDBToWohnung(updated) : w)),
+        prev.map((w: Wohnung) => (w.id === id ? mapDBToWohnung(updated) : w)),
       );
     } catch (error) {
       console.error("Error updating wohnung:", error);
@@ -437,9 +441,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const deleteWohnung = async (id: string) => {
     try {
       await deleteWohnungDB(id);
-      setWohnungen((prev) => prev.filter((w) => w.id !== id));
+      setWohnungen((prev) => prev.filter((w: Wohnung) => w.id !== id));
       // DB CASCADE löscht automatisch Mieter
-      setMieter((prev) => prev.filter((m) => m.wohnungId !== id));
+      setMieter((prev) => prev.filter((m: Mieter) => m.wohnungId !== id));
     } catch (error) {
       console.error("Error deleting wohnung:", error);
       throw error;
@@ -501,10 +505,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const mapped = mapDBToMieter(updated);
 
       if (mapped.isAktiv) {
-        setMieter((prev) => prev.map((m) => (m.id === id ? mapped : m)));
+        setMieter((prev) =>
+          prev.map((m: Mieter) => (m.id === id ? mapped : m)),
+        );
       } else {
         // Wenn inaktiv, von aktiven zu ehemaligen verschieben
-        setMieter((prev) => prev.filter((m) => m.id !== id));
+        setMieter((prev) => prev.filter((m: Mieter) => m.id !== id));
         setEhemaligeMieter((prev) => [
           ...prev,
           {
@@ -526,7 +532,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const deleteMieter = async (id: string) => {
     try {
       await deleteMieterDB(id);
-      setMieter((prev) => prev.filter((m) => m.id !== id));
+      setMieter((prev) => prev.filter((m: Mieter) => m.id !== id));
     } catch (error) {
       console.error("Error deleting mieter:", error);
       throw error;
@@ -534,7 +540,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   };
 
   const archiviereMieter = async (id: string) => {
-    const mieterToArchive = mieter.find((m) => m.id === id);
+    const mieterToArchive = mieter.find((m: Mieter) => m.id === id);
     if (!mieterToArchive) return;
 
     try {
@@ -554,7 +560,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     wohnungId: string,
   ) => {
     const ehemaligerMieterData = ehemaligeMieter.find(
-      (m) => m.id === ehemaligerMieterId,
+      (m: EhemalierMieter) => m.id === ehemaligerMieterId,
     );
     if (!ehemaligerMieterData || !user) return;
 

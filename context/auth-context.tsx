@@ -83,6 +83,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initialize auth state from Supabase
   useEffect(() => {
+    // Skip if no supabase client (e.g., during build)
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
+
     const initAuth = async () => {
       try {
         const {
@@ -116,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event: any, session: any) => {
       setUser(session?.user ?? null);
 
       if (session?.user) {
@@ -139,7 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, []);
 
   // Speichere Profil-Änderungen
   useEffect(() => {
@@ -180,6 +186,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: true };
     }
 
+    // Skip if no supabase client
+    if (!supabase) {
+      return { success: false, error: "Supabase ist nicht konfiguriert" };
+    }
+
     // Normale Supabase-Authentifizierung
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -214,6 +225,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     name: string,
   ): Promise<{ success: boolean; error?: string }> => {
+    // Skip if no supabase client
+    if (!supabase) {
+      return { success: false, error: "Supabase ist nicht konfiguriert" };
+    }
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -253,15 +269,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Logout
   const logout = async () => {
-    try {
-      await supabase.auth.signOut();
-      setUser(null);
-      setIsDemo(false);
-      setIsAdmin(false);
-      setProfile(defaultProfile);
-    } catch (error) {
-      console.error("Logout error:", error);
+    if (supabase) {
+      try {
+        await supabase.auth.signOut();
+      } catch (error) {
+        console.error("Logout error:", error);
+      }
     }
+    setUser(null);
+    setIsDemo(false);
+    setIsAdmin(false);
+    setProfile(defaultProfile);
   };
 
   // Profil aktualisieren (nur wenn nicht im Demo-Modus)
@@ -271,17 +289,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const updatedProfile = { ...profile, ...updates };
     setProfile(updatedProfile);
 
-    try {
-      // Update user metadata in Supabase
-      await supabase.auth.updateUser({
-        data: {
-          name: updatedProfile.name,
-          anschrift: updatedProfile.anschrift,
-          ansprechpartner: updatedProfile.ansprechpartner,
-        },
-      });
-    } catch (error) {
-      console.error("Error updating profile:", error);
+    if (supabase) {
+      try {
+        // Update user metadata in Supabase
+        await supabase.auth.updateUser({
+          data: {
+            name: updatedProfile.name,
+            anschrift: updatedProfile.anschrift,
+            ansprechpartner: updatedProfile.ansprechpartner,
+          },
+        });
+      } catch (error) {
+        console.error("Error updating profile:", error);
+      }
     }
   };
 
