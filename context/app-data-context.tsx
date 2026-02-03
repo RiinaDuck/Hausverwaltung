@@ -429,9 +429,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     // Demo-Modus oder kein User: Lokales Update
     if (!user || isAdmin) {
       setWohnungen((prev) =>
-        prev.map((w: Wohnung) =>
-          w.id === id ? { ...w, ...updates } : w,
-        ),
+        prev.map((w: Wohnung) => (w.id === id ? { ...w, ...updates } : w)),
       );
       return;
     }
