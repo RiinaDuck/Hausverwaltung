@@ -227,10 +227,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
     try {
+      const siteUrl =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/auth/callback`
+          : `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/auth/callback`;
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
+          emailRedirectTo: siteUrl,
           data: {
             name: name,
             anschrift: "",
@@ -247,7 +253,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.user && !data.session) {
         return {
           success: false,
-          needsEmailConfirmation: false,
+          needsEmailConfirmation: true,
           error:
             `Registrierung erfolgreich! Bitte bestätigen Sie Ihre E-Mail-Adresse. Eine Bestätigungsmail wurde an ${email} gesendet.`,
         };

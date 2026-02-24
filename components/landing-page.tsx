@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -59,6 +61,15 @@ interface LandingPageProps {
   onStartDemo: () => void;
 }
 
+const cleanupRadixLock = () => {
+  document.body.style.removeProperty("pointer-events");
+  document.body.removeAttribute("data-scroll-locked");
+  document.querySelectorAll("[inert]").forEach((el) => el.removeAttribute("inert"));
+  document.querySelectorAll("body > [aria-hidden='true']").forEach((el) =>
+    el.removeAttribute("aria-hidden")
+  );
+};
+
 export function LandingPage({
   onOpenApp,
   onLogin,
@@ -68,6 +79,23 @@ export function LandingPage({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loginDialogOpen, setLoginDialogOpen] = useState(false);
   const [signupDialogOpen, setSignupDialogOpen] = useState(false);
+
+  // Radix UI setzt beim Öffnen eines Dialogs "pointer-events: none" auf <body>
+  // und "inert" auf andere Elemente. Wenn die Komponente während einer Dialog-
+  // Animation unmountet wird (z.B. durch schnellen View-Wechsel), kann dieser
+  // Style hängen bleiben → Inputs nicht klickbar. Hier wird das beim Mount bereinigt.
+  useEffect(() => {
+    // Stuck pointer-events entfernen
+    document.body.style.removeProperty("pointer-events");
+    // Radix scroll-lock Attribut entfernen
+    document.body.removeAttribute("data-scroll-locked");
+    // Inert-Attribute von allen Elementen entfernen die Radix gesetzt haben könnte
+    document.querySelectorAll("[inert]").forEach((el) => el.removeAttribute("inert"));
+    // aria-hidden von body-children entfernen die Radix gesetzt haben könnte
+    document.querySelectorAll("body > [aria-hidden='true']").forEach((el) =>
+      el.removeAttribute("aria-hidden")
+    );
+  }, []);
   const [helpDialogOpen, setHelpDialogOpen] = useState(false);
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -147,9 +175,20 @@ export function LandingPage({
   };
 
   const handleStartDemo = () => {
+  // alle Dialoge schließen
+  setLoginDialogOpen(false);
+  setSignupDialogOpen(false);
+  setHelpDialogOpen(false);
+
+  // Radix locks entfernen
+  cleanupRadixLock();
+
+  // Nächster Tick: erst dann View wechseln
+  setTimeout(() => {
     onStartDemo();
     onOpenApp();
-  };
+  }, 0);
+};
 
   // Hilfe-Sektionen für den Dialog
   const helpSections = [
@@ -294,7 +333,10 @@ export function LandingPage({
               variant="ghost"
               size="sm"
               className="hidden sm:flex"
-              onClick={() => setLoginDialogOpen(true)}
+              onClick={() => {
+                cleanupRadixLock();
+                setLoginDialogOpen(true);
+              }}
             >
               Anmelden
             </Button>
@@ -345,7 +387,10 @@ export function LandingPage({
               variant="outline"
               size="sm"
               className="w-full"
-              onClick={() => setLoginDialogOpen(true)}
+              onClick={() => {
+              cleanupRadixLock();
+              setLoginDialogOpen(true);
+            }}
             >
               Anmelden
             </Button>
@@ -412,9 +457,10 @@ export function LandingPage({
                 type="button"
                 className="text-success hover:underline font-medium"
                 onClick={() => {
-                  setLoginDialogOpen(false);
-                  setSignupDialogOpen(true);
-                }}
+                cleanupRadixLock();
+                setLoginDialogOpen(false);
+                setSignupDialogOpen(true);
+              }}
               >
                 Jetzt registrieren
               </button>
@@ -425,15 +471,16 @@ export function LandingPage({
 
       {/* Signup Dialog */}
       <Dialog
-        open={signupDialogOpen}
-        onOpenChange={(open) => {
-          setSignupDialogOpen(open);
-          if (!open) {
-            setSignupError("");
-            setSignupPending(false);
-          }
-        }}
-      >
+            open={signupDialogOpen}
+            onOpenChange={(open) => {
+              cleanupRadixLock();
+              setSignupDialogOpen(open);
+              if (!open) {
+                setSignupError("");
+                setSignupPending(false);
+              }
+            }}
+          >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Konto erstellen</DialogTitle>
@@ -524,42 +571,6 @@ export function LandingPage({
                 }}
               >
                 Jetzt anmelden
-              </button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/*       placeholder="Passwort eingeben"
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && !loginLoading && handleLogin()
-                }
-                disabled={loginLoading}
-              />
-            </div>
-            {loginError && (
-              <p className="text-sm text-destructive">{loginError}</p>
-            )}
-            <Button
-              className="w-full bg-success hover:bg-success/90 text-success-foreground"
-              onClick={handleLogin}
-              disabled={loginLoading}
-            >
-              {loginLoading ? "Wird angemeldet..." : "Anmelden"}
-            </Button>
-            <div className="text-center text-sm text-muted-foreground">
-              Noch kein Konto?{" "}
-              <button
-                type="button"
-                className="text-success hover:underline font-medium"
-                onClick={() => {
-                  setLoginDialogOpen(false);
-                  setSignupDialogOpen(true);
-                }}
-              >
-                Jetzt registrieren
               </button>
             </div>
           </div>
