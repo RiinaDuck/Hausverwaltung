@@ -21,7 +21,7 @@ function ViewToggleContent() {
     email: string,
     password: string,
     name: string,
-  ): Promise<{ success: boolean; error?: string }> => {
+  ): Promise<{ success: boolean; error?: string; needsEmailConfirmation?: boolean }> => {
     return await signup(email, password, name);
   };
 

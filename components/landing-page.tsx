@@ -55,7 +55,7 @@ interface LandingPageProps {
     email: string,
     password: string,
     name: string,
-  ) => Promise<{ success: boolean; error?: string }>;
+  ) => Promise<{ success: boolean; error?: string; needsEmailConfirmation?: boolean }>;
   onStartDemo: () => void;
 }
 
@@ -77,6 +77,7 @@ export function LandingPage({
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
   const [signupError, setSignupError] = useState("");
+  const [signupPending, setSignupPending] = useState(false);
   const [signupLoading, setSignupLoading] = useState(false);
 
   const handleLogin = async () => {
@@ -102,6 +103,7 @@ export function LandingPage({
 
   const handleSignup = async () => {
     setSignupError("");
+    setSignupPending(false);
 
     // Validierung
     if (!signupEmail || !signupPassword) {
@@ -130,7 +132,12 @@ export function LandingPage({
       setSignupEmail("");
       setSignupPassword("");
       setSignupConfirmPassword("");
+      setSignupPending(false);
       onOpenApp();
+    } else if (result.needsEmailConfirmation) {
+      // E-Mail-Bestätigung ausstehend – Dialog offen lassen und Info anzeigen
+      setSignupPending(true);
+      setSignupError(result.error || "");
     } else {
       setSignupError(
         result.error ||
@@ -417,7 +424,16 @@ export function LandingPage({
       </Dialog>
 
       {/* Signup Dialog */}
-      <Dialog open={signupDialogOpen} onOpenChange={setSignupDialogOpen}>
+      <Dialog
+        open={signupDialogOpen}
+        onOpenChange={(open) => {
+          setSignupDialogOpen(open);
+          if (!open) {
+            setSignupError("");
+            setSignupPending(false);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Konto erstellen</DialogTitle>
@@ -462,15 +478,41 @@ export function LandingPage({
               />
             </div>
             {signupError && (
-              <div className="text-sm text-destructive">{signupError}</div>
+              <div
+                className={`text-sm rounded-md p-3 ${
+                  signupPending
+                    ? "bg-green-50 text-green-800 border border-green-200 dark:bg-green-950 dark:text-green-200 dark:border-green-800"
+                    : "text-destructive"
+                }`}
+              >
+                {signupError}
+              </div>
             )}
-            <Button
-              className="w-full"
-              onClick={handleSignup}
-              disabled={signupLoading}
-            >
-              {signupLoading ? "Wird erstellt..." : "Konto erstellen"}
-            </Button>
+            {!signupPending && (
+              <Button
+                className="w-full"
+                onClick={handleSignup}
+                disabled={signupLoading}
+              >
+                {signupLoading ? "Wird erstellt..." : "Konto erstellen"}
+              </Button>
+            )}
+            {signupPending && (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setSignupDialogOpen(false);
+                  setSignupEmail("");
+                  setSignupPassword("");
+                  setSignupConfirmPassword("");
+                  setSignupPending(false);
+                  setSignupError("");
+                }}
+              >
+                Schließen
+              </Button>
+            )}
             <div className="text-center text-sm text-muted-foreground">
               Bereits ein Konto?{" "}
               <button

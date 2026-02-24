@@ -33,7 +33,7 @@ interface AuthContextType {
     email: string,
     password: string,
     name: string,
-  ) => Promise<{ success: boolean; error?: string }>;
+  ) => Promise<{ success: boolean; error?: string; needsEmailConfirmation?: boolean }>;
   startDemo: () => void;
   logout: () => Promise<void>;
   updateProfile: (profile: Partial<UserProfile>) => void;
@@ -220,15 +220,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Signup mit Supabase Auth
-  const signup = async (
-    email: string,
-    password: string,
-    name: string,
-  ): Promise<{ success: boolean; error?: string }> => {
-    // Skip if no supabase client
-    if (!supabase) {
-      return { success: false, error: "Supabase ist nicht konfiguriert" };
-    }
+  const signup = async (email: string, password: string, name: string) => {
+  const supabase = createClient();
+  if (!supabase) {
+    return { success: false, error: "Supabase ist nicht konfiguriert" };
+  }
 
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -247,7 +243,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: error.message };
       }
 
-      if (data.user) {
+      // E-Mail-Bestätigung ausstehend (data.session ist null, aber data.user wurde erstellt)
+      if (data.user && !data.session) {
+        return {
+          success: false,
+          needsEmailConfirmation: false,
+          error:
+            `Registrierung erfolgreich! Bitte bestätigen Sie Ihre E-Mail-Adresse. Eine Bestätigungsmail wurde an ${email} gesendet.`,
+        };
+      }
+
+      if (data.user && data.session) {
+        setUser(data.user);
         return { success: true };
       }
 

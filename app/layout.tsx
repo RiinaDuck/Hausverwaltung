@@ -54,8 +54,18 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+
   return (
     <html lang="de">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.__SUPABASE_URL__=${JSON.stringify(supabaseUrl)};window.__SUPABASE_ANON_KEY__=${JSON.stringify(supabaseAnonKey)};`,
+          }}
+        />
+      </head>
       <body className={`${inter.className} antialiased`}>
         {children}
       </body>
