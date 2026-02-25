@@ -352,3 +352,79 @@ export async function deleteHausmanagerStammdaten(id: string) {
 
   if (error) throw error;
 }
+
+// ============================================
+// EXPENSES (Betriebskosten / Nebenkosten)
+// ============================================
+
+export async function getExpenses(
+  userId: string,
+  objektId?: string,
+  zeitraumVon?: string,
+  zeitraumBis?: string,
+) {
+  const supabase = createClient();
+  let query = supabase
+    .from("expenses")
+    .select("*")
+    .eq("user_id", userId)
+    .order("zeitraum_von", { ascending: false });
+
+  if (objektId) query = query.eq("objekt_id", objektId);
+  if (zeitraumVon) query = query.gte("zeitraum_bis", zeitraumVon);
+  if (zeitraumBis) query = query.lte("zeitraum_von", zeitraumBis);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createExpense(expense: {
+  user_id: string;
+  objekt_id: string;
+  kostenart: string;
+  betrag: number;
+  zeitraum_von: string;
+  zeitraum_bis: string;
+  verteilerschluessel: string;
+  rechnung_id?: string | null;
+  notiz?: string | null;
+}) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("expenses")
+    .insert(expense)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateExpense(id: string, updates: Partial<{
+  kostenart: string;
+  betrag: number;
+  zeitraum_von: string;
+  zeitraum_bis: string;
+  verteilerschluessel: string;
+  rechnung_id: string | null;
+  notiz: string | null;
+}>) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("expenses")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteExpense(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("expenses").delete().eq("id", id);
+  if (error) throw error;
+}
+

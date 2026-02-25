@@ -21,6 +21,10 @@ import {
   createMieter,
   updateMieter as updateMieterDB,
   deleteMieter as deleteMieterDB,
+  getExpenses,
+  createExpense as createExpenseDB,
+  updateExpense as updateExpenseDB,
+  deleteExpense as deleteExpenseDB,
 } from "@/lib/supabase/queries";
 
 // Types für die Datenstrukturen
@@ -114,11 +118,36 @@ export interface EhemalierMieter {
   letztesAuszugsDatum: string;
 }
 
+export type Verteilerschluessel =
+  | "wohnflaeche"
+  | "nutzflaeche"
+  | "einheiten"
+  | "personen"
+  | "verbrauch"
+  | "mea"
+  | "direkt";
+
+export interface Expense {
+  id: string;
+  userId: string;
+  objektId: string;
+  kostenart: string;
+  betrag: number;
+  zeitraumVon: string;  // ISO-Date
+  zeitraumBis: string;  // ISO-Date
+  verteilerschluessel: Verteilerschluessel;
+  rechnungId?: string | null;
+  notiz?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface AppDataContextType {
   objekte: Objekt[];
   wohnungen: Wohnung[];
   mieter: Mieter[];
   ehemaligeMieter: EhemalierMieter[];
+  expenses: Expense[];
   selectedObjektId: string | null;
   loading: boolean;
   addObjekt: (objekt: Omit<Objekt, "id">) => Promise<void>;
@@ -135,6 +164,9 @@ interface AppDataContextType {
     ehemaligerMieterId: string,
     wohnungId: string,
   ) => Promise<void>;
+  addExpense: (expense: Omit<Expense, "id" | "userId" | "createdAt" | "updatedAt">) => Promise<void>;
+  updateExpense: (id: string, updates: Partial<Expense>) => Promise<void>;
+  deleteExpense: (id: string) => Promise<void>;
   setSelectedObjektId: (id: string | null) => void;
   refreshData: () => Promise<void>;
 }
@@ -236,12 +268,68 @@ const DEMO_MIETER: Mieter[] = [
   },
 ];
 
+const DEMO_EXPENSES: Expense[] = [
+  {
+    id: "demo-e1",
+    userId: "demo",
+    objektId: "demo-1",
+    kostenart: "Gebäudeversicherung",
+    betrag: 1250.0,
+    zeitraumVon: "2025-01-01",
+    zeitraumBis: "2025-12-31",
+    verteilerschluessel: "wohnflaeche",
+    notiz: "Allianz Versicherung, Rechnung vom 02.01.2025",
+    createdAt: "2025-01-05T10:00:00Z",
+    updatedAt: "2025-01-05T10:00:00Z",
+  },
+  {
+    id: "demo-e2",
+    userId: "demo",
+    objektId: "demo-1",
+    kostenart: "Grundsteuer",
+    betrag: 890.0,
+    zeitraumVon: "2025-01-01",
+    zeitraumBis: "2025-12-31",
+    verteilerschluessel: "mea",
+    notiz: "Bescheid Finanzamt Berlin Mitte 2025",
+    createdAt: "2025-01-10T10:00:00Z",
+    updatedAt: "2025-01-10T10:00:00Z",
+  },
+  {
+    id: "demo-e3",
+    userId: "demo",
+    objektId: "demo-1",
+    kostenart: "Müllabfuhr",
+    betrag: 780.0,
+    zeitraumVon: "2025-01-01",
+    zeitraumBis: "2025-12-31",
+    verteilerschluessel: "personen",
+    notiz: "",
+    createdAt: "2025-01-15T10:00:00Z",
+    updatedAt: "2025-01-15T10:00:00Z",
+  },
+  {
+    id: "demo-e4",
+    userId: "demo",
+    objektId: "demo-1",
+    kostenart: "Allgemeinstrom / Beleuchtung",
+    betrag: 420.0,
+    zeitraumVon: "2025-01-01",
+    zeitraumBis: "2025-12-31",
+    verteilerschluessel: "einheiten",
+    notiz: "",
+    createdAt: "2025-01-20T10:00:00Z",
+    updatedAt: "2025-01-20T10:00:00Z",
+  },
+];
+
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const { user, isAdmin } = useAuth();
   const [objekte, setObjekte] = useState<Objekt[]>([]);
   const [wohnungen, setWohnungen] = useState<Wohnung[]>([]);
   const [mieter, setMieter] = useState<Mieter[]>([]);
   const [ehemaligeMieter, setEhemaligeMieter] = useState<EhemalierMieter[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [selectedObjektId, setSelectedObjektId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -290,6 +378,21 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       : undefined,
   });
 
+  const mapDBToExpense = (db: any): Expense => ({
+    id: db.id,
+    userId: db.user_id,
+    objektId: db.objekt_id,
+    kostenart: db.kostenart,
+    betrag: Number(db.betrag),
+    zeitraumVon: db.zeitraum_von,
+    zeitraumBis: db.zeitraum_bis,
+    verteilerschluessel: db.verteilerschluessel,
+    rechnungId: db.rechnung_id ?? null,
+    notiz: db.notiz ?? null,
+    createdAt: db.created_at,
+    updatedAt: db.updated_at,
+  });
+
   // Lade alle Daten von Supabase
   const refreshData = async () => {
     // Demo-Modus oder Admin-Account: Zeige Demo-Daten
@@ -299,6 +402,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setWohnungen(DEMO_WOHNUNGEN);
       setMieter(DEMO_MIETER);
       setEhemaligeMieter([]);
+      setExpenses(DEMO_EXPENSES);
       setSelectedObjektId(DEMO_OBJEKTE[0]?.id || null);
       setLoading(false);
       return;
@@ -306,14 +410,16 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
     try {
       setLoading(true);
-      const [objekteData, wohnungenData, mieterData] = await Promise.all([
+      const [objekteData, wohnungenData, mieterData, expensesData] = await Promise.all([
         getObjekte(user.id),
         getWohnungen(user.id),
         getMieter(user.id),
+        getExpenses(user.id),
       ]);
 
       setObjekte(objekteData.map(mapDBToObjekt));
       setWohnungen(wohnungenData.map(mapDBToWohnung));
+      setExpenses(expensesData.map(mapDBToExpense));
 
       const allMieter = mieterData.map(mapDBToMieter);
       setMieter(allMieter.filter((m: Mieter) => m.isAktiv));
@@ -696,6 +802,81 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ---- Expenses CRUD ----
+
+  const addExpense = async (
+    expense: Omit<Expense, "id" | "userId" | "createdAt" | "updatedAt">,
+  ) => {
+    if (!user || isAdmin) {
+      const newExpense: Expense = {
+        ...expense,
+        id: `local-exp-${Date.now()}`,
+        userId: "demo",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setExpenses((prev) => [newExpense, ...prev]);
+      return;
+    }
+    try {
+      const created = await createExpenseDB({
+        user_id: user.id,
+        objekt_id: expense.objektId,
+        kostenart: expense.kostenart,
+        betrag: expense.betrag,
+        zeitraum_von: expense.zeitraumVon,
+        zeitraum_bis: expense.zeitraumBis,
+        verteilerschluessel: expense.verteilerschluessel,
+        rechnung_id: expense.rechnungId ?? null,
+        notiz: expense.notiz ?? null,
+      });
+      setExpenses((prev) => [mapDBToExpense(created), ...prev]);
+    } catch (error) {
+      console.error("Error adding expense:", error);
+      throw error;
+    }
+  };
+
+  const updateExpense = async (id: string, updates: Partial<Expense>) => {
+    if (!user || isAdmin) {
+      setExpenses((prev) =>
+        prev.map((e) => (e.id === id ? { ...e, ...updates } : e)),
+      );
+      return;
+    }
+    try {
+      const dbUpdates: any = {};
+      if (updates.kostenart !== undefined) dbUpdates.kostenart = updates.kostenart;
+      if (updates.betrag !== undefined) dbUpdates.betrag = updates.betrag;
+      if (updates.zeitraumVon !== undefined) dbUpdates.zeitraum_von = updates.zeitraumVon;
+      if (updates.zeitraumBis !== undefined) dbUpdates.zeitraum_bis = updates.zeitraumBis;
+      if (updates.verteilerschluessel !== undefined) dbUpdates.verteilerschluessel = updates.verteilerschluessel;
+      if (updates.rechnungId !== undefined) dbUpdates.rechnung_id = updates.rechnungId;
+      if (updates.notiz !== undefined) dbUpdates.notiz = updates.notiz;
+      const updated = await updateExpenseDB(id, dbUpdates);
+      setExpenses((prev) =>
+        prev.map((e) => (e.id === id ? mapDBToExpense(updated) : e)),
+      );
+    } catch (error) {
+      console.error("Error updating expense:", error);
+      throw error;
+    }
+  };
+
+  const deleteExpense = async (id: string) => {
+    if (!user || isAdmin) {
+      setExpenses((prev) => prev.filter((e) => e.id !== id));
+      return;
+    }
+    try {
+      await deleteExpenseDB(id);
+      setExpenses((prev) => prev.filter((e) => e.id !== id));
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+      throw error;
+    }
+  };
+
   return (
     <AppDataContext.Provider
       value={{
@@ -703,6 +884,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         wohnungen,
         mieter,
         ehemaligeMieter,
+        expenses,
         selectedObjektId,
         loading,
         addObjekt,
@@ -716,6 +898,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         deleteMieter,
         archiviereMieter,
         reaktiviereMieter,
+        addExpense,
+        updateExpense,
+        deleteExpense,
         setSelectedObjektId,
         refreshData,
       }}
