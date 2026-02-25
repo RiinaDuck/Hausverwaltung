@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -249,7 +249,7 @@ export function StatistikenView() {
   const [selectedObjekt, setSelectedObjekt] = useState("alle");
   const [isEditOpen, setIsEditOpen] = useState(false);
   const { toast } = useToast();
-  const { objekte, wohnungen, mieter, selectedObjektId } = useAppData();
+  const { objekte, wohnungen, mieter, expenses, selectedObjektId } = useAppData();
 
   // Refs für Chart-Capture
   const finanzChartRef = useRef<HTMLDivElement | null>(null);
@@ -409,6 +409,70 @@ export function StatistikenView() {
   const [kostenVerteilung, setKostenVerteilung] = useState(
     initialKostenVerteilung,
   );
+
+  // Sync einnahmenProObjekt from real objekte/mieter data
+  useEffect(() => {
+    if (objekte.length === 0) return;
+    const CHART_COLORS = ["#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EC4899", "#EF4444"];
+    const data = objekte.map((obj, i) => {
+      const objWohnungen = wohnungen.filter((w) => w.objektId === obj.id);
+      const wIds = objWohnungen.map((w) => w.id);
+      const aktiveMieter = mieter.filter((m) => wIds.includes(m.wohnungId) && m.isAktiv !== false);
+      const jahreseinnahmen = aktiveMieter.reduce((s, m) => s + (m.kaltmiete + m.nebenkosten) * 12, 0);
+      return { name: obj.name, einnahmen: Math.round(jahreseinnahmen), anteil: 0, color: CHART_COLORS[i % CHART_COLORS.length] };
+    });
+    const gesamt = data.reduce((s, d) => s + d.einnahmen, 0);
+    const withAnteil = data.map((d) => ({ ...d, anteil: gesamt > 0 ? Math.round((d.einnahmen / gesamt) * 100) : 0 }));
+    setEinnahmenProObjekt(withAnteil);
+  }, [objekte, wohnungen, mieter]);
+
+  // Sync kostenVerteilung from real expenses
+  useEffect(() => {
+    if (expenses.length === 0) return;
+    const CHART_COLORS = ["#10B981", "#3B82F6", "#8B5CF6", "#F59E0B", "#EC4899", "#EF4444", "#14B8A6", "#F97316"];
+    const grouped: Record<string, number> = {};
+    expenses.forEach((exp) => {
+      grouped[exp.kostenart] = (grouped[exp.kostenart] ?? 0) + exp.betrag;
+    });
+    const data = Object.entries(grouped)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value], i) => ({ name, value: Math.round(value), color: CHART_COLORS[i % CHART_COLORS.length] }));
+    setKostenVerteilung(data);
+  }, [expenses]);
+
+  // Sync monatlicheFinanzDaten from real mieter + expenses for selectedYear
+  useEffect(() => {
+    if (mieter.length === 0 && expenses.length === 0) return;
+    const year = parseInt(selectedYear, 10);
+    const MONATE = ["Jan","Feb","Mar","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+    const data = MONATE.map((monat, idx) => {
+      const monStart = new Date(year, idx, 1);
+      const monEnd = new Date(year, idx + 1, 0);
+      const monStartStr = monStart.toISOString().slice(0, 10);
+      const monEndStr = monEnd.toISOString().slice(0, 10);
+      // Einnahmen: aktive Mieter die in diesem Monat ein Mietverhältnis haben
+      const einnahmen = mieter
+        .filter((m) => m.isAktiv !== false)
+        .filter((m) => {
+          const ein = m.einzugsDatum <= monEndStr;
+          const aus = !m.mieteBis || m.mieteBis >= monStartStr;
+          return ein && aus;
+        })
+        .reduce((s, m) => s + m.kaltmiete + m.nebenkosten, 0);
+      // Ausgaben: Expenses die diesen Monat überlappen, anteilig
+      const ausgaben = expenses
+        .filter((e) => e.zeitraumVon <= monEndStr && e.zeitraumBis >= monStartStr)
+        .reduce((s, e) => {
+          const expDays = Math.max(1, Math.round((new Date(e.zeitraumBis).getTime() - new Date(e.zeitraumVon).getTime()) / 86400000) + 1);
+          const overlapStart = e.zeitraumVon > monStartStr ? e.zeitraumVon : monStartStr;
+          const overlapEnd = e.zeitraumBis < monEndStr ? e.zeitraumBis : monEndStr;
+          const overlapDays = Math.max(0, Math.round((new Date(overlapEnd).getTime() - new Date(overlapStart).getTime()) / 86400000) + 1);
+          return s + (e.betrag * overlapDays) / expDays;
+        }, 0);
+      return { monat, einnahmen: Math.round(einnahmen), ausgaben: Math.round(ausgaben), gewinn: Math.round(einnahmen - ausgaben) };
+    });
+    setMonatlicheFinanzDaten(data);
+  }, [mieter, expenses, selectedYear]);
   const [leerstandDaten, setLeerstandDaten] = useState(initialLeerstandDaten);
   const [zahlungsverhalten, setZahlungsverhalten] = useState(
     initialZahlungsverhalten,
