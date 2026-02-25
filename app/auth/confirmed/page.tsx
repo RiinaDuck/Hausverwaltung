@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CheckCircle2, XCircle, Home, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function AuthConfirmedPage() {
+function AuthConfirmedContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [countdown, setCountdown] = useState(5);
@@ -112,5 +112,13 @@ useEffect(() => {
         </Button>
       </div>
     </div>
+  );
+}
+
+export default function AuthConfirmedPage() {
+  return (
+    <Suspense fallback={null}>
+      <AuthConfirmedContent />
+    </Suspense>
   );
 }
