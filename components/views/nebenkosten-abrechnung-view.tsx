@@ -263,7 +263,7 @@ export function NebenkostenAbrechnungView() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Kostenart</TableHead>
-                        <TableHead>Schluessel</TableHead>
+                        <TableHead>Schlüssel</TableHead>
                         <TableHead className="text-right">Gesamtbetrag</TableHead>
                         <TableHead className="text-right">Anteil</TableHead>
                         <TableHead className="text-right">Ihr Anteil</TableHead>

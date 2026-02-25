@@ -77,7 +77,7 @@ const EMPTY_FORM = {
 };
 
 export function NebenkostenView() {
-  const { objekte, expenses, selectedObjektId, addExpense, updateExpense, deleteExpense } =
+  const { objekte, expenses, selectedObjektId, setSelectedObjektId, addExpense, updateExpense, deleteExpense } =
     useAppData();
   const { toast } = useToast();
 
@@ -88,22 +88,35 @@ export function NebenkostenView() {
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [filterVon, setFilterVon] = useState("");
   const [filterBis, setFilterBis] = useState("");
+  const [filterKostenart, setFilterKostenart] = useState("alle");
+  const [filterSchluessel, setFilterSchluessel] = useState("alle");
 
   const currentObjekt = useMemo(
     () => objekte.find((o) => o.id === selectedObjektId),
     [objekte, selectedObjektId],
   );
 
+  const objektExpenses = useMemo(
+    () => expenses.filter((e) => e.objektId === selectedObjektId),
+    [expenses, selectedObjektId],
+  );
+
+  const kostenartOptionen = useMemo(() => {
+    const arten = new Set(objektExpenses.map((e) => e.kostenart));
+    return Array.from(arten).sort();
+  }, [objektExpenses]);
+
   const filteredExpenses = useMemo(() => {
-    return expenses
-      .filter((e) => e.objektId === selectedObjektId)
+    return objektExpenses
       .filter((e) => {
         if (filterVon && e.zeitraumBis < filterVon) return false;
         if (filterBis && e.zeitraumVon > filterBis) return false;
+        if (filterKostenart !== "alle" && e.kostenart !== filterKostenart) return false;
+        if (filterSchluessel !== "alle" && e.verteilerschluessel !== filterSchluessel) return false;
         return true;
       })
       .sort((a, b) => b.zeitraumVon.localeCompare(a.zeitraumVon));
-  }, [expenses, selectedObjektId, filterVon, filterBis]);
+  }, [objektExpenses, filterVon, filterBis, filterKostenart, filterSchluessel]);
 
   const gesamtbetrag = useMemo(
     () => filteredExpenses.reduce((s, e) => s + e.betrag, 0),
@@ -182,73 +195,137 @@ export function NebenkostenView() {
     setDeleteId(null);
   }
 
-  if (!selectedObjektId) {
-    return (
-      <div className="flex flex-col items-center justify-center h-60 gap-3 text-muted-foreground">
-        <Building2 className="h-10 w-10 opacity-30" />
-        <p>Bitte zuerst ein Objekt auswaehlen.</p>
-      </div>
-    );
-  }
+  const hasFilters = filterVon || filterBis || filterKostenart !== "alle" || filterSchluessel !== "alle";
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <p className="text-sm text-muted-foreground">
-            Betriebskosten fuer{" "}
-            <span className="font-medium text-foreground">
-              {currentObjekt?.name}
-            </span>{" "}
-            erfassen &mdash; werden automatisch auf die Einheiten verteilt.
-          </p>
-        </div>
-        <Button
-          size="sm"
-          className="gap-2"
-          onClick={openAdd}
-        >
-          <Plus className="h-4 w-4" />
-          Kostenposition erfassen
-        </Button>
-      </div>
-
-      {/* Filter */}
+      {/* Filter-/Auswahlleiste */}
       <Card>
         <CardContent className="pt-4">
-          <div className="flex flex-col sm:flex-row gap-3 items-end">
-            <div className="space-y-1 flex-1">
-              <Label className="text-xs">Zeitraum von</Label>
-              <Input type="date" value={filterVon} onChange={(e) => setFilterVon(e.target.value)} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
+            {/* Objekt */}
+            <div className="space-y-1">
+              <Label className="text-xs">Objekt</Label>
+              <Select
+                value={selectedObjektId ?? ""}
+                onValueChange={(v) => setSelectedObjektId(v)}
+              >
+                <SelectTrigger>
+                  <Building2 className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
+                  <SelectValue placeholder="Objekt wählen" />
+                </SelectTrigger>
+                <SelectContent>
+                  {objekte.map((o) => (
+                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="space-y-1 flex-1">
-              <Label className="text-xs">Zeitraum bis</Label>
-              <Input type="date" value={filterBis} onChange={(e) => setFilterBis(e.target.value)} />
+
+            {/* Kostenart-Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs">Kostenart</Label>
+              <Select value={filterKostenart} onValueChange={setFilterKostenart}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Alle" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="alle">Alle Kostenarten</SelectItem>
+                  {kostenartOptionen.map((k) => (
+                    <SelectItem key={k} value={k}>{k}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            {(filterVon || filterBis) && (
-              <Button variant="ghost" size="sm" onClick={() => { setFilterVon(""); setFilterBis(""); }}>
-                Filter zuruecksetzen
-              </Button>
-            )}
+
+            {/* Schlüssel-Filter */}
+            <div className="space-y-1">
+              <Label className="text-xs">Verteilerschlüssel</Label>
+              <Select value={filterSchluessel} onValueChange={setFilterSchluessel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Alle" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="alle">Alle Schlüssel</SelectItem>
+                  {SCHLUESSEL_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Zeitraum */}
+            <div className="space-y-1">
+              <Label className="text-xs">Zeitraum</Label>
+              <div className="flex gap-1.5 items-center">
+                <Input
+                  type="date"
+                  className="text-xs"
+                  value={filterVon}
+                  onChange={(e) => setFilterVon(e.target.value)}
+                />
+                <span className="text-muted-foreground text-xs shrink-0">–</span>
+                <Input
+                  type="date"
+                  className="text-xs"
+                  value={filterBis}
+                  onChange={(e) => setFilterBis(e.target.value)}
+                />
+              </div>
+            </div>
           </div>
+
+          {hasFilters && (
+            <div className="mt-2 flex justify-end">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7"
+                onClick={() => { setFilterVon(""); setFilterBis(""); setFilterKostenart("alle"); setFilterSchluessel("alle"); }}
+              >
+                Filter zurücksetzen
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Aktionen-Zeile */}
+      {selectedObjektId && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{currentObjekt?.name}</span>
+            {" — "}{filteredExpenses.length} Position{filteredExpenses.length !== 1 ? "en" : ""}
+            {hasFilters && " (gefiltert)"}
+          </p>
+          <Button size="sm" className="gap-2" onClick={openAdd}>
+            <Plus className="h-4 w-4" />
+            Kostenposition erfassen
+          </Button>
+        </div>
+      )}
 
       {/* Tabelle */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">
-              Betriebskosten ({filteredExpenses.length} Positionen)
+              Betriebskosten{selectedObjektId ? ` (${filteredExpenses.length} Positionen)` : ""}
             </CardTitle>
-            <span className="text-sm font-semibold text-foreground">
-              Gesamt: {formatEuro(gesamtbetrag)}
-            </span>
+            {selectedObjektId && (
+              <span className="text-sm font-semibold text-foreground">
+                Gesamt: {formatEuro(gesamtbetrag)}
+              </span>
+            )}
           </div>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
-          {filteredExpenses.length === 0 ? (
+          {!selectedObjektId ? (
+            <div className="flex flex-col items-center justify-center py-14 text-muted-foreground gap-2">
+              <Building2 className="h-8 w-8 opacity-25" />
+              <p className="text-sm">Bitte oben ein Objekt auswählen.</p>
+            </div>
+          ) : filteredExpenses.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground gap-2">
               <p className="text-sm">Noch keine Kostenpositionen erfasst.</p>
               <Button variant="outline" size="sm" onClick={openAdd} className="gap-1 mt-1">
@@ -261,7 +338,7 @@ export function NebenkostenView() {
                 <TableRow>
                   <TableHead>Kostenart</TableHead>
                   <TableHead>Zeitraum</TableHead>
-                  <TableHead>Verteilerschluessel</TableHead>
+                  <TableHead>Verteilerschlüssel</TableHead>
                   <TableHead className="text-right">Betrag</TableHead>
                   <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
