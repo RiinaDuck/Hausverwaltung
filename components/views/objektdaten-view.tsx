@@ -30,7 +30,11 @@ import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { validateRequired, validatePLZ } from "@/lib/validation";
 
-export function ObjektdatenView() {
+interface ObjektdatenViewProps {
+  onNavigate?: (view: "wohnungen") => void;
+}
+
+export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
   const {
     objekte,
     addObjekt,
@@ -359,7 +363,10 @@ export function ObjektdatenView() {
                     ? "border-primary bg-primary/5 shadow-sm"
                     : "border-border hover:border-primary/50"
                 }`}
-                onClick={() => setSelectedObjektId(objekt.id)}
+                onClick={() => {
+                  setSelectedObjektId(objekt.id);
+                  if (onNavigate && !isDemo) onNavigate("wohnungen");
+                }}
               >
                 <div className="flex items-center gap-4">
                   <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">

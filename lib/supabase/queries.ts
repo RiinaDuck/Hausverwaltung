@@ -352,3 +352,58 @@ export async function deleteHausmanagerStammdaten(id: string) {
 
   if (error) throw error;
 }
+
+// ============================================
+// EXPENSES (Objektbezogene Betriebskosten)
+// ============================================
+
+export async function getExpenses(userId: string, objektId?: string) {
+  const supabase = createClient();
+  let query = supabase
+    .from("expenses")
+    .select("*")
+    .eq("user_id", userId);
+
+  if (objektId) {
+    query = query.eq("objekt_id", objektId);
+  }
+
+  const { data, error } = await query.order("zeitraum_von", {
+    ascending: false,
+  });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createExpense(expense: any) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("expenses")
+    .insert(expense)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message ?? JSON.stringify(error));
+  return data;
+}
+
+export async function updateExpense(id: string, updates: any) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("expenses")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message ?? JSON.stringify(error));
+  return data;
+}
+
+export async function deleteExpense(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("expenses").delete().eq("id", id);
+
+  if (error) throw new Error(error.message ?? JSON.stringify(error));
+}

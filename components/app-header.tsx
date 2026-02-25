@@ -42,6 +42,7 @@ import {
   Gauge,
   BarChart3,
   Briefcase,
+  Calculator,
   User,
   Save,
 } from "lucide-react";
@@ -227,20 +228,15 @@ const helpSections: HelpSection[] = [
   },
   {
     id: "nebenkosten",
-    title: "Nebenkosten",
+    title: "Nebenkosten – Kosten erfassen",
     icon: <Receipt className="h-4 w-4" />,
     description:
-      "Erstellen Sie hier die jährliche Nebenkostenabrechnung für Ihre Mieter mit allen umlagefähigen Kosten.",
+      "Erfassen Sie alle objektbezogenen Betriebskosten (z.B. Versicherung, Grundsteuer, Hausreinigung). Die Kosten werden einmal hausweit eingegeben und automatisch auf die Einheiten verteilt.",
     fields: [
       {
-        name: "Mieter auswählen",
+        name: "Objekt",
         description:
-          "Wählen Sie den Mieter, für den die Abrechnung erstellt werden soll.",
-      },
-      {
-        name: "Abrechnungszeitraum",
-        description:
-          "Von/Bis-Datum der Abrechnungsperiode (meist Kalenderjahr).",
+          "Wählen Sie das Objekt, für das die Kosten gelten.",
       },
       {
         name: "Kostenart",
@@ -248,29 +244,58 @@ const helpSections: HelpSection[] = [
           "Art der Betriebskosten aus der Dropdown-Liste oder eigene Eingabe.",
       },
       {
-        name: "Kosten (€)",
+        name: "Gesamtbetrag (€)",
         description:
           "Gesamtkosten dieser Kostenart für das gesamte Objekt im Abrechnungszeitraum.",
       },
       {
+        name: "Zeitraum von/bis",
+        description:
+          "Der Zeitraum, für den diese Kosten gelten. Bei der Abrechnung werden nur Positionen im gewählten Zeitraum berücksichtigt.",
+      },
+      {
         name: "Verteilerschlüssel",
         description:
-          "Wie werden die Kosten verteilt: nach Wohnfläche, Personenanzahl, Verbrauch, etc.",
+          "Wie werden die Kosten auf die Einheiten aufgeteilt: Wohnfläche, Einheiten, Personen, MEA oder Verbrauch.",
       },
       {
-        name: "Einleitungstext",
+        name: "Notiz",
         description:
-          "Anrede und Einleitung für die Abrechnung - wird im PDF oben angezeigt.",
+          "Optionaler Vermerk, z.B. Rechnungsnummer oder Lieferant.",
+      },
+    ],
+  },
+  {
+    id: "nebenkosten-abrechnung",
+    title: "Nebenkosten – Abrechnung erstellen",
+    icon: <Calculator className="h-4 w-4" />,
+    description:
+      "Generiert automatisch eine Nebenkostenabrechnung für alle Einheiten eines Objekts. Das System lädt alle erfassten Kosten im Zeitraum und berechnet den Anteil jeder Einheit anhand des Verteilerschlüssels.",
+    fields: [
+      {
+        name: "Objekt & Zeitraum",
+        description:
+          "Wählen Sie Objekt und Abrechnungszeitraum (i.d.R. das Kalenderjahr).",
       },
       {
-        name: "Schlusstext",
+        name: "Abrechnung berechnen",
         description:
-          "Zahlungshinweise und Grußformel - erscheint am Ende der Abrechnung.",
+          "Lädt alle Kostenpositionen im Zeitraum und verteilt sie anteilig auf alle Einheiten.",
       },
       {
-        name: "PDF Export",
+        name: "Vorschautabelle",
         description:
-          "Erstellt ein druckfertiges PDF mit allen Angaben und der Mieteranschrift.",
+          "Zeigt je Einheit: Vorausleistungen (monatliche NK × Monate), tatsächliche Kosten und Saldo (Guthaben/Nachzahlung).",
+      },
+      {
+        name: "Detail (Pfeil)",
+        description:
+          "Klappt die Aufschlüsselung pro Kostenart für eine Einheit auf.",
+      },
+      {
+        name: "PDF-Export",
+        description:
+          "Erstellt für jede Einheit eine individuelle, druckfertige Nebenkostenabrechnung als PDF.",
       },
     ],
   },
@@ -467,7 +492,8 @@ const viewTitles: Record<AppView, string> = {
   objekte: "Objektdaten (Stammdaten)",
   wohnungen: "Wohnungsdaten",
   mieter: "Mieter & Mieten",
-  nebenkosten: "Nebenkostenabrechnung",
+  nebenkosten: "Nebenkosten – Kosten erfassen",
+  "nebenkosten-abrechnung": "Nebenkosten – Abrechnung erstellen",
   zaehler: "Zähler & Rauchmelder",
   hausmanager: "Hausmanager / Finanzamt",
   rechnungen: "Rechnungen",

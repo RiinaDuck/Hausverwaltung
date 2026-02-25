@@ -160,6 +160,7 @@ export function MieterdatenView() {
     "Sehr geehrte Damen und Herren,\n\nbitte beachten Sie, dass die jährliche Nebenkostenabrechnung bis Ende Februar zugestellt wird.\n\nMit freundlichen Grüßen\nIhre Hausverwaltung",
   );
   const [isNewMieterOpen, setIsNewMieterOpen] = useState(false);
+  const [isSavingMieter, setIsSavingMieter] = useState(false);
   const [isEhemaligeMieterOpen, setIsEhemaligeMieterOpen] = useState(false);
   const [isHistorieMieterOpen, setIsHistorieMieterOpen] = useState(false);
   const [editingHistorieMieterId, setEditingHistorieMieterId] = useState<
@@ -167,6 +168,7 @@ export function MieterdatenView() {
   >(null);
   const [newMieter, setNewMieter] = useState<{
     name: string;
+    anrede: string;
     wohnungId: string;
     email: string;
     telefon: string;
@@ -179,6 +181,7 @@ export function MieterdatenView() {
     prozentanteil: number;
   }>({
     name: "",
+    anrede: "familie",
     wohnungId: "",
     email: "",
     telefon: "",
@@ -460,7 +463,7 @@ export function MieterdatenView() {
     );
   };
 
-  const handleCreateMieter = () => {
+  const handleCreateMieter = async () => {
     if (!newMieter.wohnungId || !newMieter.name) {
       toast({
         title: "Fehler",
@@ -482,44 +485,59 @@ export function MieterdatenView() {
       return;
     }
 
-    // Füge neuen Mieter über Context hinzu
-    addMieter({
-      wohnungId: newMieter.wohnungId,
-      name: newMieter.name,
-      email: newMieter.email,
-      telefon: newMieter.telefon,
-      einzugsDatum: newMieter.einzugsDatum,
-      mieteBis: null,
-      kaltmiete: newMieter.kaltmiete,
-      nebenkosten: newMieter.nebenkosten,
-      kaution: newMieter.kaution,
-      isKurzzeitvermietung: newMieter.isKurzzeitvermietung,
-      kurzzeitBis: newMieter.isKurzzeitvermietung
-        ? newMieter.kurzzeitBis
-        : null,
-      isAktiv: true,
-      prozentanteil: newMieter.prozentanteil,
-    });
+    setIsSavingMieter(true);
+    try {
+      // Füge neuen Mieter über Context hinzu
+      await addMieter({
+        wohnungId: newMieter.wohnungId,
+        name: newMieter.name,
+        email: newMieter.email,
+        telefon: newMieter.telefon,
+        einzugsDatum: newMieter.einzugsDatum,
+        mieteBis: null,
+        kaltmiete: newMieter.kaltmiete,
+        nebenkosten: newMieter.nebenkosten,
+        kaution: newMieter.kaution,
+        isKurzzeitvermietung: newMieter.isKurzzeitvermietung,
+        kurzzeitBis: newMieter.isKurzzeitvermietung
+          ? newMieter.kurzzeitBis
+          : null,
+        isAktiv: true,
+        prozentanteil: newMieter.prozentanteil,
+      });
 
-    setIsNewMieterOpen(false);
-    setNewMieter({
-      name: "",
-      wohnungId: "",
-      email: "",
-      telefon: "",
-      einzugsDatum: new Date().toISOString().split("T")[0],
-      kaltmiete: 0,
-      nebenkosten: 0,
-      kaution: 0,
-      isKurzzeitvermietung: false,
-      kurzzeitBis: "",
-      prozentanteil: 0,
-    });
+      const createdName = newMieter.name;
+      setIsNewMieterOpen(false);
+      setNewMieter({
+        name: "",
+        anrede: "familie",
+        wohnungId: "",
+        email: "",
+        telefon: "",
+        einzugsDatum: new Date().toISOString().split("T")[0],
+        kaltmiete: 0,
+        nebenkosten: 0,
+        kaution: 0,
+        isKurzzeitvermietung: false,
+        kurzzeitBis: "",
+        prozentanteil: 0,
+      });
 
-    toast({
-      title: "Mieter angelegt",
-      description: `${newMieter.name} wurde erfolgreich angelegt.`,
-    });
+      toast({
+        title: "Mieter angelegt",
+        description: `${createdName} wurde erfolgreich angelegt.`,
+      });
+    } catch (error) {
+      console.error("Error creating mieter:", error);
+      toast({
+        title: "Fehler",
+        description:
+          "Mieter konnte nicht angelegt werden. Bitte versuchen Sie es erneut.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingMieter(false);
+    }
   };
 
   const handleDeleteMieter = () => {
@@ -604,15 +622,19 @@ export function MieterdatenView() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="new-anrede">Anrede</Label>
-                  <Select defaultValue="familie">
+                  <Select
+                    value={newMieter.anrede}
+                    onValueChange={(value) =>
+                      setNewMieter((prev) => ({ ...prev, anrede: value }))
+                    }
+                  >
                     <SelectTrigger id="new-anrede">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="familie">Familie</SelectItem>
                       <SelectItem value="herr">Herr</SelectItem>
                       <SelectItem value="frau">Frau</SelectItem>
-                      <SelectItem value="familie">Familie</SelectItem>
-                      <SelectItem value="firma">Firma</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -702,8 +724,9 @@ export function MieterdatenView() {
               <Button
                 className="bg-success hover:bg-success/90 text-success-foreground"
                 onClick={handleCreateMieter}
+                disabled={isSavingMieter}
               >
-                Mieter anlegen
+                {isSavingMieter ? "Wird angelegt..." : "Mieter anlegen"}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1462,15 +1485,19 @@ export function MieterdatenView() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="new-anrede">Anrede</Label>
-                <Select defaultValue="familie">
+                <Select
+                  value={newMieter.anrede}
+                  onValueChange={(value) =>
+                    setNewMieter((prev) => ({ ...prev, anrede: value }))
+                  }
+                >
                   <SelectTrigger id="new-anrede">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="familie">Familie</SelectItem>
                     <SelectItem value="herr">Herr</SelectItem>
                     <SelectItem value="frau">Frau</SelectItem>
-                    <SelectItem value="familie">Familie</SelectItem>
-                    <SelectItem value="firma">Firma</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1656,8 +1683,9 @@ export function MieterdatenView() {
             <Button
               className="bg-success hover:bg-success/90 text-success-foreground"
               onClick={handleCreateMieter}
+              disabled={isSavingMieter}
             >
-              Mieter anlegen
+              {isSavingMieter ? "Wird angelegt..." : "Mieter anlegen"}
             </Button>
           </DialogFooter>
         </DialogContent>

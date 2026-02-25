@@ -298,6 +298,72 @@ export interface Database {
         };
       };
     };
+      expenses: {
+        Row: {
+          id: string;
+          user_id: string;
+          objekt_id: string;
+          kostenart: string;
+          betrag: number;
+          zeitraum_von: string;
+          zeitraum_bis: string;
+          verteilerschluessel:
+            | "wohnflaeche"
+            | "nutzflaeche"
+            | "einheiten"
+            | "personen"
+            | "verbrauch"
+            | "mea"
+            | "direkt";
+          rechnung_id: string | null;
+          notiz: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          objekt_id: string;
+          kostenart: string;
+          betrag: number;
+          zeitraum_von: string;
+          zeitraum_bis: string;
+          verteilerschluessel?:
+            | "wohnflaeche"
+            | "nutzflaeche"
+            | "einheiten"
+            | "personen"
+            | "verbrauch"
+            | "mea"
+            | "direkt";
+          rechnung_id?: string | null;
+          notiz?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          objekt_id?: string;
+          kostenart?: string;
+          betrag?: number;
+          zeitraum_von?: string;
+          zeitraum_bis?: string;
+          verteilerschluessel?:
+            | "wohnflaeche"
+            | "nutzflaeche"
+            | "einheiten"
+            | "personen"
+            | "verbrauch"
+            | "mea"
+            | "direkt";
+          rechnung_id?: string | null;
+          notiz?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+    };
     Views: {
       [_ in never]: never;
     };

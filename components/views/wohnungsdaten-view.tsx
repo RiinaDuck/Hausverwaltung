@@ -301,7 +301,7 @@ export function WohnungsdatenView() {
       id: w.id,
       lage: w.bezeichnung,
       wohnflaeche: w.flaeche,
-      nutzflaeche: w.flaeche * 1.1, // Nutzfläche ca. 10% größer
+      nutzflaeche: Math.round(w.flaeche * 1.1), // Nutzfläche ca. 10% größer
       raeume: w.zimmer,
       punkte: Math.round(w.flaeche * 0.7),
       prozent: 12.5,
@@ -390,29 +390,43 @@ export function WohnungsdatenView() {
     setEditedUnit((prev) => (prev ? { ...prev, [field]: value } : null));
   };
 
+  const [isSaving, setIsSaving] = useState(false);
+
   const handleSave = async () => {
     if (!selectedUnit || !editedUnit) return;
 
-    // Update in Context (konvertiere zurück zu Wohnung Format)
-    await updateWohnung(selectedUnit.id, {
-      bezeichnung: editedUnit.lage,
-      flaeche: editedUnit.wohnflaeche,
-      zimmer: editedUnit.raeume,
-      miete: editedUnit.miete,
-      status:
+    setIsSaving(true);
+    try {
+      // Status-Mapping: DB akzeptiert nur 'vermietet' | 'leer' | 'eigennutzung'
+      const dbStatus: "vermietet" | "leer" | "eigennutzung" =
         editedUnit.status === "vermietet"
           ? "vermietet"
           : editedUnit.status === "frei"
             ? "leer"
-            : "vermietet",
-    });
+            : "leer"; // renovierung → leer (kein renovierung-Status in DB)
 
-    // selectedUnit wird automatisch durch useEffect aktualisiert
+      await updateWohnung(selectedUnit.id, {
+        bezeichnung: editedUnit.lage,
+        flaeche: editedUnit.wohnflaeche,
+        zimmer: editedUnit.raeume,
+        miete: editedUnit.miete ?? 0,
+        status: dbStatus,
+      });
 
-    toast({
-      title: "Gespeichert",
-      description: `Wohnungsdaten für "${editedUnit.lage}" wurden gespeichert.`,
-    });
+      toast({
+        title: "Gespeichert",
+        description: `Wohnungsdaten für "${editedUnit.lage}" wurden gespeichert.`,
+      });
+    } catch (error: any) {
+      console.error("Fehler beim Speichern:", error);
+      toast({
+        title: "Fehler beim Speichern",
+        description: error?.message ?? "Die Daten konnten nicht gespeichert werden.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const toggleItem = (id: string) => {
@@ -799,9 +813,10 @@ export function WohnungsdatenView() {
               <Button
                 className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
                 onClick={handleSave}
+                disabled={isSaving}
               >
                 <Save className="h-4 w-4" />
-                Speichern
+                {isSaving ? "Wird gespeichert..." : "Speichern"}
               </Button>
             </div>
           </div>

@@ -5,6 +5,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useMemo,
   ReactNode,
 } from "react";
 import { useAuth } from "./auth-context";
@@ -21,6 +22,10 @@ import {
   createMieter,
   updateMieter as updateMieterDB,
   deleteMieter as deleteMieterDB,
+  getExpenses,
+  createExpense,
+  updateExpense as updateExpenseDB,
+  deleteExpense as deleteExpenseDB,
 } from "@/lib/supabase/queries";
 
 // Types für die Datenstrukturen
@@ -105,6 +110,28 @@ export interface Mieter {
   prozentanteil?: number;
 }
 
+// Verteilerschlüssel-Typ — identisch mit DB-Constraint
+export type Verteilerschluessel =
+  | "wohnflaeche"
+  | "nutzflaeche"
+  | "einheiten"
+  | "personen"
+  | "verbrauch"
+  | "mea"
+  | "direkt";
+
+export interface Expense {
+  id: string;
+  objektId: string;
+  kostenart: string;
+  betrag: number;
+  zeitraumVon: string;  // ISO-Date
+  zeitraumBis: string;  // ISO-Date
+  verteilerschluessel: Verteilerschluessel;
+  rechnungId?: string | null;
+  notiz?: string | null;
+}
+
 export interface EhemalierMieter {
   id: string;
   name: string;
@@ -115,6 +142,10 @@ export interface EhemalierMieter {
 }
 
 interface AppDataContextType {
+  expenses: Expense[];
+  addExpense: (expense: Omit<Expense, "id">) => Promise<void>;
+  updateExpense: (id: string, updates: Partial<Expense>) => Promise<void>;
+  deleteExpense: (id: string) => Promise<void>;
   objekte: Objekt[];
   wohnungen: Wohnung[];
   mieter: Mieter[];
@@ -242,6 +273,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [wohnungen, setWohnungen] = useState<Wohnung[]>([]);
   const [mieter, setMieter] = useState<Mieter[]>([]);
   const [ehemaligeMieter, setEhemaligeMieter] = useState<EhemalierMieter[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [selectedObjektId, setSelectedObjektId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -269,6 +301,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     miete: Number(dbWohnung.miete),
     nebenkosten: Number(dbWohnung.nebenkosten),
     status: dbWohnung.status,
+  });
+
+  const mapDBToExpense = (db: any): Expense => ({
+    id: db.id,
+    objektId: db.objekt_id,
+    kostenart: db.kostenart,
+    betrag: Number(db.betrag),
+    zeitraumVon: db.zeitraum_von,
+    zeitraumBis: db.zeitraum_bis,
+    verteilerschluessel: db.verteilerschluessel as Verteilerschluessel,
+    rechnungId: db.rechnung_id,
+    notiz: db.notiz,
   });
 
   const mapDBToMieter = (dbMieter: any): Mieter => ({
@@ -299,6 +343,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setWohnungen(DEMO_WOHNUNGEN);
       setMieter(DEMO_MIETER);
       setEhemaligeMieter([]);
+      setExpenses([]);
       setSelectedObjektId(DEMO_OBJEKTE[0]?.id || null);
       setLoading(false);
       return;
@@ -312,8 +357,20 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         getMieter(user.id),
       ]);
 
+      // Expenses separat laden – falls Tabelle noch nicht migriert wurde, gracefully auf [] fallen
+      let expensesData: any[] = [];
+      try {
+        expensesData = await getExpenses(user.id);
+      } catch (expErr) {
+        console.warn(
+          "expenses-Tabelle nicht gefunden – Migration ausführen:",
+          expErr,
+        );
+      }
+
       setObjekte(objekteData.map(mapDBToObjekt));
       setWohnungen(wohnungenData.map(mapDBToWohnung));
+      setExpenses(expensesData.map(mapDBToExpense));
 
       const allMieter = mieterData.map(mapDBToMieter);
       setMieter(allMieter.filter((m: Mieter) => m.isAktiv));
@@ -696,10 +753,101 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ============================================
+  // EXPENSES CRUD
+  // ============================================
+
+  const addExpense = async (newExpense: Omit<Expense, "id">) => {
+    if (!user || isAdmin) {
+      // Demo/Admin: lokaler State
+      const expense: Expense = {
+        ...newExpense,
+        id: `local-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      };
+      setExpenses((prev) => [expense, ...prev]);
+      return;
+    }
+
+    try {
+      const created = await createExpense({
+        user_id: user.id,
+        objekt_id: newExpense.objektId,
+        kostenart: newExpense.kostenart,
+        betrag: newExpense.betrag,
+        zeitraum_von: newExpense.zeitraumVon,
+        zeitraum_bis: newExpense.zeitraumBis,
+        verteilerschluessel: newExpense.verteilerschluessel,
+        rechnung_id: newExpense.rechnungId ?? null,
+        notiz: newExpense.notiz ?? null,
+      });
+      setExpenses((prev) => [mapDBToExpense(created), ...prev]);
+    } catch (error) {
+      console.error("Error adding expense:", error);
+      throw error;
+    }
+  };
+
+  const updateExpense = async (id: string, updates: Partial<Expense>) => {
+    if (!user || isAdmin) {
+      setExpenses((prev) =>
+        prev.map((e) => (e.id === id ? { ...e, ...updates } : e)),
+      );
+      return;
+    }
+
+    try {
+      const dbUpdates: Record<string, unknown> = {};
+      if (updates.kostenart !== undefined) dbUpdates.kostenart = updates.kostenart;
+      if (updates.betrag !== undefined) dbUpdates.betrag = updates.betrag;
+      if (updates.zeitraumVon !== undefined) dbUpdates.zeitraum_von = updates.zeitraumVon;
+      if (updates.zeitraumBis !== undefined) dbUpdates.zeitraum_bis = updates.zeitraumBis;
+      if (updates.verteilerschluessel !== undefined)
+        dbUpdates.verteilerschluessel = updates.verteilerschluessel;
+      if (updates.notiz !== undefined) dbUpdates.notiz = updates.notiz;
+
+      const updated = await updateExpenseDB(id, dbUpdates);
+      setExpenses((prev) =>
+        prev.map((e) => (e.id === id ? mapDBToExpense(updated) : e)),
+      );
+    } catch (error) {
+      console.error("Error updating expense:", error);
+      throw error;
+    }
+  };
+
+  const deleteExpense = async (id: string) => {
+    if (!user || isAdmin) {
+      setExpenses((prev) => prev.filter((e) => e.id !== id));
+      return;
+    }
+
+    try {
+      await deleteExpenseDB(id);
+      setExpenses((prev) => prev.filter((e) => e.id !== id));
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+      throw error;
+    }
+  };
+
+  // Berechne einheiten dynamisch aus wohnungen – nie mehr out of sync mit DB
+  const objekteMitEinheiten = useMemo(
+    () =>
+      objekte.map((obj) => ({
+        ...obj,
+        einheiten: wohnungen.filter((w) => w.objektId === obj.id).length,
+      })),
+    [objekte, wohnungen],
+  );
+
   return (
     <AppDataContext.Provider
       value={{
-        objekte,
+        expenses,
+        addExpense,
+        updateExpense,
+        deleteExpense,
+        objekte: objekteMitEinheiten,
         wohnungen,
         mieter,
         ehemaligeMieter,

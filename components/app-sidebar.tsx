@@ -23,6 +23,8 @@ import {
   BarChart3,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  Calculator,
   X,
 } from "lucide-react";
 import type { AppView } from "@/components/app-dashboard";
@@ -42,11 +44,21 @@ const navItems = [
   { id: "objekte" as const, label: "Objekte", icon: Building2 },
   { id: "wohnungen" as const, label: "Wohnungen", icon: DoorOpen },
   { id: "mieter" as const, label: "Mieter & Mieten", icon: Users },
-  { id: "nebenkosten" as const, label: "Nebenkosten", icon: Receipt },
+  // Nebenkosten wird als Gruppe mit Sub-Items behandelt (siehe unten)
   { id: "rechnungen" as const, label: "Rechnungen", icon: FileText },
   { id: "zaehler" as const, label: "Zähler", icon: Gauge },
   { id: "statistiken" as const, label: "Statistiken", icon: BarChart3 },
   { id: "hausmanager" as const, label: "Hausmanager", icon: Landmark },
+];
+
+// Sub-Items für Nebenkosten
+const nebenkostenItems = [
+  { id: "nebenkosten" as const, label: "Kosten erfassen", icon: Receipt },
+  {
+    id: "nebenkosten-abrechnung" as const,
+    label: "Abrechnung erstellen",
+    icon: Calculator,
+  },
 ];
 
 export function AppSidebar({
@@ -57,6 +69,12 @@ export function AppSidebar({
   onClose,
 }: AppSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const isNebenkostenActive =
+    currentView === "nebenkosten" ||
+    currentView === "nebenkosten-abrechnung";
+  const [isNebenkostenOpen, setIsNebenkostenOpen] = useState(
+    isNebenkostenActive,
+  );
   const isMobile = useIsMobile();
   const { profile, getInitials, logout } = useAuth();
 
@@ -220,6 +238,76 @@ export function AppSidebar({
 
             return button;
           })}
+
+          {/* ---- Nebenkosten: expandierbarer Abschnitt ---- */}
+          {/* Collapsed: nur das Receipt-Icon, navigiert direkt zur Kosten-Seite */}
+          {!isMobile && isCollapsed ? (
+            <Tooltip key="nebenkosten-group">
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full h-10 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-300 justify-center px-0",
+                    isNebenkostenActive &&
+                      "bg-sidebar-accent text-sidebar-foreground",
+                  )}
+                  onClick={() => handleNavigate("nebenkosten")}
+                >
+                  <Receipt className="h-4 w-4 shrink-0" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="font-medium">
+                Nebenkosten
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <div key="nebenkosten-group">
+              {/* Parent-Eintrag: togglet die Sub-Items */}
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full h-10 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-300 justify-start gap-3",
+                  isNebenkostenActive &&
+                    "text-sidebar-foreground",
+                )}
+                onClick={() => setIsNebenkostenOpen((v) => !v)}
+              >
+                <Receipt className="h-4 w-4 shrink-0" />
+                <span className="flex-1 text-sm text-left whitespace-nowrap overflow-hidden">
+                  Nebenkosten
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "h-3.5 w-3.5 transition-transform duration-200 shrink-0",
+                    isNebenkostenOpen && "rotate-180",
+                  )}
+                />
+              </Button>
+
+              {/* Sub-Items */}
+              {isNebenkostenOpen && (
+                <div className="ml-3 pl-3 border-l border-sidebar-border space-y-0.5 mt-0.5">
+                  {nebenkostenItems.map((sub) => (
+                    <Button
+                      key={sub.id}
+                      variant="ghost"
+                      className={cn(
+                        "w-full h-9 text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-150 justify-start gap-2",
+                        currentView === sub.id &&
+                          "bg-sidebar-accent text-sidebar-foreground",
+                      )}
+                      onClick={() => handleNavigate(sub.id)}
+                    >
+                      <sub.icon className="h-3.5 w-3.5 shrink-0" />
+                      <span className="text-sm whitespace-nowrap overflow-hidden">
+                        {sub.label}
+                      </span>
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </nav>
 
         {/* User Profile */}
