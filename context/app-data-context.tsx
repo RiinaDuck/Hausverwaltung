@@ -537,6 +537,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteObjekt = async (id: string) => {
+    if (id.startsWith("demo-")) return; // Demo-Daten bleiben immer erhalten
     try {
       await deleteObjektDB(id);
       setObjekte((prev) => prev.filter((obj: Objekt) => obj.id !== id));
@@ -619,6 +620,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteWohnung = async (id: string) => {
+    if (id.startsWith("demo-")) return; // Demo-Daten bleiben immer erhalten
     try {
       await deleteWohnungDB(id);
       setWohnungen((prev) => prev.filter((w: Wohnung) => w.id !== id));
@@ -747,6 +749,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteMieter = async (id: string) => {
+    if (id.startsWith("demo-")) return; // Demo-Daten bleiben immer erhalten
     try {
       await deleteMieterDB(id);
       setMieter((prev) => prev.filter((m: Mieter) => m.id !== id));
@@ -864,6 +867,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   };
 
   const deleteExpense = async (id: string) => {
+    if (id.startsWith("demo-")) return; // Demo-Daten bleiben immer erhalten
     if (!user || isAdmin) {
       setExpenses((prev) => prev.filter((e) => e.id !== id));
       return;
