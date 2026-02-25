@@ -20,6 +20,7 @@ export type AppView =
   | "wohnungen"
   | "mieter"
   | "nebenkosten"
+  | "nebenkosten-abrechnung"
   | "rechnungen"
   | "zaehler"
   | "hausmanager"
@@ -46,6 +47,8 @@ export function AppDashboard({ onSwitchToLanding }: AppDashboardProps) {
         return <MieterdatenView />;
       case "nebenkosten":
         return <NebenkostenView />;
+      case "nebenkosten-abrechnung":
+        return <NebenkostenView mode="abrechnung" />;
       case "rechnungen":
         return <RechnungenView />;
       case "zaehler":

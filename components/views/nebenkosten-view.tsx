@@ -129,7 +129,7 @@ const verteilerschluesselOptions = [
   { value: "direkt", label: "Direkt" },
 ];
 
-export function NebenkostenView() {
+export function NebenkostenView({ mode = "erfassen" }: { mode?: "erfassen" | "abrechnung" }) {
   const { objekte, wohnungen, mieter, selectedObjektId } = useAppData();
   const { profile, isDemo } = useAuth();
   const [kostenarten, setKostenarten] =
@@ -275,6 +275,174 @@ export function NebenkostenView() {
       });
     }
   };
+
+  // ---- Kosten erfassen ----
+  if (mode === "erfassen") {
+    return (
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <p className="text-sm sm:text-base text-muted-foreground">
+            Erfassen Sie die Betriebskosten für das aktuelle Objekt.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
+              onClick={() =>
+                toast({ title: "Gespeichert", description: "Betriebskosten wurden gespeichert." })
+              }
+            >
+              <Save className="h-4 w-4" />
+              <span className="hidden sm:inline">Speichern</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* Abrechnungszeitraum */}
+        <Card>
+          <CardContent className="pt-4 sm:pt-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="erfassen-von">Zeitraum von</Label>
+                <Input
+                  id="erfassen-von"
+                  type="date"
+                  value={dateVon}
+                  onChange={(e) => setDateVon(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="erfassen-bis">Zeitraum bis</Label>
+                <Input
+                  id="erfassen-bis"
+                  type="date"
+                  value={dateBis}
+                  onChange={(e) => setDateBis(e.target.value)}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Kostentabelle */}
+        <Card>
+          <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <CardTitle className="text-base">Betriebskosten</CardTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1 bg-transparent w-fit"
+              onClick={addKostenart}
+            >
+              <Plus className="h-3 w-3" />
+              Kostenposition hinzufügen
+            </Button>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <Table className="min-w-[600px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[250px]">Kostenart</TableHead>
+                  <TableHead className="w-[120px]">Betrag (€)</TableHead>
+                  <TableHead className="w-[180px]">Verteilerschlüssel</TableHead>
+                  <TableHead className="w-[60px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {kostenarten.map((kostenart) => (
+                  <TableRow key={kostenart.id}>
+                    <TableCell>
+                      <Select
+                        value={kostenart.name || "custom"}
+                        onValueChange={(value) => {
+                          if (value === "custom") {
+                            updateKostenart(kostenart.id, "name", "");
+                          } else {
+                            updateKostenart(kostenart.id, "name", value);
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Kostenart wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {KOSTENARTEN_OPTIONEN.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value="custom">Eigene eingeben...</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {(!kostenart.name || !KOSTENARTEN_OPTIONEN.includes(kostenart.name)) && (
+                        <Input
+                          value={kostenart.name}
+                          onChange={(e) =>
+                            updateKostenart(kostenart.id, "name", e.target.value)
+                          }
+                          placeholder="Eigene Kostenart eingeben"
+                          className="mt-2"
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        value={kostenart.kosten}
+                        onChange={(e) =>
+                          updateKostenart(kostenart.id, "kosten", e.target.value)
+                        }
+                        placeholder="0.00"
+                        className="text-right"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={kostenart.schluessel}
+                        onValueChange={(value) =>
+                          updateKostenart(kostenart.id, "schluessel", value)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {verteilerschluesselOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive"
+                        onClick={() => removeKostenart(kostenart.id)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+              <TableFooter>
+                <TableRow>
+                  <TableCell className="font-bold">Gesamtkosten</TableCell>
+                  <TableCell className="font-bold text-right">
+                    {calculateTotal()} €
+                  </TableCell>
+                  <TableCell></TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
