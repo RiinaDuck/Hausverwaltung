@@ -38,98 +38,21 @@ import {
 } from "@/lib/pdf-generator";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { useAppData, type Rechnung, type RechnungsPosition } from "@/context/app-data-context";
 
-interface RechnungsPosition {
-  id: string;
-  beschreibung: string;
-  menge: number;
-  einzelpreis: number;
-}
 
-interface Rechnung {
-  id: string;
-  nummer: string;
-  datum: string;
-  empfaengerName: string;
-  empfaengerAdresse: string;
-  positionen: RechnungsPosition[];
-  bemerkung: string;
-  status: "offen" | "bezahlt" | "storniert";
-}
-
-const initialRechnungen: Rechnung[] = [
-  {
-    id: "1",
-    nummer: "2024-001",
-    datum: "2024-01-15",
-    empfaengerName: "Familie Müller",
-    empfaengerAdresse: "Berliner Straße 42\n10115 Berlin",
-    positionen: [
-      {
-        id: "1",
-        beschreibung: "Nebenkostennachzahlung 2023",
-        menge: 1,
-        einzelpreis: 245.5,
-      },
-      {
-        id: "2",
-        beschreibung: "Verwaltungsgebühr",
-        menge: 1,
-        einzelpreis: 25.0,
-      },
-    ],
-    bemerkung: "Bitte innerhalb von 14 Tagen überweisen.",
-    status: "bezahlt",
-  },
-  {
-    id: "2",
-    nummer: "2024-002",
-    datum: "2024-02-20",
-    empfaengerName: "Herr Schmidt",
-    empfaengerAdresse: "Berliner Straße 42\n10115 Berlin",
-    positionen: [
-      { id: "1", beschreibung: "Schlüsselersatz", menge: 2, einzelpreis: 35.0 },
-      {
-        id: "2",
-        beschreibung: "Verwaltungsgebühr",
-        menge: 1,
-        einzelpreis: 15.0,
-      },
-    ],
-    bemerkung: "",
-    status: "offen",
-  },
-  {
-    id: "3",
-    nummer: "2024-003",
-    datum: "2024-03-10",
-    empfaengerName: "Frau Weber",
-    empfaengerAdresse: "Berliner Straße 42\n10115 Berlin",
-    positionen: [
-      {
-        id: "1",
-        beschreibung: "Reparaturkosten Wasserhahn",
-        menge: 1,
-        einzelpreis: 89.0,
-      },
-    ],
-    bemerkung: "Reparatur erfolgte am 05.03.2024",
-    status: "offen",
-  },
-];
 
 export function RechnungenView() {
   const { profile, isDemo } = useAuth();
   const { toast } = useToast();
-  const [rechnungen, setRechnungen] = useState<Rechnung[]>(initialRechnungen);
-  const [selectedRechnung, setSelectedRechnung] = useState<Rechnung | null>(
-    null,
-  );
+  const { rechnungen, addRechnung, updateRechnung, deleteRechnung } = useAppData();
+  const [selectedRechnung, setSelectedRechnung] = useState<Rechnung | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingRechnung, setEditingRechnung] = useState<Rechnung | null>(null);
+  const THIS_YEAR = new Date().getFullYear();
   const [newRechnung, setNewRechnung] = useState<Partial<Rechnung>>({
-    nummer: `2024-${String(initialRechnungen.length + 1).padStart(3, "0")}`,
+    nummer: `${THIS_YEAR}-${String(rechnungen.length + 1).padStart(3, "0")}`,
     datum: new Date().toISOString().split("T")[0],
     empfaengerName: "",
     empfaengerAdresse: "",
@@ -236,7 +159,7 @@ export function RechnungenView() {
     }));
   };
 
-  const handleCreateRechnung = () => {
+  const handleCreateRechnung = async () => {
     if (isDemo) {
       toast({
         title: "Demo-Modus",
@@ -247,8 +170,7 @@ export function RechnungenView() {
       return;
     }
 
-    const rechnung: Rechnung = {
-      id: String(rechnungen.length + 1),
+    await addRechnung({
       nummer: newRechnung.nummer || "",
       datum: newRechnung.datum || "",
       empfaengerName: newRechnung.empfaengerName || "",
@@ -256,12 +178,10 @@ export function RechnungenView() {
       positionen: newRechnung.positionen || [],
       bemerkung: newRechnung.bemerkung || "",
       status: newRechnung.status || "offen",
-    };
-    setRechnungen((prev) => [...prev, rechnung]);
+    });
     setIsCreateOpen(false);
-    // Reset form
     setNewRechnung({
-      nummer: `2024-${String(rechnungen.length + 2).padStart(3, "0")}`,
+      nummer: `${THIS_YEAR}-${String(rechnungen.length + 2).padStart(3, "0")}`,
       datum: new Date().toISOString().split("T")[0],
       empfaengerName: "",
       empfaengerAdresse: "",
@@ -269,6 +189,7 @@ export function RechnungenView() {
       bemerkung: "",
       status: "offen",
     });
+    toast({ title: "Rechnung erstellt" });
   };
 
   const handleEditRechnung = (rechnung: Rechnung) => {
@@ -285,28 +206,21 @@ export function RechnungenView() {
     setIsEditOpen(true);
   };
 
-  const handleSaveEditRechnung = () => {
+  const handleSaveEditRechnung = async () => {
     if (!editingRechnung) return;
-    setRechnungen((prev) =>
-      prev.map((r) =>
-        r.id === editingRechnung.id
-          ? {
-              ...r,
-              nummer: newRechnung.nummer || "",
-              datum: newRechnung.datum || "",
-              empfaengerName: newRechnung.empfaengerName || "",
-              empfaengerAdresse: newRechnung.empfaengerAdresse || "",
-              positionen: newRechnung.positionen || [],
-              bemerkung: newRechnung.bemerkung || "",
-              status: newRechnung.status || "offen",
-            }
-          : r,
-      ),
-    );
+    await updateRechnung(editingRechnung.id, {
+      nummer: newRechnung.nummer || "",
+      datum: newRechnung.datum || "",
+      empfaengerName: newRechnung.empfaengerName || "",
+      empfaengerAdresse: newRechnung.empfaengerAdresse || "",
+      positionen: newRechnung.positionen || [],
+      bemerkung: newRechnung.bemerkung || "",
+      status: newRechnung.status || "offen",
+    });
     setIsEditOpen(false);
     setEditingRechnung(null);
     setNewRechnung({
-      nummer: `2024-${String(rechnungen.length + 1).padStart(3, "0")}`,
+      nummer: `${THIS_YEAR}-${String(rechnungen.length + 1).padStart(3, "0")}`,
       datum: new Date().toISOString().split("T")[0],
       empfaengerName: "",
       empfaengerAdresse: "",
@@ -314,11 +228,13 @@ export function RechnungenView() {
       bemerkung: "",
       status: "offen",
     });
+    toast({ title: "Rechnung aktualisiert" });
   };
 
-  const handleDeleteRechnung = (id: string) => {
+  const handleDeleteRechnung = async (id: string) => {
     if (confirm("Möchten Sie diese Rechnung wirklich löschen?")) {
-      setRechnungen((prev) => prev.filter((r) => r.id !== id));
+      await deleteRechnung(id);
+      toast({ title: "Rechnung gelöscht" });
     }
   };
 

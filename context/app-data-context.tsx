@@ -25,6 +25,18 @@ import {
   createExpense as createExpenseDB,
   updateExpense as updateExpenseDB,
   deleteExpense as deleteExpenseDB,
+  getZaehler,
+  createZaehler as createZaehlerDB,
+  updateZaehler as updateZaehlerDB,
+  deleteZaehler as deleteZaehlerDB,
+  getRauchmelder,
+  createRauchmelder as createRauchmelderDB,
+  updateRauchmelder as updateRauchmelderDB,
+  deleteRauchmelder as deleteRauchmelderDB,
+  getRechnungen,
+  createRechnung as createRechnungDB,
+  updateRechnung as updateRechnungDB,
+  deleteRechnung as deleteRechnungDB,
 } from "@/lib/supabase/queries";
 
 // Types für die Datenstrukturen
@@ -118,6 +130,53 @@ export interface EhemalierMieter {
   letztesAuszugsDatum: string;
 }
 
+export interface Zaehler {
+  id: string;
+  wohnungId: string;
+  wohnungNr: string;
+  geschoss: string;
+  montageort: string;
+  geraeteart: string;
+  geraetnummer: string;
+  geeichtBis: string;
+  hersteller?: string;
+  typ?: string;
+}
+
+export interface Rauchmelder {
+  id: string;
+  wohnungId: string;
+  wohnungNr: string;
+  geschoss: string;
+  montageort: string;
+  geraeteart: string;
+  geraetnummer: string;
+  lebensdauerBis: string;
+  hersteller?: string;
+  typ?: string;
+}
+
+export interface RechnungsPosition {
+  id: string;
+  beschreibung: string;
+  menge: number;
+  einzelpreis: number;
+}
+
+export interface Rechnung {
+  id: string;
+  userId: string;
+  nummer: string;
+  datum: string;
+  empfaengerName: string;
+  empfaengerAdresse: string;
+  positionen: RechnungsPosition[];
+  bemerkung: string;
+  status: "offen" | "bezahlt" | "storniert";
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type Verteilerschluessel =
   | "wohnflaeche"
   | "nutzflaeche"
@@ -167,6 +226,18 @@ interface AppDataContextType {
   addExpense: (expense: Omit<Expense, "id" | "userId" | "createdAt" | "updatedAt">) => Promise<void>;
   updateExpense: (id: string, updates: Partial<Expense>) => Promise<void>;
   deleteExpense: (id: string) => Promise<void>;
+  zaehler: Zaehler[];
+  rauchmelder: Rauchmelder[];
+  rechnungen: Rechnung[];
+  addZaehler: (z: Omit<Zaehler, "id">) => Promise<void>;
+  updateZaehler: (id: string, z: Partial<Zaehler>) => Promise<void>;
+  deleteZaehler: (id: string) => Promise<void>;
+  addRauchmelder: (r: Omit<Rauchmelder, "id">) => Promise<void>;
+  updateRauchmelder: (id: string, r: Partial<Rauchmelder>) => Promise<void>;
+  deleteRauchmelder: (id: string) => Promise<void>;
+  addRechnung: (r: Omit<Rechnung, "id" | "userId" | "createdAt" | "updatedAt">) => Promise<void>;
+  updateRechnung: (id: string, r: Partial<Rechnung>) => Promise<void>;
+  deleteRechnung: (id: string) => Promise<void>;
   setSelectedObjektId: (id: string | null) => void;
   refreshData: () => Promise<void>;
 }
@@ -323,6 +394,40 @@ const DEMO_EXPENSES: Expense[] = [
   },
 ];
 
+const DEMO_ZAEHLER: Zaehler[] = [
+  { id: "demo-z1", wohnungId: "demo-w1", wohnungNr: "demo-w1", geschoss: "EG links", montageort: "Küche", geraeteart: "Kaltwasser", geraetnummer: "KW-2024-001", geeichtBis: "12/2030", hersteller: "Techem", typ: "Q water 5.5" },
+  { id: "demo-z2", wohnungId: "demo-w1", wohnungNr: "demo-w1", geschoss: "EG links", montageort: "Bad", geraeteart: "Warmwasser", geraetnummer: "WW-2024-001", geeichtBis: "12/2030", hersteller: "Techem", typ: "Q water 5.5" },
+  { id: "demo-z3", wohnungId: "demo-w2", wohnungNr: "demo-w2", geschoss: "EG rechts", montageort: "Küche", geraeteart: "Kaltwasser", geraetnummer: "KW-2024-002", geeichtBis: "12/2030", hersteller: "Ista", typ: "domaqua m" },
+];
+
+const DEMO_RAUCHMELDER: Rauchmelder[] = [
+  { id: "demo-r1", wohnungId: "demo-w1", wohnungNr: "demo-w1", geschoss: "EG links", montageort: "Schlafzimmer", geraeteart: "Rauchmelder", geraetnummer: "RM-001-A", lebensdauerBis: "03/2034", hersteller: "Hekatron", typ: "Genius Plus X" },
+  { id: "demo-r2", wohnungId: "demo-w1", wohnungNr: "demo-w1", geschoss: "EG links", montageort: "Flur", geraeteart: "Rauchmelder", geraetnummer: "RM-001-B", lebensdauerBis: "03/2034", hersteller: "Hekatron", typ: "Genius Plus X" },
+  { id: "demo-r3", wohnungId: "demo-w2", wohnungNr: "demo-w2", geschoss: "EG rechts", montageort: "Schlafzimmer", geraeteart: "Rauchmelder", geraetnummer: "RM-002-A", lebensdauerBis: "06/2033", hersteller: "Ei Electronics", typ: "Ei650" },
+];
+
+const DEMO_RECHNUNGEN: Rechnung[] = [
+  {
+    id: "demo-re1", userId: "demo", nummer: "2025-001", datum: "2025-01-15",
+    empfaengerName: "Anna Schmidt", empfaengerAdresse: "Berliner Straße 42, EG links\n10115 Berlin",
+    positionen: [
+      { id: "1", beschreibung: "Nebenkostennachzahlung 2024", menge: 1, einzelpreis: 245.50 },
+      { id: "2", beschreibung: "Verwaltungsgebühr", menge: 1, einzelpreis: 25.00 },
+    ],
+    bemerkung: "Bitte innerhalb von 14 Tagen überweisen.", status: "bezahlt",
+    createdAt: "2025-01-15T10:00:00Z", updatedAt: "2025-01-15T10:00:00Z",
+  },
+  {
+    id: "demo-re2", userId: "demo", nummer: "2025-002", datum: "2025-02-20",
+    empfaengerName: "Mieter EG rechts", empfaengerAdresse: "Berliner Straße 42, EG rechts\n10115 Berlin",
+    positionen: [
+      { id: "1", beschreibung: "Schlüsselersatz", menge: 2, einzelpreis: 35.00 },
+    ],
+    bemerkung: "", status: "offen",
+    createdAt: "2025-02-20T10:00:00Z", updatedAt: "2025-02-20T10:00:00Z",
+  },
+];
+
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const { user, isAdmin } = useAuth();
   const [objekte, setObjekte] = useState<Objekt[]>([]);
@@ -330,6 +435,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [mieter, setMieter] = useState<Mieter[]>([]);
   const [ehemaligeMieter, setEhemaligeMieter] = useState<EhemalierMieter[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [zaehler, setZaehler] = useState<Zaehler[]>([]);
+  const [rauchmelder, setRauchmelder] = useState<Rauchmelder[]>([]);
+  const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
   const [selectedObjektId, setSelectedObjektId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -378,6 +486,46 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       : undefined,
   });
 
+  const mapDBToZaehler = (db: any): Zaehler => ({
+    id: db.id,
+    wohnungId: db.wohnung_id,
+    wohnungNr: db.wohnungnr,
+    geschoss: db.geschoss,
+    montageort: db.montageort,
+    geraeteart: db.geraeteart,
+    geraetnummer: db.geraetnummer,
+    geeichtBis: db.geeicht_bis,
+    hersteller: db.hersteller ?? undefined,
+    typ: db.typ ?? undefined,
+  });
+
+  const mapDBToRauchmelder = (db: any): Rauchmelder => ({
+    id: db.id,
+    wohnungId: db.wohnung_id,
+    wohnungNr: db.wohnungnr,
+    geschoss: db.geschoss,
+    montageort: db.montageort,
+    geraeteart: db.geraeteart,
+    geraetnummer: db.geraetnummer,
+    lebensdauerBis: db.lebensdauer_bis,
+    hersteller: db.hersteller ?? undefined,
+    typ: db.typ ?? undefined,
+  });
+
+  const mapDBToRechnung = (db: any): Rechnung => ({
+    id: db.id,
+    userId: db.user_id,
+    nummer: db.nummer,
+    datum: db.datum,
+    empfaengerName: db.empfaenger_name,
+    empfaengerAdresse: db.empfaenger_adresse,
+    positionen: (db.positionen ?? []) as RechnungsPosition[],
+    bemerkung: db.bemerkung ?? "",
+    status: db.status,
+    createdAt: db.created_at,
+    updatedAt: db.updated_at,
+  });
+
   const mapDBToExpense = (db: any): Expense => ({
     id: db.id,
     userId: db.user_id,
@@ -403,6 +551,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setMieter(DEMO_MIETER);
       setEhemaligeMieter([]);
       setExpenses(DEMO_EXPENSES);
+      setZaehler(DEMO_ZAEHLER);
+      setRauchmelder(DEMO_RAUCHMELDER);
+      setRechnungen(DEMO_RECHNUNGEN);
       setSelectedObjektId(DEMO_OBJEKTE[0]?.id || null);
       setLoading(false);
       return;
@@ -410,16 +561,22 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
     try {
       setLoading(true);
-      const [objekteData, wohnungenData, mieterData, expensesData] = await Promise.all([
+      const [objekteData, wohnungenData, mieterData, expensesData, zaehlerData, rauchmelderData, rechnungenData] = await Promise.all([
         getObjekte(user.id),
         getWohnungen(user.id),
         getMieter(user.id),
         getExpenses(user.id),
+        getZaehler(user.id),
+        getRauchmelder(user.id),
+        getRechnungen(user.id),
       ]);
 
       setObjekte(objekteData.map(mapDBToObjekt));
       setWohnungen(wohnungenData.map(mapDBToWohnung));
       setExpenses(expensesData.map(mapDBToExpense));
+      setZaehler(zaehlerData.map(mapDBToZaehler));
+      setRauchmelder(rauchmelderData.map(mapDBToRauchmelder));
+      setRechnungen(rechnungenData.map(mapDBToRechnung));
 
       const allMieter = mieterData.map(mapDBToMieter);
       setMieter(allMieter.filter((m: Mieter) => m.isAktiv));
@@ -881,6 +1038,207 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ---- Zaehler CRUD ----
+
+  const addZaehler = async (z: Omit<Zaehler, "id">) => {
+    if (!user || isAdmin) {
+      setZaehler((prev) => [{ ...z, id: `local-z-${Date.now()}` }, ...prev]);
+      return;
+    }
+    try {
+      const created = await createZaehlerDB({
+        user_id: user.id,
+        wohnung_id: z.wohnungId,
+        wohnungnr: z.wohnungNr,
+        geschoss: z.geschoss,
+        montageort: z.montageort,
+        geraeteart: z.geraeteart,
+        geraetnummer: z.geraetnummer,
+        geeicht_bis: z.geeichtBis,
+        hersteller: z.hersteller ?? null,
+        typ: z.typ ?? null,
+      });
+      setZaehler((prev) => [mapDBToZaehler(created), ...prev]);
+    } catch (error) {
+      console.error("Error adding zaehler:", error);
+      throw error;
+    }
+  };
+
+  const updateZaehler = async (id: string, z: Partial<Zaehler>) => {
+    if (!user || isAdmin) {
+      setZaehler((prev) => prev.map((e) => (e.id === id ? { ...e, ...z } : e)));
+      return;
+    }
+    try {
+      const dbUpdates: any = {};
+      if (z.wohnungId !== undefined) dbUpdates.wohnung_id = z.wohnungId;
+      if (z.wohnungNr !== undefined) dbUpdates.wohnungnr = z.wohnungNr;
+      if (z.geschoss !== undefined) dbUpdates.geschoss = z.geschoss;
+      if (z.montageort !== undefined) dbUpdates.montageort = z.montageort;
+      if (z.geraeteart !== undefined) dbUpdates.geraeteart = z.geraeteart;
+      if (z.geraetnummer !== undefined) dbUpdates.geraetnummer = z.geraetnummer;
+      if (z.geeichtBis !== undefined) dbUpdates.geeicht_bis = z.geeichtBis;
+      if (z.hersteller !== undefined) dbUpdates.hersteller = z.hersteller;
+      if (z.typ !== undefined) dbUpdates.typ = z.typ;
+      const updated = await updateZaehlerDB(id, dbUpdates);
+      setZaehler((prev) => prev.map((e) => (e.id === id ? mapDBToZaehler(updated) : e)));
+    } catch (error) {
+      console.error("Error updating zaehler:", error);
+      throw error;
+    }
+  };
+
+  const deleteZaehler = async (id: string) => {
+    if (id.startsWith("demo-")) return;
+    if (!user || isAdmin) {
+      setZaehler((prev) => prev.filter((e) => e.id !== id));
+      return;
+    }
+    try {
+      await deleteZaehlerDB(id);
+      setZaehler((prev) => prev.filter((e) => e.id !== id));
+    } catch (error) {
+      console.error("Error deleting zaehler:", error);
+      throw error;
+    }
+  };
+
+  // ---- Rauchmelder CRUD ----
+
+  const addRauchmelder = async (r: Omit<Rauchmelder, "id">) => {
+    if (!user || isAdmin) {
+      setRauchmelder((prev) => [{ ...r, id: `local-rm-${Date.now()}` }, ...prev]);
+      return;
+    }
+    try {
+      const created = await createRauchmelderDB({
+        user_id: user.id,
+        wohnung_id: r.wohnungId,
+        wohnungnr: r.wohnungNr,
+        geschoss: r.geschoss,
+        montageort: r.montageort,
+        geraeteart: r.geraeteart,
+        geraetnummer: r.geraetnummer,
+        lebensdauer_bis: r.lebensdauerBis,
+        hersteller: r.hersteller ?? null,
+        typ: r.typ ?? null,
+      });
+      setRauchmelder((prev) => [mapDBToRauchmelder(created), ...prev]);
+    } catch (error) {
+      console.error("Error adding rauchmelder:", error);
+      throw error;
+    }
+  };
+
+  const updateRauchmelder = async (id: string, r: Partial<Rauchmelder>) => {
+    if (!user || isAdmin) {
+      setRauchmelder((prev) => prev.map((e) => (e.id === id ? { ...e, ...r } : e)));
+      return;
+    }
+    try {
+      const dbUpdates: any = {};
+      if (r.wohnungId !== undefined) dbUpdates.wohnung_id = r.wohnungId;
+      if (r.wohnungNr !== undefined) dbUpdates.wohnungnr = r.wohnungNr;
+      if (r.geschoss !== undefined) dbUpdates.geschoss = r.geschoss;
+      if (r.montageort !== undefined) dbUpdates.montageort = r.montageort;
+      if (r.geraeteart !== undefined) dbUpdates.geraeteart = r.geraeteart;
+      if (r.geraetnummer !== undefined) dbUpdates.geraetnummer = r.geraetnummer;
+      if (r.lebensdauerBis !== undefined) dbUpdates.lebensdauer_bis = r.lebensdauerBis;
+      if (r.hersteller !== undefined) dbUpdates.hersteller = r.hersteller;
+      if (r.typ !== undefined) dbUpdates.typ = r.typ;
+      const updated = await updateRauchmelderDB(id, dbUpdates);
+      setRauchmelder((prev) => prev.map((e) => (e.id === id ? mapDBToRauchmelder(updated) : e)));
+    } catch (error) {
+      console.error("Error updating rauchmelder:", error);
+      throw error;
+    }
+  };
+
+  const deleteRauchmelder = async (id: string) => {
+    if (id.startsWith("demo-")) return;
+    if (!user || isAdmin) {
+      setRauchmelder((prev) => prev.filter((e) => e.id !== id));
+      return;
+    }
+    try {
+      await deleteRauchmelderDB(id);
+      setRauchmelder((prev) => prev.filter((e) => e.id !== id));
+    } catch (error) {
+      console.error("Error deleting rauchmelder:", error);
+      throw error;
+    }
+  };
+
+  // ---- Rechnungen CRUD ----
+
+  const addRechnung = async (r: Omit<Rechnung, "id" | "userId" | "createdAt" | "updatedAt">) => {
+    if (!user || isAdmin) {
+      const newR: Rechnung = {
+        ...r,
+        id: `local-re-${Date.now()}`,
+        userId: "demo",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setRechnungen((prev) => [newR, ...prev]);
+      return;
+    }
+    try {
+      const created = await createRechnungDB({
+        user_id: user.id,
+        nummer: r.nummer,
+        datum: r.datum,
+        empfaenger_name: r.empfaengerName,
+        empfaenger_adresse: r.empfaengerAdresse,
+        positionen: r.positionen,
+        bemerkung: r.bemerkung,
+        status: r.status,
+      });
+      setRechnungen((prev) => [mapDBToRechnung(created), ...prev]);
+    } catch (error) {
+      console.error("Error adding rechnung:", error);
+      throw error;
+    }
+  };
+
+  const updateRechnung = async (id: string, r: Partial<Rechnung>) => {
+    if (!user || isAdmin) {
+      setRechnungen((prev) => prev.map((e) => (e.id === id ? { ...e, ...r } : e)));
+      return;
+    }
+    try {
+      const dbUpdates: any = {};
+      if (r.nummer !== undefined) dbUpdates.nummer = r.nummer;
+      if (r.datum !== undefined) dbUpdates.datum = r.datum;
+      if (r.empfaengerName !== undefined) dbUpdates.empfaenger_name = r.empfaengerName;
+      if (r.empfaengerAdresse !== undefined) dbUpdates.empfaenger_adresse = r.empfaengerAdresse;
+      if (r.positionen !== undefined) dbUpdates.positionen = r.positionen;
+      if (r.bemerkung !== undefined) dbUpdates.bemerkung = r.bemerkung;
+      if (r.status !== undefined) dbUpdates.status = r.status;
+      const updated = await updateRechnungDB(id, dbUpdates);
+      setRechnungen((prev) => prev.map((e) => (e.id === id ? mapDBToRechnung(updated) : e)));
+    } catch (error) {
+      console.error("Error updating rechnung:", error);
+      throw error;
+    }
+  };
+
+  const deleteRechnung = async (id: string) => {
+    if (id.startsWith("demo-")) return;
+    if (!user || isAdmin) {
+      setRechnungen((prev) => prev.filter((e) => e.id !== id));
+      return;
+    }
+    try {
+      await deleteRechnungDB(id);
+      setRechnungen((prev) => prev.filter((e) => e.id !== id));
+    } catch (error) {
+      console.error("Error deleting rechnung:", error);
+      throw error;
+    }
+  };
+
   return (
     <AppDataContext.Provider
       value={{
@@ -905,6 +1263,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         addExpense,
         updateExpense,
         deleteExpense,
+        zaehler,
+        rauchmelder,
+        rechnungen,
+        addZaehler,
+        updateZaehler,
+        deleteZaehler,
+        addRauchmelder,
+        updateRauchmelder,
+        deleteRauchmelder,
+        addRechnung,
+        updateRechnung,
+        deleteRechnung,
         setSelectedObjektId,
         refreshData,
       }}

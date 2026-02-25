@@ -40,144 +40,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Plus, Pencil, Trash2 } from "lucide-react";
-import { useAppData } from "@/context/app-data-context";
+import { useAppData, type Zaehler, type Rauchmelder } from "@/context/app-data-context";
 
-interface Zaehler {
-  id: string;
-  wohnungNr: string;
-  geschoss: string;
-  montageort: string;
-  geraeteart: string;
-  geraetnummer: string;
-  geeichtBis: string;
-  hersteller?: string;
-  typ?: string;
-}
 
-interface Rauchmelder {
-  id: string;
-  wohnungNr: string;
-  geschoss: string;
-  montageort: string;
-  geraeteart: string;
-  geraetnummer: string;
-  lebensdauerBis: string;
-  hersteller?: string;
-  typ?: string;
-}
-
-const initialZaehlerData: Zaehler[] = [
-  {
-    id: "1",
-    wohnungNr: "1",
-    geschoss: "EG links",
-    montageort: "Küche",
-    geraeteart: "Kaltwasser",
-    geraetnummer: "KW-2024-001",
-    geeichtBis: "12/2030",
-    hersteller: "Techem",
-    typ: "Q water 5.5",
-  },
-  {
-    id: "2",
-    wohnungNr: "1",
-    geschoss: "EG links",
-    montageort: "Bad",
-    geraeteart: "Warmwasser",
-    geraetnummer: "WW-2024-001",
-    geeichtBis: "12/2030",
-    hersteller: "Techem",
-    typ: "Q water 5.5",
-  },
-  {
-    id: "3",
-    wohnungNr: "2",
-    geschoss: "EG rechts",
-    montageort: "Küche",
-    geraeteart: "Kaltwasser",
-    geraetnummer: "KW-2024-002",
-    geeichtBis: "12/2030",
-    hersteller: "Ista",
-    typ: "domaqua m",
-  },
-  {
-    id: "4",
-    wohnungNr: "2",
-    geschoss: "EG rechts",
-    montageort: "Flur",
-    geraeteart: "Wärmemenge",
-    geraetnummer: "WM-2024-002",
-    geeichtBis: "06/2029",
-    hersteller: "Techem",
-    typ: "compact V",
-  },
-  {
-    id: "5",
-    wohnungNr: "3",
-    geschoss: "1.OG links",
-    montageort: "Bad",
-    geraeteart: "Akku",
-    geraetnummer: "AK-2024-003",
-    geeichtBis: "12/2028",
-    hersteller: "Minol",
-    typ: "MUK",
-  },
-];
-
-const initialRauchmelderData: Rauchmelder[] = [
-  {
-    id: "1",
-    wohnungNr: "1",
-    geschoss: "EG links",
-    montageort: "Schlafzimmer",
-    geraeteart: "Rauchmelder",
-    geraetnummer: "RM-001-A",
-    lebensdauerBis: "03/2034",
-    hersteller: "Hekatron",
-    typ: "Genius Plus X",
-  },
-  {
-    id: "2",
-    wohnungNr: "1",
-    geschoss: "EG links",
-    montageort: "Flur",
-    geraeteart: "Rauchmelder",
-    geraetnummer: "RM-001-B",
-    lebensdauerBis: "03/2034",
-    hersteller: "Hekatron",
-    typ: "Genius Plus X",
-  },
-  {
-    id: "3",
-    wohnungNr: "2",
-    geschoss: "EG rechts",
-    montageort: "Schlafzimmer",
-    geraeteart: "Rauchmelder",
-    geraetnummer: "RM-002-A",
-    lebensdauerBis: "06/2033",
-    hersteller: "Ei Electronics",
-    typ: "Ei650",
-  },
-  {
-    id: "4",
-    wohnungNr: "2",
-    geschoss: "EG rechts",
-    montageort: "Kinderzimmer",
-    geraeteart: "Rauchmelder",
-    geraetnummer: "RM-002-B",
-    lebensdauerBis: "06/2033",
-    hersteller: "Ei Electronics",
-    typ: "Ei650",
-  },
-];
 
 export function ZaehlerView() {
-  const { wohnungen, selectedObjektId } = useAppData();
+  const {
+    wohnungen, selectedObjektId,
+    zaehler: zaehlerData, rauchmelder: rauchmelderData,
+    addZaehler, updateZaehler, deleteZaehler,
+    addRauchmelder, updateRauchmelder, deleteRauchmelder,
+  } = useAppData();
   const [showRauchmelder, setShowRauchmelder] = useState(false);
-  const [zaehlerData, setZaehlerData] = useState<Zaehler[]>(initialZaehlerData);
-  const [rauchmelderData, setRauchmelderData] = useState<Rauchmelder[]>(
-    initialRauchmelderData
-  );
 
   const [modalOpen, setModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"create" | "edit">("create");
@@ -237,67 +111,51 @@ export function ZaehlerView() {
     setModalOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (modalType === "zaehler") {
+      const payload = {
+        wohnungId: editingZaehler.wohnungNr || "",
+        wohnungNr: editingZaehler.wohnungNr || "",
+        geschoss: editingZaehler.geschoss || "",
+        montageort: editingZaehler.montageort || "",
+        geraeteart: editingZaehler.geraeteart || "Kaltwasser",
+        geraetnummer: editingZaehler.geraetnummer || "",
+        geeichtBis: editingZaehler.geeichtBis || "",
+        hersteller: editingZaehler.hersteller,
+        typ: editingZaehler.typ,
+      };
       if (modalMode === "create") {
-        const newId = String(
-          Math.max(...zaehlerData.map((z) => Number.parseInt(z.id))) + 1
-        );
-        const newZaehler: Zaehler = {
-          id: newId,
-          wohnungNr: editingZaehler.wohnungNr || "",
-          geschoss: editingZaehler.geschoss || "",
-          montageort: editingZaehler.montageort || "",
-          geraeteart: editingZaehler.geraeteart || "Kaltwasser",
-          geraetnummer: editingZaehler.geraetnummer || "",
-          geeichtBis: editingZaehler.geeichtBis || "",
-          hersteller: editingZaehler.hersteller,
-          typ: editingZaehler.typ,
-        };
-        setZaehlerData((prev) => [...prev, newZaehler]);
-      } else {
-        setZaehlerData((prev) =>
-          prev.map((z) =>
-            z.id === editingZaehler.id ? { ...z, ...editingZaehler } : z
-          )
-        );
+        await addZaehler(payload);
+      } else if (editingZaehler.id) {
+        await updateZaehler(editingZaehler.id, payload);
       }
     } else {
+      const payload = {
+        wohnungId: editingRauchmelder.wohnungNr || "",
+        wohnungNr: editingRauchmelder.wohnungNr || "",
+        geschoss: editingRauchmelder.geschoss || "",
+        montageort: editingRauchmelder.montageort || "",
+        geraeteart: editingRauchmelder.geraeteart || "Rauchmelder",
+        geraetnummer: editingRauchmelder.geraetnummer || "",
+        lebensdauerBis: editingRauchmelder.lebensdauerBis || "",
+        hersteller: editingRauchmelder.hersteller,
+        typ: editingRauchmelder.typ,
+      };
       if (modalMode === "create") {
-        const newId = String(
-          Math.max(...rauchmelderData.map((r) => Number.parseInt(r.id))) + 1
-        );
-        const newRauchmelder: Rauchmelder = {
-          id: newId,
-          wohnungNr: editingRauchmelder.wohnungNr || "",
-          geschoss: editingRauchmelder.geschoss || "",
-          montageort: editingRauchmelder.montageort || "",
-          geraeteart: editingRauchmelder.geraeteart || "Rauchmelder",
-          geraetnummer: editingRauchmelder.geraetnummer || "",
-          lebensdauerBis: editingRauchmelder.lebensdauerBis || "",
-          hersteller: editingRauchmelder.hersteller,
-          typ: editingRauchmelder.typ,
-        };
-        setRauchmelderData((prev) => [...prev, newRauchmelder]);
-      } else {
-        setRauchmelderData((prev) =>
-          prev.map((r) =>
-            r.id === editingRauchmelder.id ? { ...r, ...editingRauchmelder } : r
-          )
-        );
+        await addRauchmelder(payload);
+      } else if (editingRauchmelder.id) {
+        await updateRauchmelder(editingRauchmelder.id, payload);
       }
     }
     setModalOpen(false);
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!itemToDelete) return;
     if (itemToDelete.type === "zaehler") {
-      setZaehlerData((prev) => prev.filter((z) => z.id !== itemToDelete.id));
+      await deleteZaehler(itemToDelete.id);
     } else {
-      setRauchmelderData((prev) =>
-        prev.filter((r) => r.id !== itemToDelete.id)
-      );
+      await deleteRauchmelder(itemToDelete.id);
     }
     setDeleteDialogOpen(false);
     setItemToDelete(null);
@@ -310,11 +168,14 @@ export function ZaehlerView() {
 
   // Wohnung options from current object
   const wohnungOptions = wohnungen
-    .filter((w) => w.objektId === selectedObjektId)
+    .filter((w) => !selectedObjektId || w.objektId === selectedObjektId)
     .map((w) => ({
       value: w.id,
       label: `${w.bezeichnung} - ${w.etage} (${w.flaeche} m²)`,
     }));
+
+  const wohnungLabel = (id: string) =>
+    wohnungOptions.find((o) => o.value === id)?.label.split(" - ")[0] ?? id;
 
   const geschossFromWohnung = (wohnungNr: string) => {
     const option = wohnungOptions.find((o) => o.value === wohnungNr);
@@ -391,7 +252,7 @@ export function ZaehlerView() {
               <TableBody>
                 {zaehlerData.map((zaehler) => (
                   <TableRow key={zaehler.id}>
-                    <TableCell>{zaehler.wohnungNr}</TableCell>
+                    <TableCell className="text-xs">{wohnungLabel(zaehler.wohnungId)}</TableCell>
                     <TableCell className="hidden sm:table-cell">
                       {zaehler.geschoss}
                     </TableCell>
@@ -464,7 +325,7 @@ export function ZaehlerView() {
               <TableBody>
                 {rauchmelderData.map((rm) => (
                   <TableRow key={rm.id}>
-                    <TableCell>{rm.wohnungNr}</TableCell>
+                    <TableCell className="text-xs">{wohnungLabel(rm.wohnungId)}</TableCell>
                     <TableCell className="hidden sm:table-cell">
                       {rm.geschoss}
                     </TableCell>
