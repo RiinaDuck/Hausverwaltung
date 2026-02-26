@@ -123,7 +123,7 @@ export const VERTEILERSCHLUESSEL_OPTIONEN: {
 // Blank-Form
 // ============================================================
 
-const BLANK_FORM: Omit<Expense, "id"> = {
+const BLANK_FORM: Omit<Expense, "id" | "userId" | "createdAt" | "updatedAt"> = {
   objektId: "",
   kostenart: "",
   betrag: 0,
@@ -151,7 +151,7 @@ export function KostenErfassenView() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [customKostenart, setCustomKostenart] = useState("");
-  const [form, setForm] = useState<Omit<Expense, "id">>({
+  const [form, setForm] = useState<Omit<Expense, "id" | "userId" | "createdAt" | "updatedAt">>({
     ...BLANK_FORM,
     objektId: selectedObjektId ?? "",
   });
