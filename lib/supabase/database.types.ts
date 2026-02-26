@@ -297,7 +297,6 @@ export interface Database {
           updated_at?: string;
         };
       };
-    };
       expenses: {
         Row: {
           id: string;
