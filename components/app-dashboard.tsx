@@ -8,8 +8,7 @@ import { ObjektdatenView } from "@/components/views/objektdaten-view";
 import { WohnungsdatenView } from "@/components/views/wohnungsdaten-view";
 import { MieterdatenView } from "@/components/views/mieterdaten-view";
 import { NebenkostenView } from "@/components/views/nebenkosten-view";
-import { KostenErfassenView } from "@/components/views/kosten-erfassen-view";
-import { AbrechnungErstellenView } from "@/components/views/abrechnung-erstellen-view";
+import { NebenkostenAbrechnungView } from "@/components/views/nebenkosten-abrechnung-view";
 import { ZaehlerView } from "@/components/views/zaehler-view";
 import { HausmanagerView } from "@/components/views/hausmanager-view";
 import { RechnungenView } from "@/components/views/rechnungen-view";
@@ -42,15 +41,15 @@ export function AppDashboard({ onSwitchToLanding }: AppDashboardProps) {
       case "dashboard":
         return <DashboardView onNavigate={setCurrentView} />;
       case "objekte":
-        return <ObjektdatenView onNavigate={setCurrentView} />;
+        return <ObjektdatenView />;
       case "wohnungen":
         return <WohnungsdatenView />;
       case "mieter":
         return <MieterdatenView />;
       case "nebenkosten":
-        return <KostenErfassenView />;
+        return <NebenkostenView />;
       case "nebenkosten-abrechnung":
-        return <AbrechnungErstellenView />;
+        return <NebenkostenAbrechnungView />;
       case "rechnungen":
         return <RechnungenView />;
       case "zaehler":

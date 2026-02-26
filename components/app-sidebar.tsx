@@ -240,7 +240,6 @@ export function AppSidebar({
           })}
 
           {/* ---- Nebenkosten: expandierbarer Abschnitt ---- */}
-          {/* Collapsed: nur das Receipt-Icon, navigiert direkt zur Kosten-Seite */}
           {!isMobile && isCollapsed ? (
             <Tooltip key="nebenkosten-group">
               <TooltipTrigger asChild>
@@ -267,8 +266,7 @@ export function AppSidebar({
                 variant="ghost"
                 className={cn(
                   "w-full h-10 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-300 justify-start gap-3",
-                  isNebenkostenActive &&
-                    "text-sidebar-foreground",
+                  isNebenkostenActive && "text-sidebar-foreground",
                 )}
                 onClick={() => setIsNebenkostenOpen((v) => !v)}
               >

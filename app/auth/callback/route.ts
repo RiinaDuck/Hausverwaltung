@@ -12,9 +12,12 @@ export async function GET(request: NextRequest) {
   const error_code = requestUrl.searchParams.get("error_code");
   const error_description = requestUrl.searchParams.get("error_description");
 
+  // Stabile Production-URL für alle Weiterleitungen verwenden
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? requestUrl.origin;
+
   // Fehler direkt von Supabase weitergeben
   if (error) {
-    const redirectUrl = new URL("/auth/confirmed", requestUrl.origin);
+    const redirectUrl = new URL("/auth/confirmed", baseUrl);
     redirectUrl.searchParams.set("error", error);
     if (error_code) redirectUrl.searchParams.set("error_code", error_code);
     if (error_description) redirectUrl.searchParams.set("error_description", error_description);
@@ -45,21 +48,29 @@ export async function GET(request: NextRequest) {
     if (code) {
       const { error: sessionError } = await supabase.auth.exchangeCodeForSession(code);
       if (sessionError) {
-        const redirectUrl = new URL("/auth/confirmed", requestUrl.origin);
+        const redirectUrl = new URL("/auth/confirmed", baseUrl);
         redirectUrl.searchParams.set("error", "session_error");
         redirectUrl.searchParams.set("error_description", sessionError.message);
         return NextResponse.redirect(redirectUrl);
       }
+      // Erfolgreich via PKCE-Code → Dashboard
+      return NextResponse.redirect(new URL("/dashboard", baseUrl));
     } else if (token_hash && type) {
       const { error: otpError } = await supabase.auth.verifyOtp({ token_hash, type: type as any });
       if (otpError) {
-        const redirectUrl = new URL("/auth/confirmed", requestUrl.origin);
+        const redirectUrl = new URL("/auth/confirmed", baseUrl);
         redirectUrl.searchParams.set("error", "otp_error");
         redirectUrl.searchParams.set("error_description", otpError.message);
         return NextResponse.redirect(redirectUrl);
       }
+      // Erfolgreich via token_hash → Dashboard
+      return NextResponse.redirect(new URL("/dashboard", baseUrl));
     }
   }
 
-  return NextResponse.redirect(new URL("/auth/confirmed", requestUrl.origin));
+  // Kein Code und kein token_hash → Fehler
+  const fallback = new URL("/auth/confirmed", baseUrl);
+  fallback.searchParams.set("error", "missing_code");
+  fallback.searchParams.set("error_description", "Kein Bestätigungscode in der URL gefunden.");
+  return NextResponse.redirect(fallback);
 }

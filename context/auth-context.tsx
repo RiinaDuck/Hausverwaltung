@@ -227,10 +227,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
     try {
-      const siteUrl =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/auth/callback`
-          : `${process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"}/auth/callback`;
+      const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+      if (!rawSiteUrl) {
+        throw new Error("NEXT_PUBLIC_SITE_URL ist nicht gesetzt. Bitte .env.local und Vercel-Umgebungsvariablen prüfen.");
+      }
+      const siteUrl = `${rawSiteUrl}/auth/callback`;
 
       const { data, error } = await supabase.auth.signUp({
         email,
