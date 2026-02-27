@@ -64,6 +64,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useAppData } from "@/context/app-data-context";
 import { useAuth } from "@/context/auth-context";
+import type { AppView } from "@/components/app-dashboard";
 
 interface Unit {
   id: string;
@@ -279,7 +280,7 @@ const statusConfig = {
   },
 };
 
-export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: string) => void }) {
+export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView) => void }) {
   const {
     wohnungen,
     selectedObjektId,

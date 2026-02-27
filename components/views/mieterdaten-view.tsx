@@ -412,6 +412,7 @@ export function MieterdatenView() {
     // Füge neuen ehemaligen Mieter hinzu
     addMieter({
       wohnungId: selectedMieter.wohnungId,
+      anrede: "familie",
       name: historieMieter.name,
       email: "",
       telefon: "",

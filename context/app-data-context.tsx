@@ -344,6 +344,7 @@ const DEMO_MIETER: Mieter[] = [
   {
     id: "demo-m1",
     wohnungId: "demo-w1",
+    anrede: "frau",
     name: "Anna Schmidt",
     email: "anna@example.com",
     telefon: "030 11111111",
@@ -996,6 +997,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     try {
       await addMieter({
         wohnungId,
+        anrede: "familie",
         name: ehemaligerMieterData.name,
         email: ehemaligerMieterData.email,
         telefon: ehemaligerMieterData.telefon,
