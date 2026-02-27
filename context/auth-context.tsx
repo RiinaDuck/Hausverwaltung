@@ -227,11 +227,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
     try {
-      const rawSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-      if (!rawSiteUrl) {
-        throw new Error("NEXT_PUBLIC_SITE_URL ist nicht gesetzt. Bitte .env.local und Vercel-Umgebungsvariablen prüfen.");
-      }
-      const siteUrl = `${rawSiteUrl}/auth/callback`;
+      // window.location.origin passt sich automatisch an (localhost:3000 lokal, hausverwaltungboss.de in Production)
+      const siteUrl = `${window.location.origin}/auth/callback`;
 
       const { data, error } = await supabase.auth.signUp({
         email,

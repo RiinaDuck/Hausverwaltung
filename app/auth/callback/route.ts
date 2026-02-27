@@ -53,8 +53,8 @@ export async function GET(request: NextRequest) {
         redirectUrl.searchParams.set("error_description", sessionError.message);
         return NextResponse.redirect(redirectUrl);
       }
-      // Erfolgreich via PKCE-Code → App
-      return NextResponse.redirect(new URL("/", baseUrl));
+      // Erfolgreich via PKCE-Code → Bestätigungsseite
+      return NextResponse.redirect(new URL("/auth/confirmed", baseUrl));
     } else if (token_hash && type) {
       const { error: otpError } = await supabase.auth.verifyOtp({ token_hash, type: type as any });
       if (otpError) {
@@ -63,8 +63,8 @@ export async function GET(request: NextRequest) {
         redirectUrl.searchParams.set("error_description", otpError.message);
         return NextResponse.redirect(redirectUrl);
       }
-      // Erfolgreich via token_hash → App
-      return NextResponse.redirect(new URL("/", baseUrl));
+      // Erfolgreich via token_hash → Bestätigungsseite
+      return NextResponse.redirect(new URL("/auth/confirmed", baseUrl));
     }
   }
 
