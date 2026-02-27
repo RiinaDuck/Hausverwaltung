@@ -178,7 +178,7 @@ const helpSections: HelpSection[] = [
   },
   {
     id: "mieter",
-    title: "Mieter & Mieten",
+    title: "Mieter",
     icon: <Users className="h-4 w-4" />,
     description:
       "Erfassen Sie hier alle Mieterdaten, Mietverträge und zugehörige Informationen zu Zahlungen und Kaution.",
@@ -492,8 +492,8 @@ const viewTitles: Record<AppView, string> = {
   dashboard: "Dashboard",
   objekte: "Objektdaten (Stammdaten)",
   wohnungen: "Wohnungsdaten",
-  mieter: "Mieter & Mieten",
-  nebenkosten: "Nebenkosten – Kosten erfassen",
+  mieter: "Mieter",
+  nebenkosten: "Nebenkosten",
   "nebenkosten-abrechnung": "Nebenkosten – Abrechnung erstellen",
   zaehler: "Zähler & Rauchmelder",
   hausmanager: "Hausmanager / Finanzamt",
@@ -547,7 +547,9 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
           <Menu className="h-5 w-5" />
         </Button>
         <h1 className="text-base md:text-xl font-semibold truncate">
-          {viewTitles[currentView]}
+          {currentView === "dashboard" && currentObjekt
+            ? `Dashboard – ${currentObjekt.name}`
+            : viewTitles[currentView]}
         </h1>
       </div>
       <div className="flex items-center gap-2 md:gap-4">

@@ -242,7 +242,7 @@ export function LandingPage({
     },
     {
       id: "mieter",
-      title: "Mieter & Mieten",
+      title: "Mieter",
       icon: <Users className="h-4 w-4" />,
       description:
         "Erfassen Sie Mieterdaten, Verträge und Zahlungsinformationen.",

@@ -21,6 +21,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   TrendingUp,
   AlertCircle,
+  AlertTriangle,
   Building2,
   Plus,
   UserPlus,
@@ -34,6 +35,7 @@ import type { AppView } from "@/components/app-dashboard";
 import { useAppData } from "@/context/app-data-context";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { ImportErinnerungBanner } from "@/components/import-erinnerung-banner";
 
 interface DashboardViewProps {
   onNavigate: (view: AppView) => void;
@@ -42,10 +44,8 @@ interface DashboardViewProps {
 export function DashboardView({ onNavigate }: DashboardViewProps) {
   const { objekte, wohnungen, mieter, selectedObjektId, setSelectedObjektId } =
     useAppData();
-  const { isDemo } = useAuth();
+  const { isDemo, profile } = useAuth();
   const { toast } = useToast();
-
-  const currentObjekt = objekte.find((o) => o.id === selectedObjektId);
 
   const handleDemoRestriction = (action: string) => {
     toast({
@@ -143,16 +143,9 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
   return (
     <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold">
-            Dashboard{currentObjekt ? ` – ${currentObjekt.name}` : ""}
-          </h1>
-          <p className="text-sm md:text-base text-muted-foreground">
-            Willkommen zurück bei Hausverwaltung Boss
-          </p>
-        </div>
-      </div>
+      <p className="text-sm md:text-base text-muted-foreground">
+        Willkommen zurück {profile.name}
+      </p>
 
       {/* Quick Actions */}
       <Card>
@@ -204,6 +197,50 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
         </CardContent>
       </Card>
 
+      {/* Status-Banner: In Verzug + Import-Erinnerung nebeneinander */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* In Verzug */}
+        {(() => {
+          const aktiveMieter = mieter.filter((m) => m.isAktiv !== false);
+          const mieterInVerzug = aktiveMieter.filter((m) => {
+            const faellig = new Date(new Date().getFullYear(), new Date().getMonth(), 3);
+            return new Date() > faellig && (m.kaltmiete + m.nebenkosten) > 0;
+          });
+          const anzahl = mieterInVerzug.length;
+          if (anzahl === 0) return null;
+          return (
+            <Card className="border-destructive/50 bg-destructive/5">
+              <CardContent className="pt-4 pb-4 h-full flex items-center">
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-full bg-destructive/10 p-2">
+                      <AlertTriangle className="h-5 w-5 text-destructive" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">Mieter in Verzug</p>
+                      <p className="text-xs text-muted-foreground">
+                        {anzahl} {anzahl === 1 ? "Mieter hat" : "Mieter haben"} ausstehende Zahlungen
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-destructive/30 text-destructive hover:bg-destructive/10"
+                    onClick={() => onNavigate("mieter")}
+                  >
+                    Anzeigen
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
+
+        {/* Import-Erinnerung Banner */}
+        <ImportErinnerungBanner onNavigate={onNavigate} />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-1 gap-4 md:gap-6">
         {/* Active Objects Table */}
         <Card>
@@ -229,7 +266,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                   <TableRow key={objekt.id}>
                     <TableCell className="font-medium">{objekt.name}</TableCell>
                     <TableCell>{objekt.typ}</TableCell>
-                    <TableCell>{objekt.einheiten}</TableCell>
+                    <TableCell>{wohnungen.filter((w) => w.objektId === objekt.id).length}</TableCell>
                     <TableCell>
                       <Badge
                         variant="secondary"

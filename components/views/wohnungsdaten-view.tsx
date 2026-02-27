@@ -50,6 +50,8 @@ import {
   Heart,
   Copy,
   MoreHorizontal,
+  Users,
+  ArrowRight,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -277,11 +279,12 @@ const statusConfig = {
   },
 };
 
-export function WohnungsdatenView() {
+export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: string) => void }) {
   const {
     wohnungen,
     selectedObjektId,
     objekte,
+    mieter,
     addWohnung,
     updateWohnung,
     deleteWohnung,
@@ -672,32 +675,23 @@ export function WohnungsdatenView() {
       {/* Left: Units List */}
       <Card className="w-full md:w-80 shrink-0 flex flex-col overflow-hidden md:max-h-full">
         <CardHeader className="pb-3 space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
+          <div className="space-y-2">
+            <div className="flex items-baseline gap-2">
               <CardTitle className="text-base">
                 {currentObjekt?.name || "Einheiten"}
               </CardTitle>
               <CardDescription className="text-xs">
-                {units.length} Wohnungen
+                {units.length} {units.length === 1 ? "Wohnung" : "Wohnungen"}
               </CardDescription>
             </div>
             <Button
               size="sm"
-              className="gap-1.5 h-8 bg-success hover:bg-success/90 text-success-foreground"
+              className="w-full gap-1.5 h-8 bg-success hover:bg-success/90 text-success-foreground"
               onClick={() => setIsNewUnitOpen(true)}
             >
               <Plus className="h-3.5 w-3.5" />
-              Neu
+              Wohnung anlegen
             </Button>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Suchen..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 h-9"
-            />
           </div>
         </CardHeader>
         <CardContent className="flex-1 overflow-hidden p-0">
@@ -742,11 +736,6 @@ export function WohnungsdatenView() {
                           {statusConfig[unit.status].label}
                         </Badge>
                       )}
-                      {unit.miete && (
-                        <span className="text-xs font-medium text-success">
-                          {unit.miete.toLocaleString("de-DE")} €
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -760,33 +749,7 @@ export function WohnungsdatenView() {
       {selectedUnit && (
         <div className="flex-1 overflow-auto space-y-4 md:space-y-6">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 shrink-0">
-                <Home className="h-5 w-5 text-primary" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-lg font-semibold truncate">
-                  {selectedUnit.lage}
-                </h2>
-                <div className="flex flex-wrap items-center gap-2">
-                  {selectedUnit.status && (
-                    <Badge
-                      variant="outline"
-                      className={cn(
-                        "text-xs",
-                        statusConfig[selectedUnit.status].color,
-                      )}
-                    >
-                      {statusConfig[selectedUnit.status].label}
-                    </Badge>
-                  )}
-                  <span className="text-sm text-muted-foreground">
-                    {selectedUnit.wohnflaeche} m² • {selectedUnit.raeume} Zimmer
-                  </span>
-                </div>
-              </div>
-            </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3">
             <div className="flex gap-2 self-end sm:self-auto">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -819,50 +782,6 @@ export function WohnungsdatenView() {
                 {isSaving ? "Wird gespeichert..." : "Speichern"}
               </Button>
             </div>
-          </div>
-
-          {/* Quick Stats */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
-            {[
-              { label: "Geschosslage", value: selectedUnit.lage, icon: Home },
-              {
-                label: "Wohnfläche",
-                value: `${selectedUnit.wohnflaeche} m²`,
-                icon: Ruler,
-              },
-              {
-                label: "Nutzfläche",
-                value: `${selectedUnit.nutzflaeche} m²`,
-                icon: Ruler,
-              },
-              {
-                label: "Räume",
-                value: selectedUnit.raeume.toString(),
-                icon: DoorOpen,
-              },
-              {
-                label: "Punkte",
-                value: selectedUnit.punkte.toString(),
-                icon: Star,
-              },
-              {
-                label: "Anteil",
-                value: `${selectedUnit.prozent}%`,
-                icon: Percent,
-              },
-            ].map((stat) => (
-              <Card key={stat.label} className="bg-muted/30">
-                <CardContent className="p-3 md:p-4">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <stat.icon className="h-3.5 w-3.5" />
-                    <span className="text-xs">{stat.label}</span>
-                  </div>
-                  <p className="font-semibold text-sm md:text-base truncate">
-                    {stat.value}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
           </div>
 
           <Tabs defaultValue="daten" className="space-y-4">
@@ -1014,6 +933,42 @@ export function WohnungsdatenView() {
                   </div>
                 </CardContent>
               </Card>
+
+              {/* Mieter-Link */}
+              {selectedUnit && (() => {
+                const unitMieter = mieter.filter(
+                  (m) => m.wohnungId === selectedUnit.id && m.isAktiv !== false
+                );
+                if (unitMieter.length === 0) return (
+                  <Card className="border-dashed">
+                    <CardContent className="py-4 flex items-center gap-3 text-muted-foreground">
+                      <Users className="h-5 w-5" />
+                      <span className="text-sm">Kein Mieter zugeordnet</span>
+                    </CardContent>
+                  </Card>
+                );
+                return unitMieter.map((m) => (
+                  <Card
+                    key={m.id}
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => onNavigate?.("mieter")}
+                  >
+                    <CardContent className="py-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Users className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium">{m.name}</p>
+                          <p className="text-xs text-muted-foreground">Mieter</p>
+                        </div>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                    </CardContent>
+                  </Card>
+                ));
+              })()}
+
             </TabsContent>
 
             <TabsContent value="ausstattung">

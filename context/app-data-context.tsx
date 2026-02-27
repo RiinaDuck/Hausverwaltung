@@ -107,6 +107,7 @@ export interface Wohnung {
 export interface Mieter {
   id: string;
   wohnungId: string;
+  anrede: string;
   name: string;
   email: string;
   telefon: string;
@@ -201,6 +202,22 @@ export interface Expense {
   updatedAt: string;
 }
 
+export interface ZahlungEintrag {
+  id: string;
+  mieterId: string;
+  monat: string;
+  faelligkeitsdatum: string;
+  sollBetrag: number;
+  istBetrag: number;
+  buchungsdatum: string;
+  wertstellungsdatum: string;
+  verwendungszweck: string;
+  ibanAbsender: string;
+  auftraggeber: string;
+  referenz: string;
+  status: "bezahlt" | "ausstehend" | "ueberfaellig";
+}
+
 interface AppDataContextType {
   objekte: Objekt[];
   wohnungen: Wohnung[];
@@ -238,6 +255,8 @@ interface AppDataContextType {
   addRechnung: (r: Omit<Rechnung, "id" | "userId" | "createdAt" | "updatedAt">) => Promise<void>;
   updateRechnung: (id: string, r: Partial<Rechnung>) => Promise<void>;
   deleteRechnung: (id: string) => Promise<void>;
+  zahlungen: ZahlungEintrag[];
+  setZahlungen: React.Dispatch<React.SetStateAction<ZahlungEintrag[]>>;
   setSelectedObjektId: (id: string | null) => void;
   refreshData: () => Promise<void>;
 }
@@ -438,6 +457,20 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [zaehler, setZaehler] = useState<Zaehler[]>([]);
   const [rauchmelder, setRauchmelder] = useState<Rauchmelder[]>([]);
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
+  const [zahlungenState, setZahlungenState] = useState<ZahlungEintrag[]>(() => {
+    const heute = new Date();
+    const monat = `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, "0")}`;
+    return [
+      {
+        id: "z1", mieterId: "demo-1", monat,
+        faelligkeitsdatum: `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, "0")}-03`,
+        sollBetrag: 0, istBetrag: 0,
+        buchungsdatum: "", wertstellungsdatum: "",
+        verwendungszweck: "", ibanAbsender: "", auftraggeber: "", referenz: "",
+        status: "ausstehend" as const,
+      },
+    ];
+  });
   const [selectedObjektId, setSelectedObjektIdState] = useState<string | null>(() => {
     // Beim ersten Render: gespeichertes Objekt aus localStorage laden
     if (typeof window !== "undefined") {
@@ -488,6 +521,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const mapDBToMieter = (dbMieter: any): Mieter => ({
     id: dbMieter.id,
     wohnungId: dbMieter.wohnung_id,
+    anrede: dbMieter.anrede || 'familie',
     name: dbMieter.name,
     email: dbMieter.email,
     telefon: dbMieter.telefon,
@@ -821,6 +855,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const created = await createMieter({
         user_id: user.id,
         wohnung_id: newMieter.wohnungId,
+        anrede: newMieter.anrede,
         name: newMieter.name,
         email: newMieter.email,
         telefon: newMieter.telefon,
@@ -1292,6 +1327,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         addRechnung,
         updateRechnung,
         deleteRechnung,
+        zahlungen: zahlungenState,
+        setZahlungen: setZahlungenState,
         setSelectedObjektId,
         refreshData,
       }}

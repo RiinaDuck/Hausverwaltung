@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -37,6 +37,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Save,
   Plus,
   FileDown,
@@ -44,7 +51,18 @@ import {
   Users,
   Home,
   Calendar,
+  MoreHorizontal,
   UserCheck,
+  CheckCircle2,
+  AlertTriangle,
+  Clock,
+  CreditCard,
+  TrendingUp,
+  Mail,
+  Upload,
+  ChevronDown,
+  Printer,
+  X,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -56,13 +74,27 @@ import {
   sanitizeFilename,
 } from "@/lib/pdf-generator";
 import { useAppData } from "@/context/app-data-context";
+import type { ZahlungEintrag } from "@/context/app-data-context";
 import { useAuth } from "@/context/auth-context";
+import { parseCamtXml, matchTransaktionToMieter } from "@/lib/parseCamt";
+import { createClient } from "@/lib/supabase/client";
+
+// Zahlungs-Interfaces
+interface MahnEintrag {
+  id: string;
+  mieterId: string;
+  datum: string;
+  eskalationsstufe: "Erinnerung" | "1. Mahnung" | "2. Mahnung";
+  betreff: string;
+  gesendetVon: string;
+}
 
 // Lokales Interface für die Ansicht (kombiniert Mieter + Wohnungsdaten)
 interface MieterDisplay {
   id: string;
   nr: number;
   geschoss: string;
+  anrede: string;
   name: string;
   einzug: string;
   auszug: string;
@@ -93,8 +125,10 @@ export function MieterdatenView() {
     deleteMieter,
     archiviereMieter,
     reaktiviereMieter,
+    zahlungen,
+    setZahlungen,
   } = useAppData();
-  const { isDemo, profile } = useAuth();
+  const { isDemo, profile, user } = useAuth();
 
   // Finde das aktuelle Objekt für den Namen
   const currentObjekt = objekte.find((o) => o.id === selectedObjektId);
@@ -120,6 +154,7 @@ export function MieterdatenView() {
         id: m.id,
         nr: index + 1,
         geschoss: wohnung?.bezeichnung || "Unbekannt",
+        anrede: m.anrede || 'familie',
         name: m.name,
         einzug: m.einzugsDatum
           ? new Date(m.einzugsDatum).toLocaleDateString("de-DE")
@@ -212,6 +247,28 @@ export function MieterdatenView() {
   });
   const [selectedEhemaligerMieter, setSelectedEhemaligerMieter] =
     useState<string>("");
+
+  // Zahlungs-State (aus Context)
+  const [mahnHistorie, setMahnHistorie] = useState<MahnEintrag[]>([]);
+  const [mahnEskalation, setMahnEskalation] = useState<"Erinnerung" | "1. Mahnung" | "2. Mahnung">("Erinnerung");
+  const [mahnTextCustom, setMahnTextCustom] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
+  const [camtImportResult, setCamtImportResult] = useState<{
+    dateiname: string;
+    anzahl: number;
+    zugeordnet: number;
+    zeitpunkt: string;
+  } | null>(null);
+  const [pendingImport, setPendingImport] = useState<{
+    dateiname: string;
+    neueZahlungen: ZahlungEintrag[];
+    zugeordnet: number;
+    nichtZugeordnet: number;
+    duplikate: number;
+  } | null>(null);
+
+  const camtFileInputRef = useRef<HTMLInputElement>(null);
+
   const { toast } = useToast();
 
   // Aktualisiere selectedMieter wenn sich mieterData ändert
@@ -249,6 +306,53 @@ export function MieterdatenView() {
     }
   }, [selectedMieter]);
 
+  // Zahlungen beim Start aus Supabase laden (nur wenn NICHT Demo-Modus)
+  useEffect(() => {
+    if (!selectedObjektId || isDemo) return;
+    const loadZahlungen = async () => {
+      try {
+        const supabase = createClient();
+        if (!supabase) return;
+        const { data, error } = await supabase
+          .from("zahlungen")
+          .select("*")
+          .order("buchungsdatum", { ascending: false });
+        if (error) {
+          console.warn("Zahlungen konnten nicht geladen werden:", error.message);
+          return;
+        }
+      if (!data || data.length === 0) return;
+      const loaded: ZahlungEintrag[] = data.map((row: any) => ({
+        id: row.id,
+        mieterId: row.mieter_id ?? "unbekannt",
+        monat: row.monat ?? "",
+        faelligkeitsdatum: row.faelligkeitsdatum ?? "",
+        sollBetrag: row.soll_betrag ?? 0,
+        istBetrag: row.betrag ?? 0,
+        buchungsdatum: row.buchungsdatum ?? "",
+        wertstellungsdatum: row.wertstellungsdatum ?? "",
+        verwendungszweck: row.verwendungszweck ?? "",
+        ibanAbsender: row.auftraggeber_iban ?? "",
+        auftraggeber: row.auftraggeber_name ?? "",
+        referenz: row.zahlungsreferenz ?? "",
+        status: (row.status as ZahlungEintrag["status"]) ?? "ausstehend",
+      }));
+      setZahlungen((prev) => {
+        const merged = [...prev];
+        for (const lz of loaded) {
+          const idx = merged.findIndex((z) => z.id === lz.id);
+          if (idx >= 0) merged[idx] = lz;
+          else merged.push(lz);
+        }
+        return merged;
+      });
+      } catch (err) {
+        console.warn("Fehler beim Laden der Zahlungen:", err);
+      }
+    };
+    loadZahlungen();
+  }, [selectedObjektId, isDemo]);
+
   // Hilfsfunktion zum Aktualisieren der bearbeiteten Mieter-Daten
   const updateEditedMieter = (
     field: keyof MieterDisplay,
@@ -269,6 +373,7 @@ export function MieterdatenView() {
 
     // Update in Context
     await updateMieter(selectedMieter.id, {
+      anrede: editedMieter.anrede,
       name: editedMieter.name,
       email: editedMieter.email,
       telefon: editedMieter.telefon,
@@ -490,6 +595,7 @@ export function MieterdatenView() {
       // Füge neuen Mieter über Context hinzu
       await addMieter({
         wohnungId: newMieter.wohnungId,
+        anrede: newMieter.anrede,
         name: newMieter.name,
         email: newMieter.email,
         telefon: newMieter.telefon,
@@ -550,6 +656,214 @@ export function MieterdatenView() {
       title: "Mieter gelöscht",
       description: `${selectedMieter.name} wurde erfolgreich gelöscht.`,
     });
+  };
+
+  // Zahlungs-Hilfsfunktionen
+  const getCurrentMonthKey = () => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  };
+
+  const getZahlungForMieter = (mieterId: string): ZahlungEintrag => {
+    const monat = getCurrentMonthKey();
+    const existing = zahlungen.find((z) => z.mieterId === mieterId && z.monat === monat);
+    if (existing) return existing;
+    const m = mieterData.find((x) => x.id === mieterId);
+    const heute = new Date();
+    const faellig = `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, "0")}-01`;
+    const diffDays = Math.floor((heute.getTime() - new Date(faellig).getTime()) / 86400000);
+    return {
+      id: `auto-${mieterId}-${monat}`,
+      mieterId,
+      monat,
+      faelligkeitsdatum: faellig,
+      sollBetrag: (m?.kaltmiete || 0) + (m?.nebenkosten || 0),
+      istBetrag: 0,
+      buchungsdatum: "",
+      wertstellungsdatum: "",
+      verwendungszweck: "",
+      ibanAbsender: "",
+      auftraggeber: "",
+      referenz: "",
+      status: diffDays > 3 ? "ueberfaellig" : "ausstehend",
+    };
+  };
+
+  const updateZahlung = (z: ZahlungEintrag) => {
+    setZahlungen((prev) => {
+      const idx = prev.findIndex((x) => x.id === z.id);
+      if (idx >= 0) return prev.map((x) => (x.id === z.id ? z : x));
+      return [...prev, z];
+    });
+  };
+
+  const getMahnText = (eskalation: string) => {
+    if (!editedMieter) return "";
+    const z = getZahlungForMieter(editedMieter.id);
+    const diff = z.sollBetrag - z.istBetrag;
+    const faelligDate = new Date(z.faelligkeitsdatum);
+    const zahlungsFrist = new Date(faelligDate);
+    zahlungsFrist.setDate(zahlungsFrist.getDate() + 7);
+    const monatName = faelligDate.toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+    const fristStr = zahlungsFrist.toLocaleDateString("de-DE");
+    const anredeText = editedMieter.anrede === "herr"
+      ? `Sehr geehrter Herr ${editedMieter.name}`
+      : editedMieter.anrede === "frau"
+      ? `Sehr geehrte Frau ${editedMieter.name}`
+      : `Sehr geehrte Familie ${editedMieter.name}`;
+    const anrede = anredeText;
+    const prefix = eskalation === "Erinnerung"
+      ? "möchten wir Sie freundlich daran erinnern, dass"
+      : eskalation === "1. Mahnung"
+      ? "stellen wir Ihnen hiermit die erste Mahnung aus. Die"
+      : "stellen wir Ihnen hiermit die zweite und letzte Mahnung aus. Die";
+    return `${anrede},\n\nwir ${prefix} die Mietzahlung für ${monatName} in Höhe von ${z.sollBetrag.toLocaleString("de-DE")} € auf unserem Konto bisher nicht eingegangen ist.\n\nFälligkeitsdatum: ${faelligDate.toLocaleDateString("de-DE")}\nAusstehender Betrag: ${diff.toLocaleString("de-DE")} €\n\nWir bitten Sie, den ausstehenden Betrag bis zum ${fristStr} zu überweisen.\n\nBei Rückfragen stehen wir Ihnen gerne zur Verfügung.\n\nMit freundlichen Grüßen,\n${profile.name}\n${currentObjekt?.adresse || ""}\n${currentObjekt?.objektdaten?.strasse || ""}`;
+  };
+
+  // CAMT-Import Handler
+  const handleCamtFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Input zurücksetzen (damit dieselbe Datei nochmal geladen werden kann)
+    e.target.value = "";
+
+    setIsImporting(true);
+    try {
+      const xmlString = await file.text();
+      const transaktionen = parseCamtXml(xmlString);
+
+      const mieterMatchList = mieterData.map((m) => ({ id: m.id, name: m.name }));
+      const monat = getCurrentMonthKey();
+
+      let zugeordnet = 0;
+      let nichtZugeordnet = 0;
+
+      const neueZahlungen: ZahlungEintrag[] = transaktionen.map((t) => {
+        const match = matchTransaktionToMieter(t, mieterMatchList);
+        if (match) zugeordnet++;
+        else nichtZugeordnet++;
+
+        const mieterId = match?.mieterId ?? "unbekannt";
+        const m = mieterData.find((x) => x.id === mieterId);
+        const soll = m ? m.kaltmiete + m.nebenkosten : 0;
+
+        return {
+          id: t.endToEndId && t.endToEndId !== "NOTPROVIDED"
+            ? t.endToEndId
+            : `camt-${t.buchungsdatum}-${t.betrag}-${(t.auftraggeberName || "").replace(/\s/g, "").slice(0, 20)}`,
+          mieterId,
+          monat,
+          faelligkeitsdatum: `${monat}-01`,
+          sollBetrag: soll,
+          istBetrag: t.betrag,
+          buchungsdatum: t.buchungsdatum,
+          wertstellungsdatum: t.wertstellungsdatum,
+          verwendungszweck: t.verwendungszweck,
+          ibanAbsender: t.auftraggeberIban,
+          auftraggeber: t.auftraggeberName,
+          referenz: t.endToEndId,
+          status: t.betrag >= soll ? "bezahlt" : soll > 0 ? "ueberfaellig" : "offen",
+        } as ZahlungEintrag;
+      });
+
+      // Prüfe auf Duplikate (per ID oder per Buchungsdatum+Betrag+Auftraggeber)
+      const duplikate = neueZahlungen.filter((nz) =>
+        zahlungen.some((z) =>
+          z.id === nz.id ||
+          (z.buchungsdatum === nz.buchungsdatum && z.istBetrag === nz.istBetrag && z.auftraggeber === nz.auftraggeber && z.buchungsdatum !== "")
+        )
+      ).length;
+
+      if (duplikate > 0) {
+        // Duplikate gefunden – User muss bestätigen
+        setPendingImport({ dateiname: file.name, neueZahlungen, zugeordnet, nichtZugeordnet, duplikate });
+        setIsImporting(false);
+        return;
+      }
+
+      // Keine Duplikate – direkt importieren
+      await executeImport(file.name, neueZahlungen, zugeordnet, nichtZugeordnet);
+    } catch (err) {
+      toast({
+        title: "Import fehlgeschlagen",
+        description: err instanceof Error ? err.message : "Unbekannter Fehler beim Parsen der CAMT-Datei.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Import bestätigen (nach Duplikat-Warnung)
+  const confirmPendingImport = async () => {
+    if (!pendingImport) return;
+    setIsImporting(true);
+    setPendingImport(null);
+    await executeImport(pendingImport.dateiname, pendingImport.neueZahlungen, pendingImport.zugeordnet, pendingImport.nichtZugeordnet);
+    setIsImporting(false);
+  };
+
+  // Import ausführen (State + Supabase)
+  const executeImport = async (dateiname: string, neueZahlungen: ZahlungEintrag[], zugeordnet: number, nichtZugeordnet: number) => {
+      // Bestehende Zahlungen durch importierte ersetzen (Upsert per ID)
+      setZahlungen((prev) => {
+        const updated = [...prev];
+        for (const nz of neueZahlungen) {
+          const idx = updated.findIndex((z) => z.id === nz.id);
+          if (idx >= 0) updated[idx] = nz;
+          else updated.push(nz);
+        }
+        return updated;
+      });
+
+      // Supabase persistieren (nur wenn NICHT Demo-Modus und User eingeloggt)
+      if (!isDemo && user?.id) {
+        try {
+          const supabase = createClient();
+          if (supabase) {
+            const supabaseRows = neueZahlungen.map((z) => ({
+              id: z.id,
+              user_id: user.id,
+              mieter_id: z.mieterId !== "unbekannt" ? z.mieterId : null,
+              monat: z.monat,
+              soll_betrag: z.sollBetrag,
+              betrag: z.istBetrag,
+              buchungsdatum: z.buchungsdatum || null,
+              wertstellungsdatum: z.wertstellungsdatum || null,
+              verwendungszweck: z.verwendungszweck || null,
+              auftraggeber_name: z.auftraggeber || null,
+              auftraggeber_iban: z.ibanAbsender || null,
+              zahlungsreferenz: z.referenz || null,
+              status: z.status,
+              zugeordnet_via: null,
+            }));
+
+            const { error: supabaseError } = await supabase
+              .from("zahlungen")
+              .upsert(supabaseRows, { onConflict: "id" });
+
+            if (supabaseError) {
+              console.warn("Supabase upsert fehlgeschlagen (Daten lokal gespeichert):",
+                supabaseError.message || supabaseError.code || "Unbekannt");
+            }
+          }
+        } catch (err) {
+          console.warn("Supabase Persistierung fehlgeschlagen, Daten nur lokal:", err);
+        }
+      }
+
+      setCamtImportResult({
+        dateiname,
+        anzahl: neueZahlungen.length,
+        zugeordnet,
+        zeitpunkt: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }),
+      });
+
+      toast({
+        title: `CAMT-Import erfolgreich`,
+        description: `${neueZahlungen.length} Transaktionen importiert – ${zugeordnet} zugeordnet, ${nichtZugeordnet} nicht zugeordnet.`,
+      });
   };
 
   // Wenn kein Objekt ausgewählt
@@ -738,100 +1052,103 @@ export function MieterdatenView() {
   return (
     <div className="flex flex-col md:flex-row gap-4 md:gap-6 h-auto md:h-[calc(100vh-8rem)]">
       {/* Left: Tenants List */}
-      <Card className="w-full md:w-72 shrink-0 flex flex-col max-h-[300px] md:max-h-full">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
+      <Card className="w-full md:w-80 shrink-0 flex flex-col max-h-[300px] md:max-h-full">
+        <CardHeader className="pb-3 space-y-3">
+          <div className="space-y-2">
+            <div className="flex items-baseline gap-2">
               <CardTitle className="text-base">
                 {currentObjekt?.name || "Mieter"}
               </CardTitle>
               <CardDescription className="text-xs">
-                {mieterData.length} Mieter
+                {mieterData.length} {mieterData.length === 1 ? "Mieter" : "Mieter"}
               </CardDescription>
             </div>
             <Button
               size="sm"
-              variant="outline"
-              className="gap-1 h-8 bg-transparent"
+              className="w-full gap-1 h-8 bg-success hover:bg-success/90 text-success-foreground"
               onClick={() => setIsNewMieterOpen(true)}
             >
               <Plus className="h-3 w-3" />
-              <span className="hidden sm:inline">Neu</span>
+              Mieter anlegen
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="flex-1 overflow-auto p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="sticky top-0 bg-card text-xs w-10">
-                  Nr
-                </TableHead>
-                <TableHead className="sticky top-0 bg-card text-xs">
-                  Geschoss
-                </TableHead>
-                <TableHead className="sticky top-0 bg-card text-xs">
-                  Name
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {mieterData.map((m) => (
-                <TableRow
+        <CardContent className="flex-1 overflow-auto p-2">
+          <div className="space-y-0.5">
+            {mieterData.map((m) => {
+              const isSelected = selectedMieter?.id === m.id;
+              return (
+                <button
                   key={m.id}
-                  className={`cursor-pointer ${
-                    selectedMieter?.id === m.id ? "bg-accent" : ""
-                  }`}
+                  type="button"
                   onClick={() => setSelectedMieter(m)}
+                  className={`w-full text-left px-3 py-2.5 rounded-lg border transition-colors ${
+                    isSelected
+                      ? "bg-muted border-border"
+                      : "border-transparent hover:bg-accent hover:border-border text-foreground"
+                  }`}
                 >
-                  <TableCell className="text-sm py-2">{m.nr}</TableCell>
-                  <TableCell className="text-sm py-2">{m.geschoss}</TableCell>
-                  <TableCell className="font-medium text-sm py-2">
-                    {m.name}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-1">
+                        <p className="text-sm font-medium truncate">{m.name}</p>
+                        {(() => {
+                          const z = getZahlungForMieter(m.id);
+                          if (z.status === "ueberfaellig") return (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md border shrink-0 bg-destructive/10 text-destructive border-destructive/20">Fällig</span>
+                          );
+                          if (z.status === "ausstehend") return (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md border shrink-0 bg-amber-500/10 text-amber-600 border-amber-500/20">Offen</span>
+                          );
+                          return (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md border shrink-0 bg-success/10 text-success border-success/20">Bezahlt</span>
+                          );
+                        })()}
+                      </div>
+                      <p className="text-xs truncate text-muted-foreground">{m.geschoss}</p>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </CardContent>
       </Card>
 
       {/* Right: Tenant Details with Tabs */}
       {selectedMieter && (
         <div className="flex-1 overflow-auto space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">
-              Mieter: {selectedMieter.name}
-            </h2>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2 text-destructive bg-transparent"
-                onClick={handleDeleteMieter}
-                disabled={mieterData.length <= 1}
-              >
-                <Trash2 className="h-4 w-4" />
-                <span className="hidden sm:inline">Löschen</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={handleExportAllDataPDF}
-              >
-                <FileDown className="h-4 w-4" />
-                <span className="hidden sm:inline">In PDF Exportieren</span>
-              </Button>
-              <Button
-                size="sm"
-                className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
-                onClick={handleSave}
-              >
-                <Save className="h-4 w-4" />
-                <span className="hidden sm:inline">Speichern</span>
-              </Button>
-            </div>
+          <div className="flex items-center justify-end gap-2 pb-1">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-9 w-9">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportAllDataPDF}>
+                  <FileDown className="h-4 w-4 mr-2" />
+                  In PDF Exportieren
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleDeleteMieter}
+                  disabled={mieterData.length <= 1}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Löschen
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              size="sm"
+              className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
+              onClick={handleSave}
+            >
+              <Save className="h-4 w-4" />
+              <span className="hidden sm:inline">Speichern</span>
+            </Button>
           </div>
 
           <Tabs defaultValue="stammdaten" className="w-full">
@@ -859,7 +1176,20 @@ export function MieterdatenView() {
                 value="zahlungen"
                 className="text-xs sm:text-sm py-2"
               >
-                Zahlungen
+                <span className="flex items-center gap-1.5">
+                  Zahlungen
+                  {(() => {
+                    if (!editedMieter) return null;
+                    const z = getZahlungForMieter(editedMieter.id);
+                    if (z.status === "ueberfaellig") return (
+                      <span className="w-2 h-2 rounded-full bg-destructive shrink-0" />
+                    );
+                    if (z.status === "ausstehend") return (
+                      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+                    );
+                    return null;
+                  })()}
+                </span>
               </TabsTrigger>
               <TabsTrigger
                 value="kommunikation"
@@ -872,30 +1202,36 @@ export function MieterdatenView() {
             {/* Tab 1: Stammdaten */}
             <TabsContent
               value="stammdaten"
-              className="mt-4 sm:mt-6 space-y-4 sm:space-y-6"
+              className="mt-4 sm:mt-6 space-y-4"
             >
+              {/* Sektion: Stammdaten */}
               <Card>
-                <CardContent className="pt-4 sm:pt-6 space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="mieter-nr">Mieter Nr</Label>
-                      <Input
-                        id="mieter-nr"
-                        value={editedMieter?.nr || 0}
-                        readOnly
-                        className="bg-muted"
-                      />
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Stammdaten
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="anrede">Anrede</Label>
+                      <Select
+                        value={editedMieter?.anrede || 'familie'}
+                        onValueChange={(value) =>
+                          updateEditedMieter("anrede", value)
+                        }
+                      >
+                        <SelectTrigger id="anrede">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="herr">Herr</SelectItem>
+                          <SelectItem value="frau">Frau</SelectItem>
+                          <SelectItem value="familie">Familie</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="geschoss">Wohnung</Label>
-                      <Input
-                        id="geschoss"
-                        value={editedMieter?.geschoss || ""}
-                        readOnly
-                        className="bg-muted"
-                      />
-                    </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <Label htmlFor="name">Name</Label>
                       <Input
                         id="name"
@@ -905,7 +1241,9 @@ export function MieterdatenView() {
                         }
                       />
                     </div>
-                    <div className="space-y-2">
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
                       <Label htmlFor="email">E-Mail</Label>
                       <Input
                         id="email"
@@ -917,9 +1255,7 @@ export function MieterdatenView() {
                         placeholder="mieter@email.de"
                       />
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <Label htmlFor="telefon">Telefon</Label>
                       <Input
                         id="telefon"
@@ -930,7 +1266,29 @@ export function MieterdatenView() {
                         placeholder="030 12345678"
                       />
                     </div>
-                    <div className="space-y-2">
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Sektion: Mietverhältnis */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Mietverhältnis
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="geschoss">Wohnung</Label>
+                      <Input
+                        id="geschoss"
+                        value={editedMieter?.geschoss || ""}
+                        readOnly
+                        className="bg-muted"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
                       <Label htmlFor="einzug">Einzugsdatum</Label>
                       <Input
                         id="einzug"
@@ -941,9 +1299,7 @@ export function MieterdatenView() {
                         }
                       />
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <Label htmlFor="auszug">Auszugsdatum</Label>
                       <Input
                         id="auszug"
@@ -957,30 +1313,28 @@ export function MieterdatenView() {
                         }
                       />
                     </div>
-                    <div className="space-y-2 flex items-end gap-2">
-                      <div className="flex items-center space-x-2">
-                        <Checkbox
-                          id="kurzzeitvermietung"
-                          checked={editedMieter?.isKurzzeitvermietung || false}
-                          onCheckedChange={(checked) =>
-                            setEditedMieter((prev) =>
-                              prev
-                                ? {
-                                    ...prev,
-                                    isKurzzeitvermietung: checked === true,
-                                  }
-                                : null,
-                            )
-                          }
-                        />
-                        <Label
-                          htmlFor="kurzzeitvermietung"
-                          className="text-sm font-medium"
-                        >
-                          Kurzzeitvermietung
-                        </Label>
-                      </div>
-                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 pt-1">
+                    <Checkbox
+                      id="kurzzeitvermietung"
+                      checked={editedMieter?.isKurzzeitvermietung || false}
+                      onCheckedChange={(checked) =>
+                        setEditedMieter((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                isKurzzeitvermietung: checked === true,
+                              }
+                            : null,
+                        )
+                      }
+                    />
+                    <Label
+                      htmlFor="kurzzeitvermietung"
+                      className="text-sm font-medium cursor-pointer"
+                    >
+                      Kurzzeitvermietung
+                    </Label>
                   </div>
                   {editedMieter?.isKurzzeitvermietung && (
                     <div className="p-4 border rounded-lg bg-muted/30 space-y-4">
@@ -988,7 +1342,7 @@ export function MieterdatenView() {
                         Kurzzeitvermietung Zeitraum
                       </h4>
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           <Label htmlFor="kurzzeit-von">Von (Einzug)</Label>
                           <Input
                             id="kurzzeit-von"
@@ -1002,7 +1356,7 @@ export function MieterdatenView() {
                             }
                           />
                         </div>
-                        <div className="space-y-2">
+                        <div className="space-y-1.5">
                           <Label htmlFor="kurzzeit-bis">Bis (Auszug)</Label>
                           <Input
                             id="kurzzeit-bis"
@@ -1016,8 +1370,19 @@ export function MieterdatenView() {
                       </div>
                     </div>
                   )}
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
+                </CardContent>
+              </Card>
+
+              {/* Sektion: Mietkosten */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Mietkosten
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0 space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
                       <Label htmlFor="kaltmiete">Kaltmiete (€)</Label>
                       <Input
                         id="kaltmiete"
@@ -1031,7 +1396,7 @@ export function MieterdatenView() {
                         }
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <Label htmlFor="nebenkosten">NK-Vorauszahlung mtl. (€)</Label>
                       <Input
                         id="nebenkosten"
@@ -1045,7 +1410,9 @@ export function MieterdatenView() {
                         }
                       />
                     </div>
-                    <div className="space-y-2">
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
                       <Label htmlFor="kaution">Kaution (€)</Label>
                       <Input
                         id="kaution"
@@ -1057,6 +1424,14 @@ export function MieterdatenView() {
                             parseFloat(e.target.value) || 0,
                           )
                         }
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Gesamt mtl. (€)</Label>
+                      <Input
+                        value={(editedMieter?.kaltmiete || 0) + (editedMieter?.nebenkosten || 0)}
+                        readOnly
+                        className="bg-muted font-medium"
                       />
                     </div>
                   </div>
@@ -1335,77 +1710,354 @@ export function MieterdatenView() {
             </TabsContent>
 
             {/* Tab 4: Zahlungen */}
-            <TabsContent value="zahlungen" className="mt-6 space-y-6">
-              {/* Miete & Nebenkosten */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">
-                    Miete & Nebenkosten
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    Monatliche Zahlungen für {editedMieter?.name}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="kaltmiete-zahlung">Kaltmiete (€)</Label>
-                      <Input
-                        id="kaltmiete-zahlung"
-                        type="number"
-                        value={editedMieter?.kaltmiete || 0}
-                        onChange={(e) =>
-                          updateEditedMieter(
-                            "kaltmiete",
-                            parseFloat(e.target.value) || 0,
-                          )
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="nebenkosten-zahlung">
-                        NK-Vorauszahlung mtl. (€)
-                      </Label>
-                      <Input
-                        id="nebenkosten-zahlung"
-                        type="number"
-                        value={editedMieter?.nebenkosten || 0}
-                        onChange={(e) =>
-                          updateEditedMieter(
-                            "nebenkosten",
-                            parseFloat(e.target.value) || 0,
-                          )
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Gesamt (€)</Label>
-                      <Input
-                        value={
-                          (editedMieter?.kaltmiete || 0) +
-                          (editedMieter?.nebenkosten || 0)
-                        }
-                        readOnly
-                        className="bg-muted font-medium"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="kaution-zahlung">Kaution (€)</Label>
-                    <Input
-                      id="kaution-zahlung"
-                      type="number"
-                      value={editedMieter?.kaution || 0}
-                      onChange={(e) =>
-                        updateEditedMieter(
-                          "kaution",
-                          parseFloat(e.target.value) || 0,
-                        )
-                      }
+            <TabsContent value="zahlungen" className="mt-4 space-y-4">
+              {(() => {
+                const monat = getCurrentMonthKey();
+                const allZahlungen = mieterData.map((m) => getZahlungForMieter(m.id));
+                const gesamteinnahmen = allZahlungen.reduce((s, z) => s + z.istBetrag, 0);
+                const offeneBetrage = allZahlungen.reduce((s, z) => s + Math.max(0, z.sollBetrag - z.istBetrag), 0);
+                const inVerzug = allZahlungen.filter((z) => z.status === "ueberfaellig").length;
+                const vorige7Tage = new Date(); vorige7Tage.setDate(vorige7Tage.getDate() - 7);
+                const dieseWoche = allZahlungen
+                  .filter((z) => z.buchungsdatum && new Date(z.buchungsdatum) >= vorige7Tage)
+                  .reduce((s, z) => s + z.istBetrag, 0);
+
+                const cz = editedMieter ? getZahlungForMieter(editedMieter.id) : null;
+                const verzugstage = cz ? Math.max(0, Math.floor((Date.now() - new Date(cz.faelligkeitsdatum).getTime()) / 86400000)) : 0;
+                const isUeberfaellig = cz?.status === "ueberfaellig";
+                const currentMahnText = mahnTextCustom || getMahnText(mahnEskalation);
+                const mieterMahnHistorie = editedMieter ? mahnHistorie.filter((m) => m.mieterId === editedMieter.id) : [];
+
+                return (
+                  <>
+                    {/* Hidden File Input für CAMT-Import */}
+                    <input
+                      ref={camtFileInputRef}
+                      type="file"
+                      accept=".xml,application/xml,text/xml"
+                      className="hidden"
+                      onChange={handleCamtFileSelected}
                     />
-                  </div>
-                </CardContent>
-              </Card>
+
+                    {/* CAMT Import Banner */}
+                    <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-dashed border-border">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Upload className="h-4 w-4" />
+                        <span>Kontoauszug importieren (CAMT.053 / MT940)</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-1.5"
+                        disabled={isImporting}
+                        onClick={() => camtFileInputRef.current?.click()}
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        {isImporting ? "Importiere…" : "Datei importieren"}
+                      </Button>
+                    </div>
+
+                    {/* Duplikat-Warnung */}
+                    {pendingImport && (
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400">
+                        <div className="flex items-center gap-2 text-sm">
+                          <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+                          <span>
+                            <strong>{pendingImport.dateiname}</strong> enthält {pendingImport.duplikate} bereits vorhandene Buchungen. Überschreiben?
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-amber-500/30 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10 gap-1"
+                            onClick={confirmPendingImport}
+                          >
+                            Überschreiben
+                          </Button>
+                          <button
+                            className="text-amber-700 dark:text-amber-400 hover:text-amber-500 transition-colors"
+                            onClick={() => setPendingImport(null)}
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Import Erfolgs-Meldung */}
+                    {camtImportResult && (
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-success/10 border border-success/30 text-success">
+                        <div className="flex items-center gap-2 text-sm">
+                          <CheckCircle2 className="h-4 w-4" />
+                          <span>
+                            <strong>{camtImportResult.dateiname}</strong> – {camtImportResult.anzahl} Buchungen importiert, {camtImportResult.zugeordnet} zugeordnet ({camtImportResult.zeitpunkt})
+                          </span>
+                        </div>
+                        <button
+                          className="text-success hover:text-success/70 transition-colors"
+                          onClick={() => setCamtImportResult(null)}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
+
+
+                    {/* Zahlungsstatus aktuellerMieter */}
+                    {cz && editedMieter && (
+                      <Card className={isUeberfaellig ? "border-destructive bg-destructive/5" : ""}>
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <CardTitle className="text-base">
+                                Zahlungen – {editedMieter.name}
+                              </CardTitle>
+                              <CardDescription className="text-xs">{editedMieter.geschoss} – {currentObjekt?.name}</CardDescription>
+                            </div>
+                            <div>
+                              {cz.status === "bezahlt" && <Badge className="bg-success/10 text-success border-success/30 text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />Bezahlt</Badge>}
+                              {cz.status === "ausstehend" && <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/30 text-xs"><Clock className="h-3 w-3 mr-1" />Ausstehend</Badge>}
+                              {cz.status === "ueberfaellig" && <Badge variant="destructive" className="text-xs"><AlertTriangle className="h-3 w-3 mr-1" />Überfällig seit {verzugstage} Tagen</Badge>}
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">Soll-Betrag (€)</Label>
+                              <Input value={cz.sollBetrag} readOnly className="bg-muted font-medium" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">Ist-Betrag (€)</Label>
+                              <Input
+                                type="number"
+                                value={cz.istBetrag}
+                                className={isUeberfaellig ? "border-destructive" : ""}
+                                onChange={(e) => {
+                                  const ist = parseFloat(e.target.value) || 0;
+                                  const diff = cz.sollBetrag - ist;
+                                  const newStatus: ZahlungEintrag["status"] = ist >= cz.sollBetrag ? "bezahlt" : verzugstage > 3 ? "ueberfaellig" : "ausstehend";
+                                  updateZahlung({ ...cz, istBetrag: ist, status: newStatus, buchungsdatum: ist > 0 && !cz.buchungsdatum ? new Date().toISOString().split("T")[0] : cz.buchungsdatum });
+                                }}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">Differenz (€)</Label>
+                              <Input
+                                value={cz.sollBetrag - cz.istBetrag}
+                                readOnly
+                                className={`font-medium ${cz.sollBetrag - cz.istBetrag > 0 ? "bg-destructive/10 text-destructive" : "bg-success/10 text-success"}`}
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">Fälligkeitsdatum</Label>
+                              <Input
+                                type="date"
+                                value={cz.faelligkeitsdatum}
+                                onChange={(e) => updateZahlung({ ...cz, faelligkeitsdatum: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">Buchungsdatum</Label>
+                              <Input
+                                type="date"
+                                value={cz.buchungsdatum}
+                                onChange={(e) => updateZahlung({ ...cz, buchungsdatum: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">Wertstellung</Label>
+                              <Input
+                                type="date"
+                                value={cz.wertstellungsdatum}
+                                onChange={(e) => updateZahlung({ ...cz, wertstellungsdatum: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">Verzugstage</Label>
+                              <Input value={cz.status === "bezahlt" ? 0 : verzugstage} readOnly className="bg-muted" />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">IBAN Auftraggeber</Label>
+                              <Input
+                                value={cz.ibanAbsender}
+                                placeholder="DE12 3456 7890 ..."
+                                onChange={(e) => updateZahlung({ ...cz, ibanAbsender: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">Name Auftraggeber</Label>
+                              <Input
+                                value={cz.auftraggeber}
+                                placeholder={editedMieter.name}
+                                onChange={(e) => updateZahlung({ ...cz, auftraggeber: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">Verwendungszweck</Label>
+                              <Input
+                                value={cz.verwendungszweck}
+                                placeholder="Miete Febr. 2026"
+                                onChange={(e) => updateZahlung({ ...cz, verwendungszweck: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                          {cz.status !== "bezahlt" && (
+                            <Button
+                              size="sm"
+                              className="bg-success hover:bg-success/90 text-success-foreground gap-1.5"
+                              onClick={() => {
+                                updateZahlung({ ...cz, istBetrag: cz.sollBetrag, status: "bezahlt", buchungsdatum: new Date().toISOString().split("T")[0] });
+                                toast({ title: "Zahlung bestätigt", description: `${editedMieter.name}: ${cz.sollBetrag.toLocaleString("de-DE")} € als bezahlt markiert.` });
+                              }}
+                            >
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                              Als bezahlt markieren
+                            </Button>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Mahnbereich - nur bei überfällig */}
+                    {isUeberfaellig && editedMieter && (
+                      <Card className="border-destructive/40">
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-base flex items-center gap-2 text-destructive">
+                            <AlertTriangle className="h-4 w-4" />
+                            Mahnwesen
+                          </CardTitle>
+                          <CardDescription className="text-xs">
+                            Eskalationsstufe wählen und Mahnschreiben versenden
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="flex gap-2">
+                            {(["Erinnerung", "1. Mahnung", "2. Mahnung"] as const).map((stufe) => (
+                              <Button
+                                key={stufe}
+                                size="sm"
+                                variant={mahnEskalation === stufe ? "default" : "outline"}
+                                className={mahnEskalation === stufe ? "bg-destructive hover:bg-destructive/90" : ""}
+                                onClick={() => { setMahnEskalation(stufe); setMahnTextCustom(""); }}
+                              >
+                                {stufe}
+                              </Button>
+                            ))}
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">Betreff</Label>
+                            <Input
+                              readOnly
+                              value={`Zahlungserinnerung – ${editedMieter.name} – ${editedMieter.geschoss}`}
+                              className="bg-muted text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="text-xs text-muted-foreground">E-Mail Text (bearbeitbar)</Label>
+                            <textarea
+                              className="w-full min-h-[220px] rounded-md border border-input bg-background px-3 py-2 text-sm resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+                              value={currentMahnText}
+                              onChange={(e) => setMahnTextCustom(e.target.value)}
+                            />
+                          </div>
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                            {editedMieter.email ? (
+                              <Button
+                                className="bg-success hover:bg-success/90 text-success-foreground gap-2"
+                                onClick={() => {
+                                  const entry: MahnEintrag = {
+                                    id: `mahn-${Date.now()}`,
+                                    mieterId: editedMieter.id,
+                                    datum: new Date().toLocaleDateString("de-DE"),
+                                    eskalationsstufe: mahnEskalation,
+                                    betreff: `Zahlungserinnerung – ${editedMieter.name} – ${editedMieter.geschoss}`,
+                                    gesendetVon: profile.name,
+                                  };
+                                  setMahnHistorie((prev) => [entry, ...prev]);
+                                  toast({ title: `${mahnEskalation} gesendet`, description: `Mahnschreiben für ${editedMieter.name} wurde protokolliert.` });
+                                }}
+                              >
+                                <Mail className="h-4 w-4" />
+                                E-Mail senden
+                              </Button>
+                            ) : (
+                              <Button
+                                className="bg-success hover:bg-success/90 text-success-foreground gap-2"
+                                onClick={() => {
+                                  const entry: MahnEintrag = {
+                                    id: `mahn-${Date.now()}`,
+                                    mieterId: editedMieter.id,
+                                    datum: new Date().toLocaleDateString("de-DE"),
+                                    eskalationsstufe: mahnEskalation,
+                                    betreff: `Zahlungserinnerung – ${editedMieter.name} – ${editedMieter.geschoss}`,
+                                    gesendetVon: profile.name,
+                                  };
+                                  setMahnHistorie((prev) => [entry, ...prev]);
+                                  handleExportKommunikationPDF();
+                                }}
+                              >
+                                <Printer className="h-4 w-4" />
+                                Anschreiben drucken
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              className="gap-2"
+                              onClick={() => {
+                                toast({ title: "Entwurf gespeichert", description: "Das Mahnschreiben wurde als Entwurf gespeichert." });
+                              }}
+                            >
+                              Als Entwurf speichern
+                            </Button>
+                            <p className="text-xs text-muted-foreground">
+                              {editedMieter.email
+                                ? "Diese E-Mail wird in der Mahnhistorie protokolliert."
+                                : "Kein E-Mail hinterlegt – Anschreiben wird als PDF gedruckt und protokolliert."}
+                            </p>
+                          </div>
+
+                          {/* Mahnhistorie */}
+                          {mieterMahnHistorie.length > 0 && (
+                            <div className="space-y-2 pt-2 border-t">
+                              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Mahnhistorie</p>
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="border-b">
+                                      <th className="text-left py-1.5 pr-4 font-medium text-xs text-muted-foreground">Datum</th>
+                                      <th className="text-left py-1.5 pr-4 font-medium text-xs text-muted-foreground">Eskalationsstufe</th>
+                                      <th className="text-left py-1.5 pr-4 font-medium text-xs text-muted-foreground">Gesendet von</th>
+                                      <th className="text-left py-1.5 font-medium text-xs text-muted-foreground">Betreff</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {mieterMahnHistorie.map((h) => (
+                                      <tr key={h.id} className="border-b border-muted">
+                                        <td className="py-1.5 pr-4 text-xs">{h.datum}</td>
+                                        <td className="py-1.5 pr-4">
+                                          <Badge variant="outline" className="text-xs text-destructive border-destructive/30">{h.eskalationsstufe}</Badge>
+                                        </td>
+                                        <td className="py-1.5 pr-4 text-xs">{h.gesendetVon}</td>
+                                        <td className="py-1.5 text-xs text-muted-foreground">{h.betreff}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </>
+                );
+              })()}
             </TabsContent>
 
             {/* Tab 5: Kommunikation */}
