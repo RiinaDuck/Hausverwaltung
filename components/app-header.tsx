@@ -5,13 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -26,6 +19,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -45,11 +43,14 @@ import {
   Calculator,
   User,
   Save,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import type { AppView } from "@/components/app-dashboard";
 import { useAppData } from "@/context/app-data-context";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 interface HelpSection {
   id: string;
@@ -506,6 +507,9 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
   const { toast } = useToast();
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [editedProfile, setEditedProfile] = useState(profile);
+  const [objektPopoverOpen, setObjektPopoverOpen] = useState(false);
+
+  const currentObjekt = objekte.find((o) => o.id === selectedObjektId);
 
   const handleOpenProfileDialog = () => {
     setEditedProfile({ ...profile });
@@ -548,25 +552,58 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
       </div>
       <div className="flex items-center gap-2 md:gap-4">
         {objekte.length > 0 && (
-          <div className="hidden sm:flex items-center gap-2">
-            <span className="text-sm text-muted-foreground hidden lg:inline">
-              Aktuelles Objekt:
-            </span>
-            <Select
-              value={selectedObjektId || ""}
-              onValueChange={setSelectedObjektId}
-            >
-              <SelectTrigger className="w-[140px] md:w-[200px] h-9">
-                <SelectValue placeholder="Objekt wählen" />
-              </SelectTrigger>
-              <SelectContent>
+          <div className="hidden sm:flex items-center">
+            <Popover open={objektPopoverOpen} onOpenChange={setObjektPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-10 gap-2 pl-3 pr-2 max-w-[260px]"
+                  role="combobox"
+                >
+                  <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="flex flex-col items-start text-left min-w-0">
+                    <span className="text-xs font-semibold leading-tight truncate max-w-[160px]">
+                      {currentObjekt ? currentObjekt.name : "Objekt wählen"}
+                    </span>
+                    {currentObjekt && (
+                      <span className="text-[10px] text-muted-foreground leading-tight truncate max-w-[160px]">
+                        {currentObjekt.adresse}
+                      </span>
+                    )}
+                  </div>
+                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-1" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-2" align="end">
+                <p className="text-xs font-medium text-muted-foreground px-2 py-1 mb-1">
+                  Objekt wechseln
+                </p>
                 {objekte.map((objekt) => (
-                  <SelectItem key={objekt.id} value={objekt.id}>
-                    {objekt.name}
-                  </SelectItem>
+                  <button
+                    key={objekt.id}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-2 py-2 rounded-md text-left hover:bg-accent transition-colors",
+                      objekt.id === selectedObjektId && "bg-accent",
+                    )}
+                    onClick={() => {
+                      setSelectedObjektId(objekt.id);
+                      setObjektPopoverOpen(false);
+                    }}
+                  >
+                    <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                      <Building2 className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{objekt.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{objekt.adresse}</p>
+                    </div>
+                    {objekt.id === selectedObjektId && (
+                      <Check className="h-4 w-4 text-primary shrink-0" />
+                    )}
+                  </button>
                 ))}
-              </SelectContent>
-            </Select>
+              </PopoverContent>
+            </Popover>
           </div>
         )}
         <Button variant="ghost" size="icon" className="h-9 w-9">

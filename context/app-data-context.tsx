@@ -438,8 +438,26 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [zaehler, setZaehler] = useState<Zaehler[]>([]);
   const [rauchmelder, setRauchmelder] = useState<Rauchmelder[]>([]);
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
-  const [selectedObjektId, setSelectedObjektId] = useState<string | null>(null);
+  const [selectedObjektId, setSelectedObjektIdState] = useState<string | null>(() => {
+    // Beim ersten Render: gespeichertes Objekt aus localStorage laden
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("selectedObjektId") ?? null;
+    }
+    return null;
+  });
   const [loading, setLoading] = useState(true);
+
+  // Wrapper: setzt State UND persistiert in localStorage
+  const setSelectedObjektId = (id: string | null) => {
+    setSelectedObjektIdState(id);
+    if (typeof window !== "undefined") {
+      if (id) {
+        localStorage.setItem("selectedObjektId", id);
+      } else {
+        localStorage.removeItem("selectedObjektId");
+      }
+    }
+  };
 
   // Konvertiert DB-Format zu App-Format
   const mapDBToObjekt = (dbObjekt: any): Objekt => ({
@@ -594,13 +612,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         }));
       setEhemaligeMieter(ehemalige);
 
-      // Wähle erstes Objekt aus wenn noch keins gewählt oder das gewählte nicht existiert
-      if (
-        !selectedObjektId ||
-        !objekteData.find((o: any) => o.id === selectedObjektId)
-      ) {
-        setSelectedObjektId(objekteData[0]?.id || null);
-      }
+      // Wähle gespeichertes Objekt wenn vorhanden, sonst erstes
+      const savedId = typeof window !== "undefined" ? localStorage.getItem("selectedObjektId") : null;
+      const validId = savedId && objekteData.find((o: any) => o.id === savedId)
+        ? savedId
+        : objekteData[0]?.id || null;
+      setSelectedObjektId(validId);
     } catch (error) {
       console.error("Error loading data from Supabase:", error);
     } finally {

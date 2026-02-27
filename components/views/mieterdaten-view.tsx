@@ -372,7 +372,7 @@ export function MieterdatenView() {
               `${editedMieter.kaltmiete.toLocaleString("de-DE")} €`,
             ],
             [
-              "Nebenkosten",
+              "NK-Vorauszahlung (mtl.)",
               `${editedMieter.nebenkosten.toLocaleString("de-DE")} €`,
             ],
             ["Kaution", `${editedMieter.kaution.toLocaleString("de-DE")} €`],
@@ -685,7 +685,7 @@ export function MieterdatenView() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="new-nebenkosten">Nebenkosten (€)</Label>
+                  <Label htmlFor="new-nebenkosten">NK-Vorauszahlung mtl. (€)</Label>
                   <Input
                     id="new-nebenkosten"
                     type="number"
@@ -1032,7 +1032,7 @@ export function MieterdatenView() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="nebenkosten">Nebenkosten (€)</Label>
+                      <Label htmlFor="nebenkosten">NK-Vorauszahlung mtl. (€)</Label>
                       <Input
                         id="nebenkosten"
                         type="number"
@@ -1364,7 +1364,7 @@ export function MieterdatenView() {
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="nebenkosten-zahlung">
-                        Nebenkosten (€)
+                        NK-Vorauszahlung mtl. (€)
                       </Label>
                       <Input
                         id="nebenkosten-zahlung"
@@ -1545,7 +1545,7 @@ export function MieterdatenView() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="new-nebenkosten">Nebenkosten (€)</Label>
+                <Label htmlFor="new-nebenkosten">NK-Vorauszahlung mtl. (€)</Label>
                 <Input
                   id="new-nebenkosten"
                   type="number"
@@ -1768,7 +1768,7 @@ export function MieterdatenView() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="historie-nebenkosten">Nebenkosten (€)</Label>
+                <Label htmlFor="historie-nebenkosten">NK-Vorauszahlung mtl. (€)</Label>
                 <Input
                   id="historie-nebenkosten"
                   type="number"

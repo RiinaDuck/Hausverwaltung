@@ -10,13 +10,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Table,
   TableBody,
   TableCell,
@@ -51,6 +44,8 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
     useAppData();
   const { isDemo } = useAuth();
   const { toast } = useToast();
+
+  const currentObjekt = objekte.find((o) => o.id === selectedObjektId);
 
   const handleDemoRestriction = (action: string) => {
     toast({
@@ -147,33 +142,15 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Header with Object Selector */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl md:text-2xl font-bold">Dashboard</h1>
+          <h1 className="text-xl md:text-2xl font-bold">
+            Dashboard{currentObjekt ? ` – ${currentObjekt.name}` : ""}
+          </h1>
           <p className="text-sm md:text-base text-muted-foreground">
             Willkommen zurück bei Hausverwaltung Boss
           </p>
-        </div>
-        <div className="flex items-center gap-2 sm:gap-3">
-          <span className="text-xs sm:text-sm text-muted-foreground hidden sm:inline">
-            Aktuelles Objekt:
-          </span>
-          <Select
-            value={selectedObjektId || ""}
-            onValueChange={setSelectedObjektId}
-          >
-            <SelectTrigger className="w-full sm:w-[220px]">
-              <SelectValue placeholder="Objekt wählen" />
-            </SelectTrigger>
-            <SelectContent>
-              {objekte.map((objekt) => (
-                <SelectItem key={objekt.id} value={objekt.id}>
-                  {objekt.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
 

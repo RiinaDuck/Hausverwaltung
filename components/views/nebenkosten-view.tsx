@@ -77,7 +77,7 @@ const EMPTY_FORM = {
 };
 
 export function NebenkostenView() {
-  const { objekte, expenses, selectedObjektId, setSelectedObjektId, addExpense, updateExpense, deleteExpense } =
+  const { objekte, expenses, selectedObjektId, addExpense, updateExpense, deleteExpense } =
     useAppData();
   const { toast } = useToast();
 
@@ -202,26 +202,7 @@ export function NebenkostenView() {
       {/* Filter-/Auswahlleiste */}
       <Card>
         <CardContent className="pt-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-            {/* Objekt */}
-            <div className="space-y-1">
-              <Label className="text-xs">Objekt</Label>
-              <Select
-                value={selectedObjektId ?? ""}
-                onValueChange={(v) => setSelectedObjektId(v)}
-              >
-                <SelectTrigger>
-                  <Building2 className="h-3.5 w-3.5 mr-1.5 text-muted-foreground" />
-                  <SelectValue placeholder="Objekt wählen" />
-                </SelectTrigger>
-                <SelectContent>
-                  {objekte.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>{o.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 items-end">
             {/* Kostenart-Filter */}
             <div className="space-y-1">
               <Label className="text-xs">Kostenart</Label>

@@ -41,7 +41,7 @@ export function AppDashboard({ onSwitchToLanding }: AppDashboardProps) {
       case "dashboard":
         return <DashboardView onNavigate={setCurrentView} />;
       case "objekte":
-        return <ObjektdatenView />;
+        return <ObjektdatenView onNavigate={setCurrentView} />;
       case "wohnungen":
         return <WohnungsdatenView />;
       case "mieter":

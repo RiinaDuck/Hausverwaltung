@@ -37,6 +37,7 @@ interface ObjektdatenViewProps {
 export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
   const {
     objekte,
+    wohnungen,
     addObjekt,
     updateObjekt,
     deleteObjekt,
@@ -387,7 +388,7 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant="outline">{objekt.einheiten} Einheiten</Badge>
+                  <Badge variant="outline">{wohnungen.filter((w) => w.objektId === objekt.id).length} Einheiten</Badge>
                   <Button
                     variant="ghost"
                     size="icon"
