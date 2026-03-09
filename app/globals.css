@@ -165,4 +165,8 @@
   .hover-glow {
     @apply transition-shadow duration-200 hover:shadow-md;
   }
+
+  .fade-out {
+    opacity: 0 !important;
+  }
 }

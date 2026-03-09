@@ -480,7 +480,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView)
   };
 
   const handleDeleteUnit = () => {
-    if (!selectedUnit || units.length <= 1) return;
+    if (!selectedUnit) return;
     deleteWohnung(selectedUnit.id);
     toast({
       title: "Einheit gelöscht",
@@ -766,7 +766,6 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView)
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={handleDeleteUnit}
-                    disabled={units.length <= 1}
                     className="text-destructive focus:text-destructive"
                   >
                     <Trash2 className="h-4 w-4 mr-2" />
@@ -1054,7 +1053,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView)
                 onChange={(e) =>
                   setNewUnit((prev) => ({ ...prev, lage: e.target.value }))
                 }
-                placeholder="z.B. 3.OG links"
+                placeholder="z.B. EG links"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1105,33 +1104,38 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView)
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-punkte">Punkte</Label>
+                <Label htmlFor="new-miete">Kaltmiete (€)</Label>
                 <Input
-                  id="new-punkte"
+                  id="new-miete"
                   type="number"
-                  value={newUnit.punkte}
+                  value={newUnit.miete}
                   onChange={(e) =>
                     setNewUnit((prev) => ({
                       ...prev,
-                      punkte: Number.parseInt(e.target.value) || 0,
+                      miete: Number.parseFloat(e.target.value) || 0,
                     }))
                   }
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="new-prozent">Prozentanteile</Label>
-                <Input
-                  id="new-prozent"
-                  type="number"
-                  step="0.1"
-                  value={newUnit.prozent}
-                  onChange={(e) =>
+                <Label htmlFor="new-status">Status</Label>
+                <Select
+                  value={newUnit.status}
+                  onValueChange={(value) =>
                     setNewUnit((prev) => ({
                       ...prev,
-                      prozent: Number.parseFloat(e.target.value) || 0,
+                      status: value as "frei" | "vermietet",
                     }))
                   }
-                />
+                >
+                  <SelectTrigger id="new-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="frei">Frei</SelectItem>
+                    <SelectItem value="vermietet">Vermietet</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </div>

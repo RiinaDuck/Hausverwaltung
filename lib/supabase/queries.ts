@@ -119,13 +119,17 @@ export async function getMieter(userId: string, wohnungId?: string) {
 
 export async function createMieter(mieter: any) {
   const supabase = createClient();
+  console.log("[createMieter] payload:", JSON.stringify(mieter));
   const { data, error } = await supabase
     .from("mieter")
     .insert(mieter)
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error("[createMieter] Supabase error:", error.message, error.code, error.details, error.hint);
+    throw error;
+  }
   return data;
 }
 

@@ -5,6 +5,7 @@ import { LandingPage } from "@/components/landing-page";
 import { AppDashboard } from "@/components/app-dashboard";
 import { AppDataProvider } from "@/context/app-data-context";
 import { AuthProvider, useAuth } from "@/context/auth-context";
+import { Toaster } from "@/components/ui/toaster";
 
 function ViewToggleContent() {
   const [view, setView] = useState<"landing" | "app">("landing");
@@ -39,9 +40,8 @@ function ViewToggleContent() {
   const handleSignup = async (
     email: string,
     password: string,
-    name: string,
   ): Promise<{ success: boolean; error?: string; needsEmailConfirmation?: boolean }> => {
-    const result = await signup(email, password, name);
+    const result = await signup(email, password);
     if (result.success) setView("app");
     return result;
   };
@@ -93,6 +93,7 @@ export function ViewToggle() {
   return (
     <AuthProvider>
       <ViewToggleContent />
+      <Toaster />
     </AuthProvider>
   );
 }

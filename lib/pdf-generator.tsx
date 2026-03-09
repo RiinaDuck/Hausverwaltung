@@ -4,10 +4,11 @@ import jsPDF from "jspdf";
 
 // Profil-Interface für den PDF-Header
 export interface PDFProfile {
-  name: string;
+  vorname: string;
+  nachname: string;
   email: string;
+  telefon: string;
   anschrift: string;
-  ansprechpartner: string;
 }
 
 interface PDFOptions {
@@ -48,7 +49,8 @@ export function generatePDF(options: PDFOptions) {
       doc.setFontSize(10);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(0);
-      doc.text(options.profile.name || "Hausverwaltung Boss", margin, y);
+      const fullName = `${options.profile.vorname} ${options.profile.nachname}`.trim() || "Hausverwaltung Boss";
+      doc.text(fullName, margin, y);
 
       doc.setFont("helvetica", "normal");
       doc.setTextColor(80);
@@ -62,9 +64,9 @@ export function generatePDF(options: PDFOptions) {
         doc.text(`E-Mail: ${options.profile.email}`, margin, y);
         y += 4;
       }
-      if (options.profile.ansprechpartner) {
+      if (options.profile.telefon) {
         doc.text(
-          `Ansprechpartner: ${options.profile.ansprechpartner}`,
+          `Tel: ${options.profile.telefon}`,
           margin,
           y,
         );

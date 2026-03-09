@@ -75,7 +75,7 @@ import {
 } from "@/lib/pdf-generator";
 import { useAppData } from "@/context/app-data-context";
 import type { ZahlungEintrag } from "@/context/app-data-context";
-import { useAuth } from "@/context/auth-context";
+import { useAuth, getFullName } from "@/context/auth-context";
 import { parseCamtXml, matchTransaktionToMieter } from "@/lib/parseCamt";
 import { createClient } from "@/lib/supabase/client";
 
@@ -268,6 +268,7 @@ export function MieterdatenView() {
   } | null>(null);
 
   const camtFileInputRef = useRef<HTMLInputElement>(null);
+  const [activeTab, setActiveTab] = useState("stammdaten");
 
   const { toast } = useToast();
 
@@ -367,6 +368,14 @@ export function MieterdatenView() {
     if (!selectedObjektId) return [];
     return wohnungen.filter((w) => w.objektId === selectedObjektId);
   }, [wohnungen, selectedObjektId]);
+
+  // Wohnungen ohne aktiven Mieter (für "Neuen Mieter anlegen")
+  const freieWohnungen = useMemo(() => {
+    const belegteIds = new Set(
+      mieter.filter((m) => m.isAktiv !== false).map((m) => m.wohnungId),
+    );
+    return availableWohnungen.filter((w) => !belegteIds.has(w.id));
+  }, [availableWohnungen, mieter]);
 
   const handleSave = async () => {
     if (!selectedMieter || !editedMieter) return;
@@ -634,12 +643,12 @@ export function MieterdatenView() {
         title: "Mieter angelegt",
         description: `${createdName} wurde erfolgreich angelegt.`,
       });
-    } catch (error) {
-      console.error("Error creating mieter:", error);
+    } catch (error: any) {
+      const msg = error?.message ?? JSON.stringify(error);
+      console.error("Error creating mieter:", msg, error?.code, error?.details, error?.hint, error?.stack);
       toast({
         title: "Fehler",
-        description:
-          "Mieter konnte nicht angelegt werden. Bitte versuchen Sie es erneut.",
+        description: msg || "Mieter konnte nicht angelegt werden. Bitte versuchen Sie es erneut.",
         variant: "destructive",
       });
     } finally {
@@ -718,18 +727,13 @@ export function MieterdatenView() {
       : eskalation === "1. Mahnung"
       ? "stellen wir Ihnen hiermit die erste Mahnung aus. Die"
       : "stellen wir Ihnen hiermit die zweite und letzte Mahnung aus. Die";
-    return `${anrede},\n\nwir ${prefix} die Mietzahlung für ${monatName} in Höhe von ${z.sollBetrag.toLocaleString("de-DE")} € auf unserem Konto bisher nicht eingegangen ist.\n\nFälligkeitsdatum: ${faelligDate.toLocaleDateString("de-DE")}\nAusstehender Betrag: ${diff.toLocaleString("de-DE")} €\n\nWir bitten Sie, den ausstehenden Betrag bis zum ${fristStr} zu überweisen.\n\nBei Rückfragen stehen wir Ihnen gerne zur Verfügung.\n\nMit freundlichen Grüßen,\n${profile.name}\n${currentObjekt?.adresse || ""}\n${currentObjekt?.objektdaten?.strasse || ""}`;
+    return `${anrede},\n\nwir ${prefix} die Mietzahlung für ${monatName} in Höhe von ${z.sollBetrag.toLocaleString("de-DE")} € auf unserem Konto bisher nicht eingegangen ist.\n\nFälligkeitsdatum: ${faelligDate.toLocaleDateString("de-DE")}\nAusstehender Betrag: ${diff.toLocaleString("de-DE")} €\n\nWir bitten Sie, den ausstehenden Betrag bis zum ${fristStr} zu überweisen.\n\nBei Rückfragen stehen wir Ihnen gerne zur Verfügung.\n\nMit freundlichen Grüßen,\n${getFullName(profile)}\n${currentObjekt?.adresse || ""}\n${currentObjekt?.objektdaten?.strasse || ""}`;
   };
 
-  // CAMT-Import Handler
-  const handleCamtFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Input zurücksetzen (damit dieselbe Datei nochmal geladen werden kann)
-    e.target.value = "";
-
+  // CAMT-Import: Datei verarbeiten (wird von handleCamtFileSelected und importFile genutzt)
+  const processImportFile = async (file: File) => {
     setIsImporting(true);
+    setActiveTab("zahlungen");
     try {
       const xmlString = await file.text();
       const transaktionen = parseCamtXml(xmlString);
@@ -739,11 +743,20 @@ export function MieterdatenView() {
 
       let zugeordnet = 0;
       let nichtZugeordnet = 0;
+      // Mieter-IDs, die eine eingehende Zahlung (CRDT) hatten
+      const bezahlteMieterIds = new Set<string>();
 
       const neueZahlungen: ZahlungEintrag[] = transaktionen.map((t) => {
         const match = matchTransaktionToMieter(t, mieterMatchList);
-        if (match) zugeordnet++;
-        else nichtZugeordnet++;
+        if (match) {
+          zugeordnet++;
+          // Nur eingehende Zahlungen (CRDT) zählen als "bezahlt"
+          if (t.cdtDbtInd === "CRDT") {
+            bezahlteMieterIds.add(match.mieterId);
+          }
+        } else {
+          nichtZugeordnet++;
+        }
 
         const mieterId = match?.mieterId ?? "unbekannt";
         const m = mieterData.find((x) => x.id === mieterId);
@@ -767,6 +780,30 @@ export function MieterdatenView() {
           status: t.betrag >= soll ? "bezahlt" : soll > 0 ? "ueberfaellig" : "offen",
         } as ZahlungEintrag;
       });
+
+      // Mieter ohne eingehende Zahlung im Kontoauszug als „überfällig" markieren
+      for (const m of mieterData) {
+        if (!bezahlteMieterIds.has(m.id)) {
+          const soll = m.kaltmiete + m.nebenkosten;
+          if (soll > 0) {
+            neueZahlungen.push({
+              id: `camt-nichtbezahlt-${m.id}-${monat}`,
+              mieterId: m.id,
+              monat,
+              faelligkeitsdatum: `${monat}-01`,
+              sollBetrag: soll,
+              istBetrag: 0,
+              buchungsdatum: "",
+              wertstellungsdatum: "",
+              verwendungszweck: "",
+              ibanAbsender: "",
+              auftraggeber: "",
+              referenz: "",
+              status: "ueberfaellig",
+            } as ZahlungEintrag);
+          }
+        }
+      }
 
       // Prüfe auf Duplikate (per ID oder per Buchungsdatum+Betrag+Auftraggeber)
       const duplikate = neueZahlungen.filter((nz) =>
@@ -796,7 +833,14 @@ export function MieterdatenView() {
     }
   };
 
-  // Import bestätigen (nach Duplikat-Warnung)
+  // CAMT-Import Handler (vom File-Input auf der Mieter-Seite)
+  const handleCamtFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    await processImportFile(file);
+  };
+
   const confirmPendingImport = async () => {
     if (!pendingImport) return;
     setIsImporting(true);
@@ -926,7 +970,7 @@ export function MieterdatenView() {
                     <SelectValue placeholder="Wohnung auswählen" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableWohnungen.map((w) => (
+                    {freieWohnungen.map((w) => (
                       <SelectItem key={w.id} value={w.id}>
                         {w.bezeichnung} ({w.flaeche} m²)
                       </SelectItem>
@@ -1152,7 +1196,7 @@ export function MieterdatenView() {
             </Button>
           </div>
 
-          <Tabs defaultValue="stammdaten" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 max-w-4xl h-auto">
               <TabsTrigger
                 value="stammdaten"
@@ -1978,7 +2022,7 @@ export function MieterdatenView() {
                                     datum: new Date().toLocaleDateString("de-DE"),
                                     eskalationsstufe: mahnEskalation,
                                     betreff: `Zahlungserinnerung – ${editedMieter.name} – ${editedMieter.geschoss}`,
-                                    gesendetVon: profile.name,
+                                    gesendetVon: getFullName(profile),
                                   };
                                   setMahnHistorie((prev) => [entry, ...prev]);
                                   toast({ title: `${mahnEskalation} gesendet`, description: `Mahnschreiben für ${editedMieter.name} wurde protokolliert.` });
@@ -1997,7 +2041,7 @@ export function MieterdatenView() {
                                     datum: new Date().toLocaleDateString("de-DE"),
                                     eskalationsstufe: mahnEskalation,
                                     betreff: `Zahlungserinnerung – ${editedMieter.name} – ${editedMieter.geschoss}`,
-                                    gesendetVon: profile.name,
+                                    gesendetVon: getFullName(profile),
                                   };
                                   setMahnHistorie((prev) => [entry, ...prev]);
                                   handleExportKommunikationPDF();
@@ -2127,7 +2171,7 @@ export function MieterdatenView() {
                   <SelectValue placeholder="Wohnung auswählen" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableWohnungen.map((w) => (
+                  {freieWohnungen.map((w) => (
                     <SelectItem key={w.id} value={w.id}>
                       {w.bezeichnung} ({w.flaeche} m²)
                     </SelectItem>

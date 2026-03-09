@@ -14,6 +14,7 @@ import { HausmanagerView } from "@/components/views/hausmanager-view";
 import { RechnungenView } from "@/components/views/rechnungen-view";
 import { StatistikenView } from "@/components/views/statistiken-view";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { OnboardingModal } from "@/components/onboarding-modal";
 
 export type AppView =
   | "dashboard"
@@ -36,14 +37,18 @@ export function AppDashboard({ onSwitchToLanding }: AppDashboardProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const isMobile = useIsMobile();
 
+  const handleNavigate = (view: AppView) => {
+    setCurrentView(view);
+  };
+
   const renderView = () => {
     switch (currentView) {
       case "dashboard":
-        return <DashboardView onNavigate={setCurrentView} />;
+        return <DashboardView onNavigate={handleNavigate} />;
       case "objekte":
-        return <ObjektdatenView onNavigate={setCurrentView} />;
+        return <ObjektdatenView onNavigate={handleNavigate} />;
       case "wohnungen":
-        return <WohnungsdatenView onNavigate={setCurrentView} />;
+        return <WohnungsdatenView onNavigate={handleNavigate} />;
       case "mieter":
         return <MieterdatenView />;
       case "nebenkosten":
@@ -59,15 +64,16 @@ export function AppDashboard({ onSwitchToLanding }: AppDashboardProps) {
       case "statistiken":
         return <StatistikenView />;
       default:
-        return <DashboardView onNavigate={setCurrentView} />;
+        return <DashboardView onNavigate={handleNavigate} />;
     }
   };
 
   return (
     <div className="min-h-screen flex bg-background">
+      <OnboardingModal />
       <AppSidebar
         currentView={currentView}
-        onNavigate={setCurrentView}
+        onNavigate={handleNavigate}
         onSwitchToLanding={onSwitchToLanding}
         isOpen={isMobile ? sidebarOpen : true}
         onClose={() => setSidebarOpen(false)}

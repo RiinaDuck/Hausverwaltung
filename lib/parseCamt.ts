@@ -17,6 +17,8 @@ export interface CamtTransaktion {
   betrag: number;
   /** Währungscode, z. B. "EUR" */
   waehrung: string;
+  /** Credit/Debit-Indikator: CRDT = Eingang, DBIT = Ausgang */
+  cdtDbtInd: "CRDT" | "DBIT";
   /** Name des Auftraggebers / Schuldners */
   auftraggeberName: string;
   /** IBAN des Auftraggebers / Schuldners */
@@ -159,6 +161,10 @@ export function parseCamtXml(xmlString: string): CamtTransaktion[] {
     const betrag = parseFloat(betragRaw.replace(",", ".")) || 0;
     const waehrung = amtEl?.getAttribute("Ccy") ?? "EUR";
 
+    // Credit/Debit-Indikator
+    const cdtDbtIndRaw = getText(ntry, "CdtDbtInd");
+    const cdtDbtInd: "CRDT" | "DBIT" = cdtDbtIndRaw === "DBIT" ? "DBIT" : "CRDT";
+
     // Buchungsdatum: <BookgDt><Dt>
     const bookgDtEl = getElement(ntry, "BookgDt");
     const buchungsdatum = bookgDtEl ? getText(bookgDtEl, "Dt") : "";
@@ -218,6 +224,7 @@ export function parseCamtXml(xmlString: string): CamtTransaktion[] {
       wertstellungsdatum,
       betrag,
       waehrung,
+      cdtDbtInd,
       auftraggeberName,
       auftraggeberIban,
       verwendungszweck,

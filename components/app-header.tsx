@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -509,6 +509,13 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
   const [editedProfile, setEditedProfile] = useState(profile);
   const [objektPopoverOpen, setObjektPopoverOpen] = useState(false);
 
+  // Erlaube Öffnen des Profil-Dialogs via Custom Event (z.B. vom Profil-Banner)
+  useEffect(() => {
+    const handler = () => handleOpenProfileDialog();
+    window.addEventListener("open-profile-dialog", handler);
+    return () => window.removeEventListener("open-profile-dialog", handler);
+  }, []);
+
   const currentObjekt = objekte.find((o) => o.id === selectedObjektId);
 
   const handleOpenProfileDialog = () => {
@@ -522,6 +529,14 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
         title: "Demo-Modus",
         description:
           "Im Demo-Modus können keine Änderungen gespeichert werden. Bitte melden Sie sich an, um Ihr Profil zu bearbeiten.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!editedProfile.vorname.trim() || !editedProfile.nachname.trim()) {
+      toast({
+        title: "Pflichtfelder fehlen",
+        description: "Bitte geben Sie Vor- und Nachname ein.",
         variant: "destructive",
       });
       return;
@@ -646,17 +661,31 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="profile-name">Name</Label>
-                <Input
-                  id="profile-name"
-                  value={editedProfile.name}
-                  onChange={(e) =>
-                    setEditedProfile({ ...editedProfile, name: e.target.value })
-                  }
-                  disabled={isDemo}
-                  placeholder="Ihr vollständiger Name"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="profile-vorname">Vorname <span className="text-destructive">*</span></Label>
+                  <Input
+                    id="profile-vorname"
+                    value={editedProfile.vorname}
+                    onChange={(e) =>
+                      setEditedProfile({ ...editedProfile, vorname: e.target.value })
+                    }
+                    disabled={isDemo}
+                    placeholder="Max"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="profile-nachname">Nachname <span className="text-destructive">*</span></Label>
+                  <Input
+                    id="profile-nachname"
+                    value={editedProfile.nachname}
+                    onChange={(e) =>
+                      setEditedProfile({ ...editedProfile, nachname: e.target.value })
+                    }
+                    disabled={isDemo}
+                    placeholder="Mustermann"
+                  />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="profile-email">E-Mail</Label>
@@ -664,14 +693,24 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
                   id="profile-email"
                   type="email"
                   value={editedProfile.email}
+                  readOnly
+                  className="bg-muted cursor-not-allowed"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="profile-telefon">Telefon</Label>
+                <Input
+                  id="profile-telefon"
+                  type="tel"
+                  value={editedProfile.telefon}
                   onChange={(e) =>
                     setEditedProfile({
                       ...editedProfile,
-                      email: e.target.value,
+                      telefon: e.target.value,
                     })
                   }
                   disabled={isDemo}
-                  placeholder="ihre@email.de"
+                  placeholder="+49 123 456789"
                 />
               </div>
               <div className="space-y-2">
@@ -687,21 +726,6 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
                   }
                   disabled={isDemo}
                   placeholder="Straße, PLZ Ort"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="profile-ansprechpartner">Ansprechpartner</Label>
-                <Input
-                  id="profile-ansprechpartner"
-                  value={editedProfile.ansprechpartner}
-                  onChange={(e) =>
-                    setEditedProfile({
-                      ...editedProfile,
-                      ansprechpartner: e.target.value,
-                    })
-                  }
-                  disabled={isDemo}
-                  placeholder="Name des Ansprechpartners"
                 />
               </div>
               <div className="pt-2 p-3 rounded-lg bg-muted/50">

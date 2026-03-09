@@ -12,10 +12,16 @@ import type { User } from "@supabase/supabase-js";
 
 // Profil-Interface
 export interface UserProfile {
-  name: string;
+  vorname: string;
+  nachname: string;
   email: string;
+  telefon: string;
   anschrift: string;
-  ansprechpartner: string;
+}
+
+// Hilfsfunktion: Voller Name aus Vor- und Nachname
+export function getFullName(p: UserProfile): string {
+  return [p.vorname, p.nachname].filter(Boolean).join(" ") || "User";
 }
 
 // Auth-Context-Interface
@@ -25,6 +31,8 @@ interface AuthContextType {
   isAdmin: boolean;
   user: User | null;
   profile: UserProfile;
+  needsOnboarding: boolean;
+  showProfileBanner: boolean;
   login: (
     email: string,
     password: string,
@@ -32,11 +40,13 @@ interface AuthContextType {
   signup: (
     email: string,
     password: string,
-    name: string,
   ) => Promise<{ success: boolean; error?: string; needsEmailConfirmation?: boolean }>;
   startDemo: () => void;
   logout: () => Promise<void>;
   updateProfile: (profile: Partial<UserProfile>) => void;
+  completeOnboarding: (data: { vorname: string; nachname: string; telefon: string; anschrift: string }) => Promise<void>;
+  dismissOnboarding: () => void;
+  dismissProfileBanner: () => void;
   getInitials: () => string;
   loading: boolean;
 }
@@ -45,18 +55,20 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Standard-Profil
 const defaultProfile: UserProfile = {
-  name: "Max Mustermann",
+  vorname: "Max",
+  nachname: "Mustermann",
   email: "admin@example.de",
+  telefon: "",
   anschrift: "Musterstraße 123, 12345 Berlin",
-  ansprechpartner: "Max Mustermann",
 };
 
 // Demo-Profil (nicht änderbar)
 const demoProfile: UserProfile = {
-  name: "Demo Benutzer",
+  vorname: "Demo",
+  nachname: "Benutzer",
   email: "demo@hausverwaltung-boss.de",
+  telefon: "",
   anschrift: "Demo-Straße 1, 00000 Demostadt",
-  ansprechpartner: "Demo Support",
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -68,6 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isDemo, setIsDemo] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const [profile, setProfile] = useState<UserProfile>(defaultProfile);
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [showProfileBanner, setShowProfileBanner] = useState(false);
 
   // Helper: Load from localStorage with fallback
   const loadFromStorage = <T,>(key: string, fallback: T): T => {
@@ -97,17 +111,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
+          const profileCompleted = session.user.user_metadata?.profile_completed === true;
+          setNeedsOnboarding(!profileCompleted);
+          const meta = session.user.user_metadata || {};
           setProfile({
-            name:
-              session.user.user_metadata?.name ||
-              session.user.email?.split("@")[0] ||
-              "User",
+            vorname: meta.vorname || meta.name?.split?.(/\s+/)?.[0] || session.user.email?.split("@")[0] || "User",
+            nachname: meta.nachname || meta.name?.split?.(/\s+/)?.slice?.(1)?.join?.(" ") || "",
             email: session.user.email || "",
-            anschrift: session.user.user_metadata?.anschrift || "",
-            ansprechpartner:
-              session.user.user_metadata?.ansprechpartner ||
-              session.user.user_metadata?.name ||
-              "",
+            telefon: meta.telefon || "",
+            anschrift: meta.anschrift || "",
           });
         }
       } catch (error) {
@@ -126,17 +138,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
 
       if (session?.user) {
+        const profileCompleted = session.user.user_metadata?.profile_completed === true;
+        setNeedsOnboarding(!profileCompleted);
+        const meta = session.user.user_metadata || {};
         setProfile({
-          name:
-            session.user.user_metadata?.name ||
-            session.user.email?.split("@")[0] ||
-            "User",
+          vorname: meta.vorname || meta.name?.split?.(/\s+/)?.[0] || session.user.email?.split("@")[0] || "User",
+          nachname: meta.nachname || meta.name?.split?.(/\s+/)?.slice?.(1)?.join?.(" ") || "",
           email: session.user.email || "",
-          anschrift: session.user.user_metadata?.anschrift || "",
-          ansprechpartner:
-            session.user.user_metadata?.ansprechpartner ||
-            session.user.user_metadata?.name ||
-            "",
+          telefon: meta.telefon || "",
+          anschrift: meta.anschrift || "",
         });
       }
       setLoading(false);
@@ -168,9 +178,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         id: "admin-user",
         email: "admin@hausverwaltung-boss.de",
         user_metadata: {
-          name: "Administrator",
+          vorname: "Admin",
+          nachname: "istrator",
           anschrift: "Admin-Straße 1, 00000 Admin",
-          ansprechpartner: "Administrator",
         },
       } as unknown as User;
 
@@ -178,10 +188,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsDemo(false);
       setIsAdmin(true);
       setProfile({
-        name: "Administrator",
+        vorname: "Admin",
+        nachname: "istrator",
         email: "admin@hausverwaltung-boss.de",
+        telefon: "",
         anschrift: "Admin-Straße 1, 00000 Admin",
-        ansprechpartner: "Administrator",
       });
       return { success: true };
     }
@@ -220,14 +231,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   // Signup mit Supabase Auth
-  const signup = async (email: string, password: string, name: string) => {
+  const signup = async (email: string, password: string) => {
   const supabase = createClient();
   if (!supabase) {
     return { success: false, error: "Supabase ist nicht konfiguriert" };
   }
 
     try {
-      // window.location.origin passt sich automatisch an (localhost:3000 lokal, hausverwaltungboss.de in Production)
       const siteUrl = `${window.location.origin}/auth/callback`;
 
       const { data, error } = await supabase.auth.signUp({
@@ -236,9 +246,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         options: {
           emailRedirectTo: siteUrl,
           data: {
-            name: name,
+            vorname: "",
+            nachname: "",
             anschrift: "",
-            ansprechpartner: name,
+            telefon: "",
           },
         },
       });
@@ -305,9 +316,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Update user metadata in Supabase
         await supabase.auth.updateUser({
           data: {
-            name: updatedProfile.name,
+            vorname: updatedProfile.vorname,
+            nachname: updatedProfile.nachname,
+            telefon: updatedProfile.telefon,
             anschrift: updatedProfile.anschrift,
-            ansprechpartner: updatedProfile.ansprechpartner,
           },
         });
       } catch (error) {
@@ -318,12 +330,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initialen aus dem Namen generieren
   const getInitials = (): string => {
-    const nameParts = profile.name.trim().split(/\s+/);
-    if (nameParts.length === 0 || !nameParts[0]) return "??";
-    if (nameParts.length === 1) {
-      return nameParts[0].substring(0, 2).toUpperCase();
+    const v = profile.vorname.trim();
+    const n = profile.nachname.trim();
+    if (v && n) return (v[0] + n[0]).toUpperCase();
+    if (v) return v.substring(0, 2).toUpperCase();
+    return "??";
+  };
+
+  // Onboarding abschließen: Profil speichern und Flag setzen
+  const completeOnboarding = async (data: { vorname: string; nachname: string; telefon: string; anschrift: string }) => {
+    const updatedProfile = { ...profile, ...data };
+    setProfile(updatedProfile);
+    setNeedsOnboarding(false);
+
+    if (supabase) {
+      try {
+        await supabase.auth.updateUser({
+          data: {
+            vorname: data.vorname,
+            nachname: data.nachname,
+            telefon: data.telefon,
+            anschrift: data.anschrift,
+            profile_completed: true,
+          },
+        });
+      } catch (error) {
+        console.error("Error completing onboarding:", error);
+      }
     }
-    return (nameParts[0][0] + nameParts[nameParts.length - 1][0]).toUpperCase();
+  };
+
+  // Onboarding überspringen (Modal schließen, aber Banner zeigen)
+  const dismissOnboarding = () => {
+    setNeedsOnboarding(false);
+    setShowProfileBanner(true);
+  };
+
+  // Banner permanent ausblenden
+  const dismissProfileBanner = () => {
+    setShowProfileBanner(false);
+    if (supabase) {
+      supabase.auth.updateUser({ data: { profile_completed: true } }).catch(console.error);
+    }
   };
 
   const isAuthenticated = !!user || isDemo;
@@ -336,11 +384,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin,
         user,
         profile,
+        needsOnboarding,
+        showProfileBanner,
         login,
         signup,
         startDemo,
         logout,
         updateProfile,
+        completeOnboarding,
+        dismissOnboarding,
+        dismissProfileBanner,
         getInitials,
         loading,
       }}

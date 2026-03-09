@@ -872,8 +872,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       });
 
       setMieter((prev) => [...prev, mapDBToMieter(created)]);
-    } catch (error) {
-      console.error("Error adding mieter:", error);
+    } catch (error: any) {
+      console.error("Error adding mieter:", error?.message ?? JSON.stringify(error), error?.code, error?.details, error?.hint, error?.stack);
       throw error;
     }
   };

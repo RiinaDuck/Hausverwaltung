@@ -249,7 +249,7 @@ export function AppSidebar({
                   </Avatar>
                 </TooltipTrigger>
                 <TooltipContent side="right">
-                  <p className="font-medium">{profile.name}</p>
+                  <p className="font-medium">{`${profile.vorname} ${profile.nachname}`.trim()}</p>
                   <p className="text-xs text-muted-foreground">
                     {profile.email}
                   </p>
@@ -263,7 +263,7 @@ export function AppSidebar({
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0 overflow-hidden">
-                  <p className="text-sm font-medium truncate">{profile.name}</p>
+                  <p className="text-sm font-medium truncate">{`${profile.vorname} ${profile.nachname}`.trim()}</p>
                   <p className="text-xs text-sidebar-foreground/60 truncate">
                     {profile.email}
                   </p>

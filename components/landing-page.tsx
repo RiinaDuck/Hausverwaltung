@@ -2,7 +2,9 @@
 
 
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { toast } from "@/hooks/use-toast";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -45,6 +47,7 @@ import {
   Receipt,
   Gauge,
   Briefcase,
+  Loader2,
 } from "lucide-react";
 
 interface LandingPageProps {
@@ -56,7 +59,6 @@ interface LandingPageProps {
   onSignup: (
     email: string,
     password: string,
-    name: string,
   ) => Promise<{ success: boolean; error?: string; needsEmailConfirmation?: boolean }>;
   onStartDemo: () => void;
 }
@@ -106,7 +108,76 @@ export function LandingPage({
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
   const [signupError, setSignupError] = useState("");
   const [signupPending, setSignupPending] = useState(false);
+  const [signupConfirmed, setSignupConfirmed] = useState(false);
   const [signupLoading, setSignupLoading] = useState(false);
+
+  // Polling: nach Registrierung alle 4s prüfen, ob E-Mail bestätigt wurde
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollingStartRef = useRef<number>(0);
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!signupPending || !signupEmail || !signupPassword) {
+      stopPolling();
+      return;
+    }
+
+    const TEN_MINUTES = 10 * 60 * 1000;
+    pollingStartRef.current = Date.now();
+
+    pollingRef.current = setInterval(async () => {
+      // Timeout nach 10 Minuten
+      if (Date.now() - pollingStartRef.current > TEN_MINUTES) {
+        stopPolling();
+        return;
+      }
+
+      try {
+        // Direkt über Supabase prüfen, ohne onLogin (das würde sofort die View wechseln)
+        const supabase = createClient();
+        if (!supabase) return;
+        const { data } = await supabase.auth.signInWithPassword({
+          email: signupEmail,
+          password: signupPassword,
+        });
+        if (data?.session) {
+          stopPolling();
+          // Credentials merken bevor State resettet wird
+          const email = signupEmail;
+          const password = signupPassword;
+          // Erfolgs-Zustand im Modal anzeigen
+          setSignupConfirmed(true);
+          setSignupPending(false);
+          setSignupError("");
+          // 2 Sekunden warten, dann via onLogin die View wechseln
+          setTimeout(async () => {
+            cleanupRadixLock();
+            setSignupDialogOpen(false);
+            setSignupEmail("");
+            setSignupPassword("");
+            setSignupConfirmPassword("");
+            setSignupConfirmed(false);
+            // onLogin prüft die bestehende Session und leitet weiter
+            await onLogin(email, password);
+            toast({
+              title: "Willkommen!",
+              description: "Ihr Konto ist bereit. Viel Spaß!",
+            });
+          }, 2000);
+        }
+      } catch {
+        // Fehler ignorieren, beim nächsten Intervall erneut versuchen
+      }
+    }, 4000);
+
+    return () => stopPolling();
+  }, [signupPending, signupEmail, signupPassword, onLogin, stopPolling]);
 
   const handleLogin = async () => {
     setLoginError("");
@@ -150,9 +221,7 @@ export function LandingPage({
     }
 
     setSignupLoading(true);
-    // Verwende E-Mail-Präfix als Namen (vor dem @)
-    const name = signupEmail.split("@")[0] || "Benutzer";
-    const result = await onSignup(signupEmail, signupPassword, name);
+    const result = await onSignup(signupEmail, signupPassword);
     setSignupLoading(false);
 
     if (result.success) {
@@ -338,15 +407,16 @@ export function LandingPage({
                 setLoginDialogOpen(true);
               }}
             >
-              Anmelden
+              Anmelden/ Registrieren
             </Button>
             <Button
               size="sm"
               onClick={handleStartDemo}
               className="bg-success hover:bg-success/90 text-success-foreground"
             >
-              <span className="hidden sm:inline">Jetzt starten</span>
-              <span className="sm:hidden">Start</span>
+              <span className="hidden sm:inline">Demo starten</span>
+              <span className="sm:hidden">Demo</span>
+              <ArrowRight className="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"
@@ -392,7 +462,7 @@ export function LandingPage({
               setLoginDialogOpen(true);
             }}
             >
-              Anmelden
+              Anmelden/ Registrieren
             </Button>
           </div>
         )}
@@ -473,6 +543,8 @@ export function LandingPage({
       <Dialog
             open={signupDialogOpen}
             onOpenChange={(open) => {
+              // Während Erfolgs-Animation nicht schließen lassen
+              if (signupConfirmed) return;
               cleanupRadixLock();
               setSignupDialogOpen(open);
               if (!open) {
@@ -482,6 +554,55 @@ export function LandingPage({
             }}
           >
         <DialogContent className="sm:max-w-md">
+          {/* Warte-Zustand: Spinner + Text */}
+          {signupPending && !signupConfirmed && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Konto erstellen</DialogTitle>
+                <DialogDescription>
+                  Erstellen Sie ein kostenloses Konto und starten Sie sofort.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex flex-col items-center justify-center py-10 space-y-4">
+                <Loader2 className="h-10 w-10 text-success animate-spin" />
+                <p className="text-sm font-medium text-muted-foreground">
+                  Warte auf E-Mail-Bestätigung...
+                </p>
+                <p className="text-xs text-muted-foreground text-center max-w-xs">
+                  Bitte klicken Sie auf den Bestätigungslink in der E-Mail, die an{" "}
+                  <span className="font-medium text-foreground">{signupEmail}</span>{" "}
+                  gesendet wurde.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setSignupDialogOpen(false);
+                  setSignupEmail("");
+                  setSignupPassword("");
+                  setSignupConfirmPassword("");
+                  setSignupPending(false);
+                  setSignupError("");
+                }}
+              >
+                Schließen
+              </Button>
+            </>
+          )}
+          {/* Erfolgs-Zustand: Checkmark + Text */}
+          {signupConfirmed && (
+            <div className="flex flex-col items-center justify-center py-12 space-y-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-success/10">
+                <CheckCircle2 className="h-10 w-10 text-success" />
+              </div>
+              <p className="text-lg font-semibold">E-Mail bestätigt!</p>
+              <p className="text-sm text-muted-foreground">Sie werden gleich weitergeleitet...</p>
+            </div>
+          )}
+          {/* Normaler Formular-Zustand */}
+          {!signupPending && !signupConfirmed && (
+            <>
           <DialogHeader>
             <DialogTitle>Konto erstellen</DialogTitle>
             <DialogDescription>
@@ -525,17 +646,10 @@ export function LandingPage({
               />
             </div>
             {signupError && (
-              <div
-                className={`text-sm rounded-md p-3 ${
-                  signupPending
-                    ? "bg-green-50 text-green-800 border border-green-200 dark:bg-green-950 dark:text-green-200 dark:border-green-800"
-                    : "text-destructive"
-                }`}
-              >
+              <div className="text-sm text-destructive">
                 {signupError}
               </div>
             )}
-            {!signupPending && (
               <Button
                 className="w-full"
                 onClick={handleSignup}
@@ -543,23 +657,6 @@ export function LandingPage({
               >
                 {signupLoading ? "Wird erstellt..." : "Konto erstellen"}
               </Button>
-            )}
-            {signupPending && (
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => {
-                  setSignupDialogOpen(false);
-                  setSignupEmail("");
-                  setSignupPassword("");
-                  setSignupConfirmPassword("");
-                  setSignupPending(false);
-                  setSignupError("");
-                }}
-              >
-                Schließen
-              </Button>
-            )}
             <div className="text-center text-sm text-muted-foreground">
               Bereits ein Konto?{" "}
               <button
@@ -574,6 +671,8 @@ export function LandingPage({
               </button>
             </div>
           </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 
