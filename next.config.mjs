@@ -1,4 +1,6 @@
 import bundleAnalyzer from "@next/bundle-analyzer";
+import { resolve } from "path";
+import { fileURLToPath } from "url";
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
@@ -6,15 +8,15 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ["nodemailer", "resend", "svix", "postal-mime"],
   turbopack: {
-    root: "C:\\Users\\CC-Student\\hausverwaltung",
+    // pnpm virtual store uses lowercase "hausverwaltung" path; going up one level
+    // ensures Turbopack's case-sensitive root check passes for the symlink targets
+    root: resolve(fileURLToPath(import.meta.url), "..", ".."),
   },
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
-  },
-  turbopack: {
-    root: "C:\\Users\\CC-Student\\hausverwaltung",
   },
   // Security Headers
   async headers() {

@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, CheckCircle2, AlertTriangle, X, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 import { useAppData } from "@/context/app-data-context";
+import { useToast } from "@/hooks/use-toast";
 import type { ZahlungEintrag } from "@/context/app-data-context";
 import { createClient } from "@/lib/supabase/client";
-import { parseCamtXml, matchTransaktionToMieter } from "@/lib/parseCamt";
+import { parseDatevCsv, matchDatevToMieter, getMonatFromBelegdatum } from "@/lib/parseDatev";
 import type { AppView } from "@/components/app-dashboard";
 
 interface ImportErinnerungBannerProps {
@@ -46,8 +47,9 @@ function getMonatsname(monat: number): string {
 }
 
 export function ImportErinnerungBanner({ onNavigate, statusContainer }: ImportErinnerungBannerProps) {
-  const { isDemo, user } = useAuth();
+  const { isDemo, isAdmin, user } = useAuth();
   const { mieter, wohnungen, selectedObjektId, zahlungen, setZahlungen } = useAppData();
+  const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [letzterImport, setLetzterImport] = useState<string | null>(null);
   const [ersterImportDiesenMonat, setErsterImportDiesenMonat] = useState<string | null>(null);
@@ -98,7 +100,7 @@ export function ImportErinnerungBanner({ onNavigate, statusContainer }: ImportEr
 
   useEffect(() => {
     async function loadImportStatus() {
-      if (isDemo || !user?.id) {
+      if (isDemo || isAdmin || !user?.id) {
         setLetzterImport(null);
         setErsterImportDiesenMonat(null);
         setImportNachSechstem(null);
@@ -160,7 +162,7 @@ export function ImportErinnerungBanner({ onNavigate, statusContainer }: ImportEr
     }
 
     loadImportStatus();
-  }, [isDemo, user?.id]);
+  }, [isDemo, isAdmin, user?.id]);
 
   // ── Import-Logik ──────────────────────────────────────────────────────
   const getCurrentMonthKey = () => {
@@ -179,8 +181,7 @@ export function ImportErinnerungBanner({ onNavigate, statusContainer }: ImportEr
     setErrorResult(null);
 
     try {
-      const xmlString = await file.text();
-      const transaktionen = parseCamtXml(xmlString);
+      const { buchungen } = await parseDatevCsv(file);
 
       const mieterMatchList = aktiveMieter.map((m) => ({ id: m.id, name: m.name }));
       const monat = getCurrentMonthKey();
@@ -189,39 +190,40 @@ export function ImportErinnerungBanner({ onNavigate, statusContainer }: ImportEr
       let nichtZugeordnet = 0;
       const bezahlteMieterIds = new Set<string>();
 
-      const neueZahlungen: ZahlungEintrag[] = transaktionen.map((t) => {
-        const match = matchTransaktionToMieter(t, mieterMatchList);
-        if (match) {
-          zugeordnet++;
-          if (t.cdtDbtInd === "CRDT") {
+      const neueZahlungen: ZahlungEintrag[] = buchungen
+        .filter((b) => b.sollHaben === "H") // Nur Haben-Buchungen (Einnahmen)
+        .map((b) => {
+          const match = matchDatevToMieter(b, mieterMatchList);
+          if (match) {
+            zugeordnet++;
             bezahlteMieterIds.add(match.mieterId);
+          } else {
+            nichtZugeordnet++;
           }
-        } else {
-          nichtZugeordnet++;
-        }
 
-        const mieterId = match?.mieterId ?? "unbekannt";
-        const m = aktiveMieter.find((x) => x.id === mieterId);
-        const soll = m ? m.kaltmiete + m.nebenkosten : 0;
+          const mieterId = match?.mieterId ?? "unbekannt";
+          const m = aktiveMieter.find((x) => x.id === mieterId);
+          const soll = m ? m.kaltmiete + m.nebenkosten : 0;
+          const belegMonat = getMonatFromBelegdatum(b.belegdatum) || monat;
 
-        return {
-          id: t.endToEndId && t.endToEndId !== "NOTPROVIDED"
-            ? t.endToEndId
-            : `camt-${t.buchungsdatum}-${t.betrag}-${(t.auftraggeberName || "").replace(/\s/g, "").slice(0, 20)}`,
-          mieterId,
-          monat,
-          faelligkeitsdatum: `${monat}-01`,
-          sollBetrag: soll,
-          istBetrag: t.betrag,
-          buchungsdatum: t.buchungsdatum,
-          wertstellungsdatum: t.wertstellungsdatum,
-          verwendungszweck: t.verwendungszweck,
-          ibanAbsender: t.auftraggeberIban,
-          auftraggeber: t.auftraggeberName,
-          referenz: t.endToEndId,
-          status: t.betrag >= soll ? "bezahlt" : soll > 0 ? "ueberfaellig" : "offen",
-        } as ZahlungEintrag;
-      });
+          return {
+            id: b.belegfeld1
+              ? `datev-${b.belegfeld1}`
+              : `datev-${b.belegdatum}-${b.umsatz}-${b.buchungstext.replace(/\s/g, "").slice(0, 20)}`,
+            mieterId,
+            monat: belegMonat,
+            faelligkeitsdatum: `${belegMonat}-01`,
+            sollBetrag: soll,
+            istBetrag: b.umsatz,
+            buchungsdatum: b.belegdatum,
+            wertstellungsdatum: b.belegdatum,
+            verwendungszweck: b.buchungstext,
+            ibanAbsender: "",
+            auftraggeber: b.buchungstext,
+            referenz: b.belegfeld1,
+            status: b.umsatz >= soll ? "bezahlt" : soll > 0 ? "ueberfaellig" : "offen",
+          } as ZahlungEintrag;
+        });
 
       // Mieter ohne eingehende Zahlung als überfällig markieren
       for (const m of aktiveMieter) {
@@ -229,7 +231,7 @@ export function ImportErinnerungBanner({ onNavigate, statusContainer }: ImportEr
           const soll = m.kaltmiete + m.nebenkosten;
           if (soll > 0) {
             neueZahlungen.push({
-              id: `camt-nichtbezahlt-${m.id}-${monat}`,
+              id: `datev-offen-${m.id}-${monat}`,
               mieterId: m.id,
               monat,
               faelligkeitsdatum: `${monat}-01`,
@@ -250,8 +252,10 @@ export function ImportErinnerungBanner({ onNavigate, statusContainer }: ImportEr
       // Duplikat-Prüfung
       const duplikate = neueZahlungen.filter((nz) =>
         zahlungen.some((z) =>
-          z.id === nz.id ||
-          (z.buchungsdatum === nz.buchungsdatum && z.istBetrag === nz.istBetrag && z.auftraggeber === nz.auftraggeber && z.buchungsdatum !== "")
+          // Buchungen: gleicher Zeitstempel, Betrag und Auftraggeber
+          (nz.buchungsdatum !== "" && z.buchungsdatum === nz.buchungsdatum && z.istBetrag === nz.istBetrag && z.auftraggeber === nz.auftraggeber) ||
+          // Offen-Einträge: gleicher Mieter und Monat
+          (nz.buchungsdatum === "" && z.buchungsdatum === "" && z.mieterId === nz.mieterId && z.monat === nz.monat)
         )
       ).length;
 
@@ -271,7 +275,7 @@ export function ImportErinnerungBanner({ onNavigate, statusContainer }: ImportEr
     } catch (err) {
       setErrorResult({
         type: "error",
-        message: err instanceof Error ? err.message : "Unbekannter Fehler beim Parsen der CAMT-Datei.",
+        message: err instanceof Error ? err.message : "Unbekannter Fehler beim Parsen der DATEV-Datei.",
       });
     } finally {
       setIsImporting(false);
@@ -279,6 +283,7 @@ export function ImportErinnerungBanner({ onNavigate, statusContainer }: ImportEr
   };
 
   const executeImport = async (dateiname: string, neueZahlungen: ZahlungEintrag[], zugeordnet: number) => {
+    // In-memory state immer befüllen (für Sofortanzeige)
     setZahlungen((prev) => {
       const updated = [...prev];
       for (const nz of neueZahlungen) {
@@ -289,12 +294,19 @@ export function ImportErinnerungBanner({ onNavigate, statusContainer }: ImportEr
       return updated;
     });
 
-    if (!isDemo && user?.id) {
+    if (isDemo || isAdmin || !user?.id) {
+      // Kein echter Supabase-User – nur temporär im Speicher
+      toast({
+        title: "Import temporär gespeichert",
+        description: "Im Admin-Modus werden Daten nicht dauerhaft gespeichert. Bitte registrieren Sie sich für persistenten Datenzugriff.",
+        variant: "destructive",
+      });
+    } else {
       try {
         const supabase = createClient();
         if (supabase) {
           const supabaseRows = neueZahlungen.map((z) => ({
-            id: z.id,
+            id: crypto.randomUUID(), // Immer neue UUID – keine datev-xyz IDs als PK!
             user_id: user.id,
             mieter_id: z.mieterId !== "unbekannt" ? z.mieterId : null,
             monat: z.monat,
@@ -312,14 +324,22 @@ export function ImportErinnerungBanner({ onNavigate, statusContainer }: ImportEr
 
           const { error: supabaseError } = await supabase
             .from("zahlungen")
-            .upsert(supabaseRows, { onConflict: "id" });
+            .insert(supabaseRows);
 
           if (supabaseError) {
-            console.warn("Supabase upsert fehlgeschlagen:", supabaseError.message);
+            toast({
+              title: "Speichern fehlgeschlagen",
+              description: `Supabase: ${supabaseError.message}`,
+              variant: "destructive",
+            });
           }
         }
       } catch (err) {
-        console.warn("Supabase Persistierung fehlgeschlagen:", err);
+        toast({
+          title: "Speichern fehlgeschlagen",
+          description: err instanceof Error ? err.message : "Verbindungsfehler zu Supabase",
+          variant: "destructive",
+        });
       }
     }
 
@@ -373,12 +393,12 @@ export function ImportErinnerungBanner({ onNavigate, statusContainer }: ImportEr
           card: "border-green-200 bg-green-50",
           iconBg: "bg-green-100",
           iconColor: "text-green-600",
-          button: "",
+          button: "border-green-300 text-green-700 hover:bg-green-100",
         },
         icon: <CheckCircle2 className="h-5 w-5" />,
         titel: "Bankdaten aktuell",
         text: `Letzter Import: ${formatDatum(importNachSechstem)}`,
-        buttonText: null,
+        buttonText: "Aktualisieren",
       };
     }
 
@@ -404,12 +424,12 @@ export function ImportErinnerungBanner({ onNavigate, statusContainer }: ImportEr
         card: "border-green-200 bg-green-50",
         iconBg: "bg-green-100",
         iconColor: "text-green-600",
-        button: "",
+        button: "border-green-300 text-green-700 hover:bg-green-100",
       },
       icon: <CheckCircle2 className="h-5 w-5" />,
       titel: "Import erfolgreich",
       text: `Letzter Import: ${formatDatum(letzterImport)}. Ab dem 6. erneut importieren um Verzug zu erkennen.`,
-      buttonText: null,
+      buttonText: "Aktualisieren",
     };
   }, [letzterImport, importNachSechstem]);
 
@@ -499,7 +519,7 @@ export function ImportErinnerungBanner({ onNavigate, statusContainer }: ImportEr
           <input
             ref={fileInputRef}
             type="file"
-            accept=".xml,application/xml,text/xml"
+            accept=".csv,text/csv"
             className="hidden"
             onChange={handleFileSelected}
           />

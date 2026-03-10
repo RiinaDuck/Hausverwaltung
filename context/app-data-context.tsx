@@ -215,7 +215,7 @@ export interface ZahlungEintrag {
   ibanAbsender: string;
   auftraggeber: string;
   referenz: string;
-  status: "bezahlt" | "ausstehend" | "ueberfaellig";
+  status: "bezahlt" | "ausstehend" | "offen" | "ueberfaellig";
 }
 
 interface AppDataContextType {
@@ -458,20 +458,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [zaehler, setZaehler] = useState<Zaehler[]>([]);
   const [rauchmelder, setRauchmelder] = useState<Rauchmelder[]>([]);
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
-  const [zahlungenState, setZahlungenState] = useState<ZahlungEintrag[]>(() => {
-    const heute = new Date();
-    const monat = `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, "0")}`;
-    return [
-      {
-        id: "z1", mieterId: "demo-1", monat,
-        faelligkeitsdatum: `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, "0")}-03`,
-        sollBetrag: 0, istBetrag: 0,
-        buchungsdatum: "", wertstellungsdatum: "",
-        verwendungszweck: "", ibanAbsender: "", auftraggeber: "", referenz: "",
-        status: "ausstehend" as const,
-      },
-    ];
-  });
+  const [zahlungenState, setZahlungenState] = useState<ZahlungEintrag[]>([]);
   const [selectedObjektId, setSelectedObjektIdState] = useState<string | null>(() => {
     // Beim ersten Render: gespeichertes Objekt aus localStorage laden
     if (typeof window !== "undefined") {
@@ -646,6 +633,37 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
           letztesAuszugsDatum: m.mieteBis || m.einzugsDatum,
         }));
       setEhemaligeMieter(ehemalige);
+
+      // Zahlungen laden (für Dashboard-Anzeige beim initialen Laden)
+      try {
+        const { createClient } = await import("@/lib/supabase/client");
+        const supabase = createClient();
+        if (supabase) {
+          const { data: zahlungenData } = await supabase
+            .from("zahlungen")
+            .select("*")
+            .order("buchungsdatum", { ascending: false });
+          if (zahlungenData && zahlungenData.length > 0) {
+            setZahlungenState(zahlungenData.map((row: any) => ({
+              id: row.id,
+              mieterId: row.mieter_id ?? "unbekannt",
+              monat: row.monat ?? "",
+              faelligkeitsdatum: row.monat ? `${row.monat}-01` : "",
+              sollBetrag: row.soll_betrag ?? 0,
+              istBetrag: row.betrag ?? 0,
+              buchungsdatum: row.buchungsdatum ?? "",
+              wertstellungsdatum: row.wertstellungsdatum ?? "",
+              verwendungszweck: row.verwendungszweck ?? "",
+              ibanAbsender: row.auftraggeber_iban ?? "",
+              auftraggeber: row.auftraggeber_name ?? "",
+              referenz: row.zahlungsreferenz ?? "",
+              status: (row.status as ZahlungEintrag["status"]) ?? "offen",
+            })));
+          }
+        }
+      } catch {
+        // Zahlungen konnten nicht geladen werden – ignorieren, Dashboard zeigt grün
+      }
 
       // Wähle gespeichertes Objekt wenn vorhanden, sonst erstes
       const savedId = typeof window !== "undefined" ? localStorage.getItem("selectedObjektId") : null;

@@ -63,6 +63,8 @@ import {
   ChevronDown,
   Printer,
   X,
+  FileText,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -76,7 +78,7 @@ import {
 import { useAppData } from "@/context/app-data-context";
 import type { ZahlungEintrag } from "@/context/app-data-context";
 import { useAuth, getFullName } from "@/context/auth-context";
-import { parseCamtXml, matchTransaktionToMieter } from "@/lib/parseCamt";
+import { parseDatevCsv, matchDatevToMieter, getMonatFromBelegdatum } from "@/lib/parseDatev";
 import { createClient } from "@/lib/supabase/client";
 
 // Zahlungs-Interfaces
@@ -87,6 +89,17 @@ interface MahnEintrag {
   eskalationsstufe: "Erinnerung" | "1. Mahnung" | "2. Mahnung";
   betreff: string;
   gesendetVon: string;
+}
+
+interface MieterEvent {
+  id: string;
+  user_id: string;
+  mieter_id: string;
+  event_type: string;
+  title: string;
+  description?: string | null;
+  created_by?: string | null;
+  created_at: string;
 }
 
 // Lokales Interface für die Ansicht (kombiniert Mieter + Wohnungsdaten)
@@ -128,7 +141,7 @@ export function MieterdatenView() {
     zahlungen,
     setZahlungen,
   } = useAppData();
-  const { isDemo, profile, user } = useAuth();
+  const { isDemo, profile, user, isAdmin } = useAuth();
 
   // Finde das aktuelle Objekt für den Namen
   const currentObjekt = objekte.find((o) => o.id === selectedObjektId);
@@ -253,10 +266,11 @@ export function MieterdatenView() {
   const [mahnEskalation, setMahnEskalation] = useState<"Erinnerung" | "1. Mahnung" | "2. Mahnung">("Erinnerung");
   const [mahnTextCustom, setMahnTextCustom] = useState("");
   const [isImporting, setIsImporting] = useState(false);
-  const [camtImportResult, setCamtImportResult] = useState<{
+  const [datevImportResult, setDatevImportResult] = useState<{
     dateiname: string;
     anzahl: number;
     zugeordnet: number;
+    offen: number;
     zeitpunkt: string;
   } | null>(null);
   const [pendingImport, setPendingImport] = useState<{
@@ -267,8 +281,16 @@ export function MieterdatenView() {
     duplikate: number;
   } | null>(null);
 
-  const camtFileInputRef = useRef<HTMLInputElement>(null);
+  const datevFileInputRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState("stammdaten");
+
+  // Timeline-State
+  const [events, setEvents] = useState<MieterEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventFilter, setEventFilter] = useState<string>("alle");
+  const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
+  const [newNoteText, setNewNoteText] = useState("");
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   const { toast } = useToast();
 
@@ -307,19 +329,22 @@ export function MieterdatenView() {
     }
   }, [selectedMieter]);
 
-  // Zahlungen beim Start aus Supabase laden (nur wenn NICHT Demo-Modus)
+  // Zahlungen beim Start aus Supabase laden (nur wenn NICHT Demo-Modus und NICHT Admin)
   useEffect(() => {
-    if (!selectedObjektId || isDemo) return;
+    if (!selectedObjektId || isDemo || isAdmin) return;
     const loadZahlungen = async () => {
       try {
         const supabase = createClient();
-        if (!supabase) return;
+        if (!supabase) {
+          toast({ title: "Supabase nicht konfiguriert", description: "Zahlungen konnten nicht geladen werden.", variant: "destructive" });
+          return;
+        }
         const { data, error } = await supabase
           .from("zahlungen")
           .select("*")
           .order("buchungsdatum", { ascending: false });
         if (error) {
-          console.warn("Zahlungen konnten nicht geladen werden:", error.message);
+          toast({ title: "Laden fehlgeschlagen", description: `Zahlungen: ${error.message}`, variant: "destructive" });
           return;
         }
       if (!data || data.length === 0) return;
@@ -327,7 +352,7 @@ export function MieterdatenView() {
         id: row.id,
         mieterId: row.mieter_id ?? "unbekannt",
         monat: row.monat ?? "",
-        faelligkeitsdatum: row.faelligkeitsdatum ?? "",
+        faelligkeitsdatum: row.monat ? `${row.monat}-01` : "",
         sollBetrag: row.soll_betrag ?? 0,
         istBetrag: row.betrag ?? 0,
         buchungsdatum: row.buchungsdatum ?? "",
@@ -338,21 +363,41 @@ export function MieterdatenView() {
         referenz: row.zahlungsreferenz ?? "",
         status: (row.status as ZahlungEintrag["status"]) ?? "ausstehend",
       }));
-      setZahlungen((prev) => {
-        const merged = [...prev];
-        for (const lz of loaded) {
-          const idx = merged.findIndex((z) => z.id === lz.id);
-          if (idx >= 0) merged[idx] = lz;
-          else merged.push(lz);
-        }
-        return merged;
-      });
+      setZahlungen(loaded);
       } catch (err) {
-        console.warn("Fehler beim Laden der Zahlungen:", err);
+        toast({ title: "Laden fehlgeschlagen", description: err instanceof Error ? err.message : "Unbekannter Fehler", variant: "destructive" });
       }
     };
     loadZahlungen();
-  }, [selectedObjektId, isDemo]);
+  }, [selectedObjektId, isDemo, isAdmin]);
+
+  // Events für den aktuellen Mieter laden wenn Historie-Tab geöffnet wird
+  useEffect(() => {
+    if (activeTab !== "historie" || !selectedMieter?.id) return;
+    if (isAdmin || isDemo || !user?.id) {
+      setEvents([]);
+      return;
+    }
+    const mieterId = selectedMieter.id;
+    setEventsLoading(true);
+    (async () => {
+      try {
+        const supabase = createClient();
+        if (!supabase) { setEventsLoading(false); return; }
+        const { data } = await supabase
+          .from("mieter_events")
+          .select("*")
+          .eq("mieter_id", mieterId)
+          .order("created_at", { ascending: false });
+        setEvents((data ?? []) as MieterEvent[]);
+      } catch {
+        setEvents([]);
+      } finally {
+        setEventsLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedMieter?.id, isAdmin, isDemo, user?.id]);
 
   // Hilfsfunktion zum Aktualisieren der bearbeiteten Mieter-Daten
   const updateEditedMieter = (
@@ -376,6 +421,23 @@ export function MieterdatenView() {
     );
     return availableWohnungen.filter((w) => !belegteIds.has(w.id));
   }, [availableWohnungen, mieter]);
+
+  const filteredEvents = useMemo(() => {
+    if (eventFilter === "alle") return events;
+    if (eventFilter === "zahlungen")
+      return events.filter((e) =>
+        ["zahlung_eingegangen", "zahlung_manuell", "zahlung_ueberfaellig"].includes(e.event_type),
+      );
+    if (eventFilter === "mahnungen")
+      return events.filter((e) =>
+        ["erinnerung", "mahnung_1", "mahnung_2"].includes(e.event_type),
+      );
+    if (eventFilter === "mitteilungen")
+      return events.filter((e) => e.event_type === "mitteilung");
+    if (eventFilter === "notizen")
+      return events.filter((e) => e.event_type === "notiz");
+    return events;
+  }, [events, eventFilter]);
 
   const handleSave = async () => {
     if (!selectedMieter || !editedMieter) return;
@@ -576,6 +638,12 @@ export function MieterdatenView() {
         `mitteilung_${selectedMieter.name}_${new Date().toISOString().split("T")[0]}`,
       ),
     );
+    insertMieterEvent(
+      selectedMieter.id,
+      "mitteilung",
+      betreff ? `Mitteilung: ${betreff}` : "Mitteilung als PDF exportiert",
+      betreff ? undefined : undefined,
+    );
   };
 
   const handleCreateMieter = async () => {
@@ -730,64 +798,157 @@ export function MieterdatenView() {
     return `${anrede},\n\nwir ${prefix} die Mietzahlung für ${monatName} in Höhe von ${z.sollBetrag.toLocaleString("de-DE")} € auf unserem Konto bisher nicht eingegangen ist.\n\nFälligkeitsdatum: ${faelligDate.toLocaleDateString("de-DE")}\nAusstehender Betrag: ${diff.toLocaleString("de-DE")} €\n\nWir bitten Sie, den ausstehenden Betrag bis zum ${fristStr} zu überweisen.\n\nBei Rückfragen stehen wir Ihnen gerne zur Verfügung.\n\nMit freundlichen Grüßen,\n${getFullName(profile)}\n${currentObjekt?.adresse || ""}\n${currentObjekt?.objektdaten?.strasse || ""}`;
   };
 
-  // CAMT-Import: Datei verarbeiten (wird von handleCamtFileSelected und importFile genutzt)
+  // E-Mail über SMTP-API-Route senden
+  const sendEmail = async (to: string, subject: string, body: string): Promise<boolean> => {
+    setIsSendingEmail(true);
+    try {
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to, subject, body }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ title: "E-Mail-Versand fehlgeschlagen", description: data?.error ?? "Unbekannter Fehler", variant: "destructive" });
+        return false;
+      }
+      return true;
+    } catch (err: any) {
+      toast({ title: "E-Mail-Versand fehlgeschlagen", description: err?.message ?? "Netzwerkfehler", variant: "destructive" });
+      return false;
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  // Konfiguration pro Event-Typ (Icon, Farbe, Label)
+  const getEventConfig = (eventType: string) => {
+    switch (eventType) {
+      case "einzug":
+        return { Icon: Home, bgColor: "bg-green-100 dark:bg-green-900", iconColor: "text-green-600", badgeClass: "border-green-300 text-green-700 bg-green-50", label: "Einzug" };
+      case "auszug":
+        return { Icon: Home, bgColor: "bg-gray-100 dark:bg-gray-800", iconColor: "text-gray-500", badgeClass: "border-gray-300 text-gray-600 bg-gray-50", label: "Auszug" };
+      case "zahlung_eingegangen":
+      case "zahlung_manuell":
+        return { Icon: CheckCircle2, bgColor: "bg-green-100 dark:bg-green-900", iconColor: "text-green-600", badgeClass: "border-green-300 text-green-700 bg-green-50", label: "Zahlung" };
+      case "zahlung_ueberfaellig":
+        return { Icon: AlertTriangle, bgColor: "bg-red-100 dark:bg-red-900", iconColor: "text-red-600", badgeClass: "border-red-300 text-red-700 bg-red-50", label: "Überfällig" };
+      case "erinnerung":
+        return { Icon: Clock, bgColor: "bg-amber-100 dark:bg-amber-900", iconColor: "text-amber-600", badgeClass: "border-amber-300 text-amber-700 bg-amber-50", label: "Erinnerung" };
+      case "mahnung_1":
+        return { Icon: AlertTriangle, bgColor: "bg-orange-100 dark:bg-orange-900", iconColor: "text-orange-600", badgeClass: "border-orange-300 text-orange-700 bg-orange-50", label: "1. Mahnung" };
+      case "mahnung_2":
+        return { Icon: AlertTriangle, bgColor: "bg-red-100 dark:bg-red-900", iconColor: "text-red-600", badgeClass: "border-red-300 text-red-700 bg-red-50", label: "2. Mahnung" };
+      case "mitteilung":
+        return { Icon: Mail, bgColor: "bg-blue-100 dark:bg-blue-900", iconColor: "text-blue-600", badgeClass: "border-blue-300 text-blue-700 bg-blue-50", label: "Mitteilung" };
+      case "notiz":
+      default:
+        return { Icon: FileText, bgColor: "bg-gray-100 dark:bg-gray-800", iconColor: "text-gray-500", badgeClass: "border-gray-300 text-gray-600 bg-gray-50", label: "Notiz" };
+    }
+  };
+
+  // Event in Supabase speichern + optimistisch in lokalen State einfügen
+  const insertMieterEvent = async (
+    mieterId: string,
+    eventType: string,
+    title: string,
+    description?: string,
+  ) => {
+    const localEvent: MieterEvent = {
+      id: `local-${Date.now()}-${Math.random()}`,
+      user_id: user?.id ?? "local",
+      mieter_id: mieterId,
+      event_type: eventType,
+      title,
+      description: description ?? null,
+      created_by: getFullName(profile),
+      created_at: new Date().toISOString(),
+    };
+    setEvents((prev) => [localEvent, ...prev]);
+    if (isDemo || isAdmin || !user?.id) return;
+    try {
+      const supabase = createClient();
+      if (!supabase) return;
+      const { data } = await supabase
+        .from("mieter_events")
+        .insert({
+          user_id: user.id,
+          mieter_id: mieterId,
+          event_type: eventType,
+          title,
+          description: description ?? null,
+          created_by: getFullName(profile),
+        })
+        .select()
+        .single();
+      if (data) {
+        setEvents((prev) =>
+          prev.map((e) => (e.id === localEvent.id ? (data as MieterEvent) : e)),
+        );
+      }
+    } catch {
+      // lokales Event bleibt erhalten
+    }
+  };
+
+  // DATEV-Import: Datei verarbeiten
   const processImportFile = async (file: File) => {
     setIsImporting(true);
     setActiveTab("zahlungen");
     try {
-      const xmlString = await file.text();
-      const transaktionen = parseCamtXml(xmlString);
+      const { buchungen } = await parseDatevCsv(file);
 
       const mieterMatchList = mieterData.map((m) => ({ id: m.id, name: m.name }));
       const monat = getCurrentMonthKey();
 
       let zugeordnet = 0;
       let nichtZugeordnet = 0;
-      // Mieter-IDs, die eine eingehende Zahlung (CRDT) hatten
       const bezahlteMieterIds = new Set<string>();
 
-      const neueZahlungen: ZahlungEintrag[] = transaktionen.map((t) => {
-        const match = matchTransaktionToMieter(t, mieterMatchList);
-        if (match) {
-          zugeordnet++;
-          // Nur eingehende Zahlungen (CRDT) zählen als "bezahlt"
-          if (t.cdtDbtInd === "CRDT") {
+      const neueZahlungen: ZahlungEintrag[] = buchungen
+        .filter((b) => b.sollHaben === "H") // Nur Haben-Buchungen (Einnahmen)
+        .map((b) => {
+          const match = matchDatevToMieter(b, mieterMatchList);
+          if (match) {
+            zugeordnet++;
             bezahlteMieterIds.add(match.mieterId);
+          } else {
+            nichtZugeordnet++;
           }
-        } else {
-          nichtZugeordnet++;
-        }
 
-        const mieterId = match?.mieterId ?? "unbekannt";
-        const m = mieterData.find((x) => x.id === mieterId);
-        const soll = m ? m.kaltmiete + m.nebenkosten : 0;
+          const mieterId = match?.mieterId ?? "unbekannt";
+          const m = mieterData.find((x) => x.id === mieterId);
+          const soll = m ? m.kaltmiete + m.nebenkosten : 0;
+          const belegMonat = getMonatFromBelegdatum(b.belegdatum) || monat;
 
-        return {
-          id: t.endToEndId && t.endToEndId !== "NOTPROVIDED"
-            ? t.endToEndId
-            : `camt-${t.buchungsdatum}-${t.betrag}-${(t.auftraggeberName || "").replace(/\s/g, "").slice(0, 20)}`,
-          mieterId,
-          monat,
-          faelligkeitsdatum: `${monat}-01`,
-          sollBetrag: soll,
-          istBetrag: t.betrag,
-          buchungsdatum: t.buchungsdatum,
-          wertstellungsdatum: t.wertstellungsdatum,
-          verwendungszweck: t.verwendungszweck,
-          ibanAbsender: t.auftraggeberIban,
-          auftraggeber: t.auftraggeberName,
-          referenz: t.endToEndId,
-          status: t.betrag >= soll ? "bezahlt" : soll > 0 ? "ueberfaellig" : "offen",
-        } as ZahlungEintrag;
-      });
+          return {
+            id: b.belegfeld1
+              ? `datev-${b.belegfeld1}`
+              : `datev-${b.belegdatum}-${b.umsatz}-${b.buchungstext.replace(/\s/g, "").slice(0, 20)}`,
+            mieterId,
+            monat: belegMonat,
+            faelligkeitsdatum: `${belegMonat}-01`,
+            sollBetrag: soll,
+            istBetrag: b.umsatz,
+            buchungsdatum: b.belegdatum,
+            wertstellungsdatum: b.belegdatum,
+            verwendungszweck: b.buchungstext,
+            ibanAbsender: "",
+            auftraggeber: b.buchungstext,
+            referenz: b.belegfeld1,
+            status: b.umsatz >= soll ? "bezahlt" : soll > 0 ? "ueberfaellig" : "offen",
+          } as ZahlungEintrag;
+        });
 
-      // Mieter ohne eingehende Zahlung im Kontoauszug als „überfällig" markieren
+      // Mieter ohne eingehende Zahlung als „offen" markieren
+      let offeneAnzahl = 0;
       for (const m of mieterData) {
         if (!bezahlteMieterIds.has(m.id)) {
           const soll = m.kaltmiete + m.nebenkosten;
           if (soll > 0) {
+            offeneAnzahl++;
             neueZahlungen.push({
-              id: `camt-nichtbezahlt-${m.id}-${monat}`,
+              id: `datev-offen-${m.id}-${monat}`,
               mieterId: m.id,
               monat,
               faelligkeitsdatum: `${monat}-01`,
@@ -805,27 +966,28 @@ export function MieterdatenView() {
         }
       }
 
-      // Prüfe auf Duplikate (per ID oder per Buchungsdatum+Betrag+Auftraggeber)
+      // Prüfe auf Duplikate (per Buchungsdatum+Betrag+Auftraggeber für Buchungen, per Mieter+Monat für offen-Einträge)
       const duplikate = neueZahlungen.filter((nz) =>
         zahlungen.some((z) =>
-          z.id === nz.id ||
-          (z.buchungsdatum === nz.buchungsdatum && z.istBetrag === nz.istBetrag && z.auftraggeber === nz.auftraggeber && z.buchungsdatum !== "")
+          // Buchungen: gleicher Zeitstempel, Betrag und Auftraggeber
+          (nz.buchungsdatum !== "" && z.buchungsdatum === nz.buchungsdatum && z.istBetrag === nz.istBetrag && z.auftraggeber === nz.auftraggeber) ||
+          // Offen-Einträge: gleicher Mieter und Monat und status
+          (nz.buchungsdatum === "" && z.buchungsdatum === "" && z.mieterId === nz.mieterId && z.monat === nz.monat)
         )
       ).length;
 
       if (duplikate > 0) {
-        // Duplikate gefunden – User muss bestätigen
         setPendingImport({ dateiname: file.name, neueZahlungen, zugeordnet, nichtZugeordnet, duplikate });
         setIsImporting(false);
         return;
       }
 
       // Keine Duplikate – direkt importieren
-      await executeImport(file.name, neueZahlungen, zugeordnet, nichtZugeordnet);
+      await executeImport(file.name, neueZahlungen, zugeordnet, nichtZugeordnet, offeneAnzahl);
     } catch (err) {
       toast({
         title: "Import fehlgeschlagen",
-        description: err instanceof Error ? err.message : "Unbekannter Fehler beim Parsen der CAMT-Datei.",
+        description: err instanceof Error ? err.message : "Unbekannter Fehler beim Parsen der DATEV-Datei.",
         variant: "destructive",
       });
     } finally {
@@ -833,8 +995,8 @@ export function MieterdatenView() {
     }
   };
 
-  // CAMT-Import Handler (vom File-Input auf der Mieter-Seite)
-  const handleCamtFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // DATEV-Import Handler (vom File-Input auf der Mieter-Seite)
+  const handleDatevFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
@@ -845,69 +1007,120 @@ export function MieterdatenView() {
     if (!pendingImport) return;
     setIsImporting(true);
     setPendingImport(null);
-    await executeImport(pendingImport.dateiname, pendingImport.neueZahlungen, pendingImport.zugeordnet, pendingImport.nichtZugeordnet);
+    await executeImport(pendingImport.dateiname, pendingImport.neueZahlungen, pendingImport.zugeordnet, pendingImport.nichtZugeordnet, 0);
     setIsImporting(false);
   };
 
   // Import ausführen (State + Supabase)
-  const executeImport = async (dateiname: string, neueZahlungen: ZahlungEintrag[], zugeordnet: number, nichtZugeordnet: number) => {
-      // Bestehende Zahlungen durch importierte ersetzen (Upsert per ID)
-      setZahlungen((prev) => {
-        const updated = [...prev];
-        for (const nz of neueZahlungen) {
-          const idx = updated.findIndex((z) => z.id === nz.id);
-          if (idx >= 0) updated[idx] = nz;
-          else updated.push(nz);
-        }
-        return updated;
-      });
-
-      // Supabase persistieren (nur wenn NICHT Demo-Modus und User eingeloggt)
-      if (!isDemo && user?.id) {
-        try {
-          const supabase = createClient();
-          if (supabase) {
-            const supabaseRows = neueZahlungen.map((z) => ({
-              id: z.id,
-              user_id: user.id,
-              mieter_id: z.mieterId !== "unbekannt" ? z.mieterId : null,
-              monat: z.monat,
-              soll_betrag: z.sollBetrag,
-              betrag: z.istBetrag,
-              buchungsdatum: z.buchungsdatum || null,
-              wertstellungsdatum: z.wertstellungsdatum || null,
-              verwendungszweck: z.verwendungszweck || null,
-              auftraggeber_name: z.auftraggeber || null,
-              auftraggeber_iban: z.ibanAbsender || null,
-              zahlungsreferenz: z.referenz || null,
-              status: z.status,
-              zugeordnet_via: null,
-            }));
-
-            const { error: supabaseError } = await supabase
-              .from("zahlungen")
-              .upsert(supabaseRows, { onConflict: "id" });
-
-            if (supabaseError) {
-              console.warn("Supabase upsert fehlgeschlagen (Daten lokal gespeichert):",
-                supabaseError.message || supabaseError.code || "Unbekannt");
-            }
+  const executeImport = async (dateiname: string, neueZahlungen: ZahlungEintrag[], zugeordnet: number, nichtZugeordnet: number, offen: number) => {
+      // Im Demo-Modus oder Admin-Login (kein echter Supabase-User) nur in-memory speichern
+      if (isDemo || isAdmin || !user?.id) {
+        setZahlungen((prev) => {
+          const updated = [...prev];
+          for (const nz of neueZahlungen) {
+            const idx = updated.findIndex((z) => z.id === nz.id);
+            if (idx >= 0) updated[idx] = nz;
+            else updated.push(nz);
           }
-        } catch (err) {
-          console.warn("Supabase Persistierung fehlgeschlagen, Daten nur lokal:", err);
-        }
+          return updated;
+        });
+        setDatevImportResult({
+          dateiname,
+          anzahl: neueZahlungen.length,
+          zugeordnet,
+          offen,
+          zeitpunkt: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }),
+        });
+        toast({
+          title: "Import temporär gespeichert",
+          description: "Im Admin-Modus werden Daten nicht dauerhaft gespeichert und gehen beim Seitenrefresh verloren. Bitte registrieren Sie sich für persistenten Datenzugriff.",
+          variant: "destructive",
+        });
+        return;
       }
 
-      setCamtImportResult({
+      // Supabase persistieren – UUID für jede Zeile generieren
+      try {
+        const supabase = createClient();
+        if (!supabase) throw new Error("Supabase nicht konfiguriert");
+
+        const supabaseRows = neueZahlungen.map((z) => ({
+          id: crypto.randomUUID(),
+          user_id: user.id,
+          mieter_id: z.mieterId !== "unbekannt" ? z.mieterId : null,
+          monat: z.monat,
+          soll_betrag: z.sollBetrag,
+          betrag: z.istBetrag,
+          buchungsdatum: z.buchungsdatum || null,
+          wertstellungsdatum: z.wertstellungsdatum || null,
+          verwendungszweck: z.verwendungszweck || null,
+          auftraggeber_name: z.auftraggeber || null,
+          auftraggeber_iban: z.ibanAbsender || null,
+          zahlungsreferenz: z.referenz || null,
+          status: z.status,
+          zugeordnet_via: null,
+        }));
+
+        const { data: insertedRows, error: supabaseError } = await supabase
+          .from("zahlungen")
+          .upsert(supabaseRows, { onConflict: "id" })
+          .select();
+
+        if (supabaseError) {
+          toast({
+            title: "Import fehlgeschlagen",
+            description: `Speichern in Supabase fehlgeschlagen: ${supabaseError.message}`,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        // State mit den tatsächlich gespeicherten Zeilen aus der DB befüllen
+        const gespeichert: ZahlungEintrag[] = (insertedRows ?? supabaseRows).map((row: any) => ({
+          id: row.id,
+          mieterId: row.mieter_id ?? "unbekannt",
+          monat: row.monat ?? "",
+          faelligkeitsdatum: row.faelligkeitsdatum ?? `${row.monat}-01`,
+          sollBetrag: row.soll_betrag ?? 0,
+          istBetrag: row.betrag ?? 0,
+          buchungsdatum: row.buchungsdatum ?? "",
+          wertstellungsdatum: row.wertstellungsdatum ?? "",
+          verwendungszweck: row.verwendungszweck ?? "",
+          ibanAbsender: row.auftraggeber_iban ?? "",
+          auftraggeber: row.auftraggeber_name ?? "",
+          referenz: row.zahlungsreferenz ?? "",
+          status: row.status ?? "offen",
+        }));
+
+        setZahlungen((prev) => {
+          const updated = [...prev];
+          for (const nz of gespeichert) {
+            const idx = updated.findIndex((z) => z.id === nz.id);
+            if (idx >= 0) updated[idx] = nz;
+            else updated.push(nz);
+          }
+          return updated;
+        });
+      } catch (err) {
+        toast({
+          title: "Import fehlgeschlagen",
+          description: err instanceof Error ? err.message : "Verbindungsfehler zu Supabase",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setDatevImportResult({
         dateiname,
         anzahl: neueZahlungen.length,
         zugeordnet,
+        offen,
         zeitpunkt: new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" }),
       });
 
       toast({
-        title: `CAMT-Import erfolgreich`,
-        description: `${neueZahlungen.length} Transaktionen importiert – ${zugeordnet} zugeordnet, ${nichtZugeordnet} nicht zugeordnet.`,
+        title: `DATEV-Import erfolgreich`,
+        description: `${zugeordnet} zugeordnet, ${offen} offen`,
       });
   };
 
@@ -1484,195 +1697,121 @@ export function MieterdatenView() {
               </Card>
             </TabsContent>
 
-            {/* Tab 2: Mieterhistorie / Timeline */}
-            <TabsContent value="historie" className="mt-6 space-y-6">
-              <Card>
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-base flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        Mietzeiträume für {editedMieter?.geschoss}
-                      </CardTitle>
-                      <CardDescription className="text-xs">
-                        Übersicht aller Mieter dieser Wohnung inkl. Zeiträume
-                      </CardDescription>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-2"
-                      onClick={() => setIsHistorieMieterOpen(true)}
-                    >
-                      <Plus className="h-3 w-3" />
-                      Vorherigen Mieter hinzufügen
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Timeline Visualisierung */}
-                  <div className="space-y-3">
-                    {alleMieterFuerWohnung
-                      .sort(
-                        (a, b) =>
-                          new Date(a.einzugsDatum).getTime() -
-                          new Date(b.einzugsDatum).getTime(),
-                      ) // Chronologisch: älteste zuerst
-                      .map((m, index, array) => {
-                        const isCurrentMieter = m.id === editedMieter?.id;
-                        const einzug = new Date(m.einzugsDatum);
-                        const auszug = m.mieteBis ? new Date(m.mieteBis) : null;
-                        const isAktiv = m.isAktiv !== false && !m.mieteBis;
+            {/* Tab 2: Ereignis-Protokoll / Timeline */}
+            <TabsContent value="historie" className="mt-6 space-y-4">
+              {/* Header */}
+              <div>
+                <h3 className="text-base font-semibold">Ereignis-Protokoll</h3>
+                <p className="text-sm text-muted-foreground">
+                  Zahlungen, Mahnungen und Mitteilungen für{" "}
+                  {selectedMieter?.name}
+                </p>
+              </div>
 
-                        // Berechne Mietdauer
-                        const endDate = auszug || new Date();
-                        const durationMs = endDate.getTime() - einzug.getTime();
-                        const durationMonths = Math.floor(
-                          durationMs / (1000 * 60 * 60 * 24 * 30.44),
-                        );
-                        const durationYears = Math.floor(durationMonths / 12);
-                        const remainingMonths = durationMonths % 12;
+              {/* Filter + Notiz-Button */}
+              <div className="flex items-center gap-2">
+                <Select value={eventFilter} onValueChange={setEventFilter}>
+                  <SelectTrigger className="w-[160px] h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="alle">Alle</SelectItem>
+                    <SelectItem value="zahlungen">Zahlungen</SelectItem>
+                    <SelectItem value="mahnungen">Mahnungen</SelectItem>
+                    <SelectItem value="mitteilungen">Mitteilungen</SelectItem>
+                    <SelectItem value="notizen">Notizen</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => setIsAddNoteOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
+                  Notiz hinzufügen
+                </Button>
+              </div>
 
-                        let durationText = "";
-                        if (durationYears > 0) {
-                          durationText = `${durationYears} Jahr${durationYears !== 1 ? "e" : ""}`;
-                          if (remainingMonths > 0) {
-                            durationText += `, ${remainingMonths} Monat${remainingMonths !== 1 ? "e" : ""}`;
-                          }
-                        } else {
-                          durationText = `${durationMonths} Monat${durationMonths !== 1 ? "e" : ""}`;
-                        }
-
-                        return (
+              {/* Timeline oder Ladeindikator */}
+              {eventsLoading ? (
+                <div className="flex justify-center py-10">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredEvents.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-14 text-muted-foreground">
+                  <FileText className="h-10 w-10 mb-3 opacity-25" />
+                  <p className="text-sm font-medium">Keine Ereignisse vorhanden</p>
+                  {(isAdmin || isDemo) && (
+                    <p className="text-xs mt-1 opacity-70">
+                      Im Demo-/Admin-Modus werden Ereignisse nicht gespeichert.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="relative">
+                  {/* Vertikale Linie */}
+                  <div className="absolute left-[15px] top-0 bottom-0 w-px bg-border" />
+                  <div className="space-y-3 pl-10">
+                    {filteredEvents.map((event) => {
+                      const cfg = getEventConfig(event.event_type);
+                      const EventIcon = cfg.Icon;
+                      return (
+                        <div key={event.id} className="relative">
+                          {/* Icon-Blase */}
                           <div
-                            key={m.id}
-                            className={`relative pl-8 pb-4 ${
-                              index !== array.length - 1
-                                ? "border-l-2 border-muted-foreground/20"
-                                : ""
-                            }`}
+                            className={`absolute -left-[26px] w-8 h-8 rounded-full flex items-center justify-center border-2 border-background shadow-sm ${cfg.bgColor}`}
                           >
-                            {/* Timeline Punkt */}
-                            <div
-                              className={`absolute left-[-5px] top-0 w-3 h-3 rounded-full border-2 border-background ${
-                                isAktiv
-                                  ? "bg-success ring-2 ring-success/20"
-                                  : "bg-muted-foreground/50"
-                              }`}
+                            <EventIcon
+                              className={`h-4 w-4 ${cfg.iconColor}`}
                             />
-
-                            <div
-                              className={`p-3 rounded-lg border ${
-                                isCurrentMieter
-                                  ? "border-primary bg-primary/5"
-                                  : "border-muted"
-                              }`}
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium">{m.name}</span>
-                                  {isAktiv && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs bg-success/10 text-success border-success/20"
-                                    >
-                                      Aktuell
-                                    </Badge>
-                                  )}
-                                  {m.isKurzzeitvermietung && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs bg-amber-500/10 text-amber-500 border-amber-500/20"
-                                    >
-                                      Kurzzeit
-                                    </Badge>
-                                  )}
-                                  {!isAktiv && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs bg-muted text-muted-foreground"
-                                    >
-                                      Ehemalig
-                                    </Badge>
-                                  )}
-                                </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {m.prozentanteil ? `${m.prozentanteil}%` : ""}
-                                </span>
-                              </div>
-
-                              {/* Zeitraum-Balken */}
-                              <div className="flex items-center gap-2 text-sm">
-                                <span className="text-muted-foreground font-medium">
-                                  {einzug.toLocaleDateString("de-DE")}
-                                </span>
-                                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden relative">
-                                  <div
-                                    className={`h-full transition-all ${
-                                      isAktiv
-                                        ? "bg-gradient-to-r from-success/70 to-success"
-                                        : "bg-gradient-to-r from-muted-foreground/30 to-muted-foreground/50"
-                                    }`}
-                                    style={{ width: "100%" }}
-                                  />
-                                </div>
-                                <span className="text-muted-foreground font-medium">
-                                  {auszug
-                                    ? auszug.toLocaleDateString("de-DE")
-                                    : "heute"}
-                                </span>
-                              </div>
-
-                              {/* Details */}
-                              <div className="mt-2 flex items-center justify-between">
-                                <div className="flex flex-col gap-1">
-                                  <span className="text-xs text-muted-foreground">
-                                    Miete: {m.kaltmiete.toLocaleString("de-DE")}{" "}
-                                    € + {m.nebenkosten.toLocaleString("de-DE")}{" "}
-                                    € NK
-                                  </span>
-                                  <span className="text-xs text-muted-foreground font-medium">
-                                    Dauer: {durationText}
-                                    {isAktiv ? " (läuft)" : ""}
-                                  </span>
-                                </div>
-                                {!isAktiv && (
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="h-7 text-xs"
-                                    onClick={() => {
-                                      setEditingHistorieMieterId(m.id);
-                                      setHistorieMieter({
-                                        name: m.name,
-                                        einzugsDatum: m.einzugsDatum,
-                                        auszugsDatum: m.mieteBis || "",
-                                        kaltmiete: m.kaltmiete,
-                                        nebenkosten: m.nebenkosten,
-                                        prozentanteil: m.prozentanteil || 0,
-                                        isKurzzeitvermietung:
-                                          m.isKurzzeitvermietung || false,
-                                      });
-                                      setIsHistorieMieterOpen(true);
-                                    }}
-                                  >
-                                    Bearbeiten
-                                  </Button>
-                                )}
-                              </div>
-                            </div>
                           </div>
-                        );
-                      })}
-
-                    {alleMieterFuerWohnung.length === 0 && (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        Keine Mieterhistorie für diese Wohnung vorhanden.
-                      </p>
-                    )}
+                          {/* Karte */}
+                          <Card className="shadow-none border">
+                            <CardContent className="px-4 py-3">
+                              <div className="flex items-start gap-3 justify-between">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                    <Badge
+                                      variant="outline"
+                                      className={`text-[11px] px-1.5 py-0 font-medium ${cfg.badgeClass}`}
+                                    >
+                                      {cfg.label}
+                                    </Badge>
+                                    <span className="text-sm font-medium">
+                                      {event.title}
+                                    </span>
+                                  </div>
+                                  {event.description && (
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      {event.description}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="text-right shrink-0 text-xs text-muted-foreground">
+                                  <p>
+                                    {new Date(event.created_at).toLocaleDateString(
+                                      "de-DE",
+                                      {
+                                        day: "2-digit",
+                                        month: "2-digit",
+                                        year: "numeric",
+                                      },
+                                    )}
+                                  </p>
+                                  {event.created_by && (
+                                    <p className="mt-0.5">{event.created_by}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      );
+                    })}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              )}
             </TabsContent>
 
             {/* Tab 3: Verteilungsschlüssel */}
@@ -1775,27 +1914,27 @@ export function MieterdatenView() {
 
                 return (
                   <>
-                    {/* Hidden File Input für CAMT-Import */}
+                    {/* Hidden File Input für DATEV-Import */}
                     <input
-                      ref={camtFileInputRef}
+                      ref={datevFileInputRef}
                       type="file"
-                      accept=".xml,application/xml,text/xml"
+                      accept=".csv,text/csv"
                       className="hidden"
-                      onChange={handleCamtFileSelected}
+                      onChange={handleDatevFileSelected}
                     />
 
-                    {/* CAMT Import Banner */}
+                    {/* DATEV Import Banner */}
                     <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-dashed border-border">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Upload className="h-4 w-4" />
-                        <span>Kontoauszug importieren (CAMT.053 / MT940)</span>
+                        <span>DATEV-Buchungsstapel importieren (CSV)</span>
                       </div>
                       <Button
                         variant="outline"
                         size="sm"
                         className="gap-1.5"
                         disabled={isImporting}
-                        onClick={() => camtFileInputRef.current?.click()}
+                        onClick={() => datevFileInputRef.current?.click()}
                       >
                         <Upload className="h-3.5 w-3.5" />
                         {isImporting ? "Importiere…" : "Datei importieren"}
@@ -1831,17 +1970,17 @@ export function MieterdatenView() {
                     )}
 
                     {/* Import Erfolgs-Meldung */}
-                    {camtImportResult && (
+                    {datevImportResult && (
                       <div className="flex items-center justify-between p-3 rounded-lg bg-success/10 border border-success/30 text-success">
                         <div className="flex items-center gap-2 text-sm">
                           <CheckCircle2 className="h-4 w-4" />
                           <span>
-                            <strong>{camtImportResult.dateiname}</strong> – {camtImportResult.anzahl} Buchungen importiert, {camtImportResult.zugeordnet} zugeordnet ({camtImportResult.zeitpunkt})
+                            <strong>{datevImportResult.dateiname}</strong> – {datevImportResult.zugeordnet} zugeordnet, {datevImportResult.offen} offen ({datevImportResult.zeitpunkt})
                           </span>
                         </div>
                         <button
                           className="text-success hover:text-success/70 transition-colors"
-                          onClick={() => setCamtImportResult(null)}
+                          onClick={() => setDatevImportResult(null)}
                         >
                           <X className="h-4 w-4" />
                         </button>
@@ -1959,6 +2098,12 @@ export function MieterdatenView() {
                               onClick={() => {
                                 updateZahlung({ ...cz, istBetrag: cz.sollBetrag, status: "bezahlt", buchungsdatum: new Date().toISOString().split("T")[0] });
                                 toast({ title: "Zahlung bestätigt", description: `${editedMieter.name}: ${cz.sollBetrag.toLocaleString("de-DE")} € als bezahlt markiert.` });
+                                insertMieterEvent(
+                                  editedMieter.id,
+                                  "zahlung_manuell",
+                                  `Zahlung manuell bestätigt – ${cz.sollBetrag.toLocaleString("de-DE")} €`,
+                                  `Monat: ${cz.monat}`,
+                                );
                               }}
                             >
                               <CheckCircle2 className="h-3.5 w-3.5" />
@@ -2015,20 +2160,26 @@ export function MieterdatenView() {
                             {editedMieter.email ? (
                               <Button
                                 className="bg-success hover:bg-success/90 text-success-foreground gap-2"
-                                onClick={() => {
+                                disabled={isSendingEmail}
+                                onClick={async () => {
+                                  const mahnBetreff = `Zahlungserinnerung – ${editedMieter.name} – ${editedMieter.geschoss}`;
+                                  const ok = await sendEmail(editedMieter.email!, mahnBetreff, currentMahnText);
+                                  if (!ok) return;
                                   const entry: MahnEintrag = {
                                     id: `mahn-${Date.now()}`,
                                     mieterId: editedMieter.id,
                                     datum: new Date().toLocaleDateString("de-DE"),
                                     eskalationsstufe: mahnEskalation,
-                                    betreff: `Zahlungserinnerung – ${editedMieter.name} – ${editedMieter.geschoss}`,
+                                    betreff: mahnBetreff,
                                     gesendetVon: getFullName(profile),
                                   };
                                   setMahnHistorie((prev) => [entry, ...prev]);
-                                  toast({ title: `${mahnEskalation} gesendet`, description: `Mahnschreiben für ${editedMieter.name} wurde protokolliert.` });
+                                  const eventType = mahnEskalation === "Erinnerung" ? "erinnerung" : mahnEskalation === "1. Mahnung" ? "mahnung_1" : "mahnung_2";
+                                  insertMieterEvent(editedMieter.id, eventType, `${mahnEskalation} per E-Mail gesendet`, `Betreff: ${mahnBetreff}`);
+                                  toast({ title: `${mahnEskalation} gesendet`, description: `E-Mail wurde erfolgreich an ${editedMieter.email} versendet.` });
                                 }}
                               >
-                                <Mail className="h-4 w-4" />
+                                {isSendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
                                 E-Mail senden
                               </Button>
                             ) : (
@@ -2044,6 +2195,8 @@ export function MieterdatenView() {
                                     gesendetVon: getFullName(profile),
                                   };
                                   setMahnHistorie((prev) => [entry, ...prev]);
+                                  const eventType = mahnEskalation === "Erinnerung" ? "erinnerung" : mahnEskalation === "1. Mahnung" ? "mahnung_1" : "mahnung_2";
+                                  insertMieterEvent(editedMieter.id, eventType, `${mahnEskalation} als Anschreiben gedruckt`, `Betreff: ${entry.betreff}`);
                                   handleExportKommunikationPDF();
                                 }}
                               >
@@ -2109,19 +2262,10 @@ export function MieterdatenView() {
             <TabsContent value="kommunikation" className="mt-6 space-y-6">
               <Card>
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">
-                      Mitteilung an den Mieter
-                    </CardTitle>
-                    <Button
-                      variant="outline"
-                      className="gap-2 bg-transparent"
-                      onClick={handleExportKommunikationPDF}
-                    >
-                      <FileDown className="h-4 w-4" />
-                      Als PDF exportieren
-                    </Button>
-                  </div>
+                  <CardTitle className="text-base">Mitteilung an den Mieter</CardTitle>
+                  <CardDescription className="text-xs">
+                    Verfassen Sie eine Mitteilung und senden Sie diese per E-Mail oder als PDF.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
@@ -2142,6 +2286,49 @@ export function MieterdatenView() {
                       value={nachricht}
                       onChange={(e) => setNachricht(e.target.value)}
                     />
+                  </div>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pt-1">
+                    {editedMieter?.email ? (
+                      <Button
+                        className="bg-success hover:bg-success/90 text-success-foreground gap-2"
+                        disabled={isSendingEmail}
+                        onClick={async () => {
+                          if (!selectedMieter) return;
+                          const ok = await sendEmail(editedMieter.email!, betreff, nachricht);
+                          if (!ok) return;
+                          insertMieterEvent(
+                            selectedMieter.id,
+                            "mitteilung",
+                            betreff ? `Mitteilung per E-Mail: ${betreff}` : "Mitteilung per E-Mail gesendet",
+                          );
+                          toast({ title: "E-Mail gesendet", description: `Mitteilung wurde erfolgreich an ${editedMieter.email} versendet.` });
+                        }}
+                      >
+                        {isSendingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                        E-Mail senden
+                      </Button>
+                    ) : (
+                      <Button
+                        className="bg-success hover:bg-success/90 text-success-foreground gap-2"
+                        onClick={handleExportKommunikationPDF}
+                      >
+                        <Printer className="h-4 w-4" />
+                        Anschreiben drucken
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      className="gap-2 bg-transparent"
+                      onClick={handleExportKommunikationPDF}
+                    >
+                      <FileDown className="h-4 w-4" />
+                      Als PDF exportieren
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      {editedMieter?.email
+                        ? `E-Mail wird an ${editedMieter.email} geöffnet und protokolliert.`
+                        : "Kein E-Mail hinterlegt – Mitteilung wird als PDF gedruckt."}
+                    </p>
                   </div>
                 </CardContent>
               </Card>
@@ -2538,6 +2725,56 @@ export function MieterdatenView() {
               onClick={handleAddHistorieMieter}
             >
               {editingHistorieMieterId ? "Aktualisieren" : "Hinzufügen"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Notiz hinzufügen */}
+      <Dialog open={isAddNoteOpen} onOpenChange={setIsAddNoteOpen}>
+        <DialogContent className="sm:max-w-[440px]">
+          <DialogHeader>
+            <DialogTitle>Notiz hinzufügen</DialogTitle>
+            <DialogDescription>
+              Fügen Sie eine manuelle Notiz zum Ereignis-Protokoll hinzu.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="note-text">Notiz</Label>
+              <Textarea
+                id="note-text"
+                rows={4}
+                placeholder="Ihre Notiz..."
+                value={newNoteText}
+                onChange={(e) => setNewNoteText(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsAddNoteOpen(false);
+                setNewNoteText("");
+              }}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              disabled={!newNoteText.trim()}
+              onClick={() => {
+                if (!selectedMieter || !newNoteText.trim()) return;
+                insertMieterEvent(
+                  selectedMieter.id,
+                  "notiz",
+                  newNoteText.trim(),
+                );
+                setIsAddNoteOpen(false);
+                setNewNoteText("");
+              }}
+            >
+              Speichern
             </Button>
           </DialogFooter>
         </DialogContent>
