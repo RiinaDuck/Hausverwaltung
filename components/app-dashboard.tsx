@@ -35,9 +35,11 @@ interface AppDashboardProps {
 export function AppDashboard({ onSwitchToLanding }: AppDashboardProps) {
   const [currentView, setCurrentView] = useState<AppView>("dashboard");
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [navMieterId, setNavMieterId] = useState<string | undefined>();
   const isMobile = useIsMobile();
 
-  const handleNavigate = (view: AppView) => {
+  const handleNavigate = (view: AppView, options?: { mieterId?: string }) => {
+    setNavMieterId(options?.mieterId);
     setCurrentView(view);
   };
 
@@ -50,7 +52,7 @@ export function AppDashboard({ onSwitchToLanding }: AppDashboardProps) {
       case "wohnungen":
         return <WohnungsdatenView onNavigate={handleNavigate} />;
       case "mieter":
-        return <MieterdatenView />;
+        return <MieterdatenView initialMieterId={navMieterId} />;
       case "nebenkosten":
         return <NebenkostenView />;
       case "nebenkosten-abrechnung":

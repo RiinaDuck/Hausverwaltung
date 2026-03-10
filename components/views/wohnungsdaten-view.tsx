@@ -52,6 +52,12 @@ import {
   MoreHorizontal,
   Users,
   ArrowRight,
+  Archive,
+  ArrowUpDown,
+  UtensilsCrossed,
+  Building,
+  Wifi,
+  ClipboardList,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -60,6 +66,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useAppData } from "@/context/app-data-context";
@@ -175,38 +189,66 @@ interface AusstattungCategory {
 
 const ausstattungCategories: AusstattungCategory[] = [
   {
-    title: "Bad",
-    icon: Bath,
+    title: "Aufzug",
+    icon: ArrowUpDown,
     items: [
-      { id: "bad-dusche", label: "Dusche" },
-      { id: "bad-wanne", label: "Badewanne" },
-      { id: "bad-fenster", label: "Fenster" },
-      { id: "bad-gaeste-wc", label: "Gäste-WC" },
+      { id: "personenaufzug", label: "Personenaufzug" },
     ],
   },
   {
-    title: "Heizung",
+    title: "Küche",
+    icon: UtensilsCrossed,
+    items: [
+      { id: "einbaukueche", label: "Einbauküche" },
+      { id: "offene-kueche", label: "Offene Küche" },
+      { id: "speisekammer", label: "Speisekammer" },
+    ],
+  },
+  {
+    title: "Sanitär",
+    icon: Bath,
+    items: [
+      { id: "bad-dusche", label: "Bad mit Dusche" },
+      { id: "bad-fenster", label: "Bad mit Fenster" },
+      { id: "bad-wanne", label: "Bad mit Wanne" },
+      { id: "bad-wc-getrennt", label: "Bad / WC getrennt" },
+    ],
+  },
+  {
+    title: "Heizungsart",
     icon: Flame,
     items: [
       { id: "etagenheizung", label: "Etagenheizung" },
       { id: "fussbodenheizung", label: "Fußbodenheizung" },
       { id: "ofenheizung", label: "Ofenheizung" },
       { id: "zentralheizung", label: "Zentralheizung" },
+      { id: "fernheizung", label: "Fernheizung" },
     ],
   },
   {
-    title: "Boden",
+    title: "Böden",
     icon: Layers,
     items: [
-      { id: "dielen", label: "Dielen" },
-      { id: "fliesen", label: "Fliesen" },
+      { id: "fertigparkett", label: "Fertigparkett" },
+      { id: "fliesen", label: "Fliesenboden" },
+      { id: "holzdielen", label: "Holzdielen" },
       { id: "laminat", label: "Laminat" },
-      { id: "parkett", label: "Parkett" },
-      { id: "teppich", label: "Teppich" },
+      { id: "linoleum", label: "Linoleum" },
+      { id: "parkett", label: "Parkettboden" },
+      { id: "teppich", label: "Teppichboden" },
     ],
   },
   {
-    title: "Außen",
+    title: "Wohnungslage",
+    icon: Building,
+    items: [
+      { id: "dachgeschoss", label: "Dachgeschoss" },
+      { id: "erdgeschoss", label: "Erdgeschoss" },
+      { id: "souterrain", label: "Souterrain" },
+    ],
+  },
+  {
+    title: "Balkon / Terrasse",
     icon: TreePine,
     items: [
       { id: "balkon", label: "Balkon" },
@@ -214,11 +256,10 @@ const ausstattungCategories: AusstattungCategory[] = [
       { id: "loggia", label: "Loggia" },
       { id: "terrasse", label: "Terrasse" },
       { id: "wintergarten", label: "Wintergarten" },
-      { id: "gartenanteil", label: "Gartenanteil" },
     ],
   },
   {
-    title: "Parken",
+    title: "Garage / Stellplatz",
     icon: Car,
     items: [
       { id: "duplex", label: "Duplex" },
@@ -231,36 +272,61 @@ const ausstattungCategories: AusstattungCategory[] = [
     title: "Zustand",
     icon: CheckCircle2,
     items: [
-      { id: "altbau", label: "Altbau" },
+      { id: "altbau", label: "Altbau (bis 1945)" },
       { id: "erstbezug", label: "Erstbezug" },
       { id: "gehoben", label: "Gehoben" },
       { id: "gepflegt", label: "Gepflegt" },
       { id: "luxus", label: "Luxus" },
       { id: "neubau", label: "Neubau" },
       { id: "renoviert", label: "Renoviert" },
+      { id: "renovierungsbeduerftig", label: "Renovierungsbedürftig" },
       { id: "saniert", label: "Saniert" },
+      { id: "standard", label: "Standard" },
     ],
   },
   {
-    title: "Medien",
+    title: "TV",
     icon: Tv,
     items: [
-      { id: "kabel", label: "Kabel-TV" },
-      { id: "sat", label: "Sat-TV" },
+      { id: "kabel", label: "Kabelanschluss" },
+      { id: "sat", label: "Sat" },
+    ],
+  },
+  {
+    title: "Sonstiges / Wohnen",
+    icon: Heart,
+    items: [
+      { id: "gartenanteil", label: "Gartenanteil" },
+      { id: "haustiere", label: "Haustiere erlaubt" },
+      { id: "kelleranteil", label: "Kelleranteil" },
+      { id: "rollstuhlgerecht", label: "Rollstuhlgerecht" },
+      { id: "seniorengerecht", label: "Seniorengerechtes Wohnen" },
+      { id: "wg-geeignet", label: "WG geeignet" },
+      { id: "wohnberechtigungsschein", label: "Wohnberechtigungsschein" },
+    ],
+  },
+  {
+    title: "Kommunikation",
+    icon: Wifi,
+    items: [
       { id: "dsl", label: "DSL" },
       { id: "glasfaser", label: "Glasfaser" },
     ],
   },
   {
-    title: "Sonstiges",
-    icon: Heart,
+    title: "Serviceleistungen",
+    icon: ClipboardList,
     items: [
-      { id: "haustiere", label: "Haustiere erlaubt" },
-      { id: "kelleranteil", label: "Kelleranteil" },
-      { id: "rollstuhlgerecht", label: "Rollstuhlgerecht" },
-      { id: "seniorengerecht", label: "Seniorengerecht" },
-      { id: "wg-geeignet", label: "WG geeignet" },
       { id: "betreutes-wohnen", label: "Betreutes Wohnen" },
+    ],
+  },
+  {
+    title: "Derzeitige Nutzung",
+    icon: Home,
+    items: [
+      { id: "nutzung-frei", label: "Frei" },
+      { id: "nutzung-frei-werdend", label: "Frei werdend" },
+      { id: "nutzung-vermietet", label: "Vermietet" },
     ],
   },
 ];
@@ -280,12 +346,14 @@ const statusConfig = {
   },
 };
 
-export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView) => void }) {
+export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView, options?: { mieterId?: string }) => void }) {
   const {
     wohnungen,
     selectedObjektId,
     objekte,
     mieter,
+    zaehler,
+    rauchmelder,
     addWohnung,
     updateWohnung,
     deleteWohnung,
@@ -748,54 +816,53 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView)
 
       {/* Right: Unit Details */}
       {selectedUnit && (
-        <div className="flex-1 overflow-auto space-y-4 md:space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-end gap-3">
-            <div className="flex gap-2 self-end sm:self-auto">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="icon" className="h-9 w-9">
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleDuplicateUnit}>
-                    <Copy className="h-4 w-4 mr-2" />
-                    Duplizieren
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={handleDeleteUnit}
-                    className="text-destructive focus:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Löschen
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button
-                className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
-                onClick={handleSave}
-                disabled={isSaving}
-              >
-                <Save className="h-4 w-4" />
-                {isSaving ? "Wird gespeichert..." : "Speichern"}
-              </Button>
+        <div className="flex-1 flex flex-col min-h-0">
+          <Tabs defaultValue="daten" className="flex flex-col flex-1 min-h-0">
+            <div className="shrink-0 pb-4 pr-2">
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 max-w-4xl h-auto">
+                <TabsTrigger value="daten" className="text-xs sm:text-sm py-2">Flächendaten</TabsTrigger>
+                <TabsTrigger value="ausstattung" className="text-xs sm:text-sm py-2">Ausstattung</TabsTrigger>
+                <TabsTrigger value="zaehler" className="text-xs sm:text-sm py-2">Zähler</TabsTrigger>
+                <TabsTrigger value="schluessel" className="text-xs sm:text-sm py-2">Schlüssel</TabsTrigger>
+              </TabsList>
+              <div className="flex items-center justify-end gap-3 mt-4">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-9 w-9">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleDuplicateUnit}>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Duplizieren
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled>
+                      <Archive className="h-4 w-4 mr-2" />
+                      Archivieren
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={handleDeleteUnit}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Löschen
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                >
+                  <Save className="h-4 w-4" />
+                  {isSaving ? "Wird gespeichert..." : "Speichern"}
+                </Button>
+              </div>
             </div>
-          </div>
 
-          <Tabs defaultValue="daten" className="space-y-4">
-            <TabsList>
-              <TabsTrigger value="daten">Flächendaten</TabsTrigger>
-              <TabsTrigger value="ausstattung" className="gap-2">
-                Ausstattung
-                {checkedCount > 0 && (
-                  <Badge variant="secondary" className="h-5 px-1.5 text-xs">
-                    {checkedCount}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            </TabsList>
+            <div className="flex-1 overflow-auto pr-2">
 
             <TabsContent value="daten" className="space-y-4">
               <Card>
@@ -951,7 +1018,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView)
                   <Card
                     key={m.id}
                     className="cursor-pointer hover:bg-accent/50 transition-colors"
-                    onClick={() => onNavigate?.("mieter")}
+                    onClick={() => onNavigate?.("mieter", { mieterId: m.id })}
                   >
                     <CardContent className="py-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -986,12 +1053,12 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView)
                     {ausstattungCategories.map((category) => (
                       <Card
                         key={category.title}
-                        className="bg-muted/20 border-dashed"
+                        className="bg-muted/20 border-dashed overflow-hidden"
                       >
                         <CardHeader className="pb-2 pt-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <category.icon className="h-4 w-4 text-muted-foreground" />
-                            <CardTitle className="text-sm font-medium">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <category.icon className="h-4 w-4 text-muted-foreground shrink-0" />
+                            <CardTitle className="text-sm font-medium truncate">
                               {category.title}
                             </CardTitle>
                           </div>
@@ -1001,17 +1068,17 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView)
                             {category.items.map((item) => (
                               <div
                                 key={item.id}
-                                className="flex items-center space-x-2"
+                                className="flex items-start gap-2"
                               >
                                 <Checkbox
                                   id={item.id}
                                   checked={checkedItems[item.id] || false}
                                   onCheckedChange={() => toggleItem(item.id)}
-                                  className="h-4 w-4"
+                                  className="h-4 w-4 mt-0.5 shrink-0"
                                 />
                                 <label
                                   htmlFor={item.id}
-                                  className="text-sm leading-none cursor-pointer hover:text-foreground transition-colors"
+                                  className="text-sm leading-tight cursor-pointer hover:text-foreground transition-colors break-words min-w-0"
                                 >
                                   {item.label}
                                 </label>
@@ -1025,6 +1092,127 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView)
                 </CardContent>
               </Card>
             </TabsContent>
+            {/* Tab: Zähler */}
+            <TabsContent value="zaehler" className="space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Zähler</CardTitle>
+                  <CardDescription>
+                    Wasser-, Wärme- und sonstige Zähler für diese Wohneinheit.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const unitZaehler = zaehler.filter((z) => z.wohnungId === selectedUnit?.id);
+                    if (unitZaehler.length === 0) return (
+                      <p className="text-sm text-muted-foreground py-4">Keine Zähler für diese Wohnung vorhanden.</p>
+                    );
+                    return (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Montageort</TableHead>
+                            <TableHead>Geräteart</TableHead>
+                            <TableHead>Gerätenummer</TableHead>
+                            <TableHead>Geeicht bis</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {unitZaehler.map((z) => (
+                            <TableRow key={z.id}>
+                              <TableCell>{z.montageort}</TableCell>
+                              <TableCell>{z.geraeteart}</TableCell>
+                              <TableCell className="font-mono text-xs">{z.geraetnummer}</TableCell>
+                              <TableCell>{z.geeichtBis}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Rauchmelder</CardTitle>
+                  <CardDescription>
+                    Rauchmelder in dieser Wohneinheit.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const unitRauchmelder = rauchmelder.filter((r) => r.wohnungId === selectedUnit?.id);
+                    if (unitRauchmelder.length === 0) return (
+                      <p className="text-sm text-muted-foreground py-4">Keine Rauchmelder für diese Wohnung vorhanden.</p>
+                    );
+                    return (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Montageort</TableHead>
+                            <TableHead>Geräteart</TableHead>
+                            <TableHead>Gerätenummer</TableHead>
+                            <TableHead>Lebensdauer bis</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {unitRauchmelder.map((r) => (
+                            <TableRow key={r.id}>
+                              <TableCell>{r.montageort}</TableCell>
+                              <TableCell>{r.geraeteart}</TableCell>
+                              <TableCell className="font-mono text-xs">{r.geraetnummer}</TableCell>
+                              <TableCell>{r.lebensdauerBis}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Tab: Schlüssel (Verteilungsschlüssel) */}
+            <TabsContent value="schluessel" className="space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Verteilungsschlüssel</CardTitle>
+                  <CardDescription>
+                    Informationen zur Nebenkostenverteilung für diese Wohneinheit.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {(() => {
+                    const unitMieter = mieter.filter(
+                      (m) => m.wohnungId === selectedUnit?.id && m.isAktiv !== false
+                    );
+                    if (unitMieter.length === 0) return (
+                      <p className="text-sm text-muted-foreground py-4">Kein Mieter zugeordnet – kein Verteilungsschlüssel verfügbar.</p>
+                    );
+                    return unitMieter.map((m) => (
+                      <div key={m.id} className="p-4 bg-muted/50 rounded-lg space-y-2">
+                        <p className="text-sm font-medium">{m.name}</p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Wohnung</p>
+                            <p className="text-sm">{selectedUnit?.lage}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Prozentanteil</p>
+                            <p className="text-sm font-medium">{m.prozentanteil ?? 0} %</p>
+                          </div>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                  <p className="text-sm text-muted-foreground">
+                    Der Prozentanteil wird für die Verteilung der Nebenkosten verwendet.
+                  </p>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            </div>
           </Tabs>
         </div>
       )}

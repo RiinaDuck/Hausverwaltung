@@ -65,6 +65,8 @@ import {
   X,
   FileText,
   Loader2,
+  Pencil,
+  Archive,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -126,7 +128,7 @@ interface MieterDisplay {
   prozentanteil: number;
 }
 
-export function MieterdatenView() {
+export function MieterdatenView({ initialMieterId }: { initialMieterId?: string } = {}) {
   const {
     mieter,
     wohnungen,
@@ -289,6 +291,8 @@ export function MieterdatenView() {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventFilter, setEventFilter] = useState<string>("alle");
   const [isAddNoteOpen, setIsAddNoteOpen] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
+  const [editNoteText, setEditNoteText] = useState("");
   const [newNoteText, setNewNoteText] = useState("");
   const [isSendingEmail, setIsSendingEmail] = useState(false);
 
@@ -297,6 +301,13 @@ export function MieterdatenView() {
   // Aktualisiere selectedMieter wenn sich mieterData ändert
   useEffect(() => {
     if (mieterData.length > 0) {
+      if (initialMieterId) {
+        const target = mieterData.find((m) => m.id === initialMieterId);
+        if (target) {
+          setSelectedMieter(target);
+          return;
+        }
+      }
       if (
         !selectedMieter ||
         !mieterData.find((m) => m.id === selectedMieter.id)
@@ -891,6 +902,37 @@ export function MieterdatenView() {
     }
   };
 
+  const updateMieterEvent = async (eventId: string, newTitle: string) => {
+    setEvents((prev) =>
+      prev.map((e) => (e.id === eventId ? { ...e, title: newTitle } : e)),
+    );
+    setEditingEventId(null);
+    setEditNoteText("");
+    if (isDemo || isAdmin || !user?.id) return;
+    try {
+      const supabase = createClient();
+      if (!supabase) return;
+      await supabase
+        .from("mieter_events")
+        .update({ title: newTitle })
+        .eq("id", eventId);
+    } catch {
+      // lokales Update bleibt erhalten
+    }
+  };
+
+  const deleteMieterEvent = async (eventId: string) => {
+    setEvents((prev) => prev.filter((e) => e.id !== eventId));
+    if (isDemo || isAdmin || !user?.id) return;
+    try {
+      const supabase = createClient();
+      if (!supabase) return;
+      await supabase.from("mieter_events").delete().eq("id", eventId);
+    } catch {
+      // lokales Löschen bleibt erhalten
+    }
+  };
+
   // DATEV-Import: Datei verarbeiten
   const processImportFile = async (file: File) => {
     setIsImporting(true);
@@ -1363,7 +1405,14 @@ export function MieterdatenView() {
                           );
                         })()}
                       </div>
-                      <p className="text-xs truncate text-muted-foreground">{m.geschoss}</p>
+                      <div className="flex items-center gap-1">
+                        <p className="text-xs truncate text-muted-foreground">{m.geschoss}</p>
+                        {m.isKurzzeitvermietung && (
+                          <span className="flex items-center gap-0.5 text-[10px] text-blue-500" title="Kurzzeitvermietung">
+                            <Clock className="h-3 w-3" />
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </button>
@@ -1375,42 +1424,10 @@ export function MieterdatenView() {
 
       {/* Right: Tenant Details with Tabs */}
       {selectedMieter && (
-        <div className="flex-1 overflow-auto space-y-4">
-          <div className="flex items-center justify-end gap-2 pb-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" className="h-9 w-9">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleExportAllDataPDF}>
-                  <FileDown className="h-4 w-4 mr-2" />
-                  In PDF Exportieren
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleDeleteMieter}
-                  disabled={mieterData.length <= 1}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Löschen
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button
-              size="sm"
-              className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
-              onClick={handleSave}
-            >
-              <Save className="h-4 w-4" />
-              <span className="hidden sm:inline">Speichern</span>
-            </Button>
-          </div>
-
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 max-w-4xl h-auto">
+        <div className="flex-1 flex flex-col min-h-0">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
+            <div className="shrink-0 pb-4 pr-2">
+              <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 max-w-4xl h-auto">
               <TabsTrigger
                 value="stammdaten"
                 className="text-xs sm:text-sm py-2"
@@ -1420,15 +1437,6 @@ export function MieterdatenView() {
               <TabsTrigger value="historie" className="text-xs sm:text-sm py-2">
                 <Calendar className="h-3 w-3 mr-1 hidden sm:inline" />
                 Historie
-              </TabsTrigger>
-              <TabsTrigger
-                value="verteilung"
-                className="text-xs sm:text-sm py-2"
-              >
-                Schlüssel
-              </TabsTrigger>
-              <TabsTrigger value="zaehler" className="text-xs sm:text-sm py-2">
-                Zähler
               </TabsTrigger>
               <TabsTrigger
                 value="zahlungen"
@@ -1455,12 +1463,56 @@ export function MieterdatenView() {
               >
                 Kontakt
               </TabsTrigger>
+              <TabsTrigger
+                value="vertrag"
+                className="text-xs sm:text-sm py-2"
+              >
+                Vertrag
+              </TabsTrigger>
             </TabsList>
+              <div className="flex items-center justify-end gap-3 mt-4">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-9 w-9">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={handleExportAllDataPDF}>
+                      <FileDown className="h-4 w-4 mr-2" />
+                      In PDF Exportieren
+                    </DropdownMenuItem>
+                    <DropdownMenuItem disabled>
+                      <Archive className="h-4 w-4 mr-2" />
+                      Archivieren
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={handleDeleteMieter}
+                      disabled={mieterData.length <= 1}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Löschen
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  size="sm"
+                  className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
+                  onClick={handleSave}
+                >
+                  <Save className="h-4 w-4" />
+                  <span className="hidden sm:inline">Speichern</span>
+                </Button>
+              </div>
+            </div>
 
+            <div className="flex-1 min-h-0 pr-2">
             {/* Tab 1: Stammdaten */}
             <TabsContent
               value="stammdaten"
-              className="mt-4 sm:mt-6 space-y-4"
+              className="mt-4 sm:mt-6 space-y-4 overflow-auto h-full"
             >
               {/* Sektion: Stammdaten */}
               <Card>
@@ -1698,42 +1750,45 @@ export function MieterdatenView() {
             </TabsContent>
 
             {/* Tab 2: Ereignis-Protokoll / Timeline */}
-            <TabsContent value="historie" className="mt-6 space-y-4">
-              {/* Header */}
-              <div>
-                <h3 className="text-base font-semibold">Ereignis-Protokoll</h3>
-                <p className="text-sm text-muted-foreground">
-                  Zahlungen, Mahnungen und Mitteilungen für{" "}
-                  {selectedMieter?.name}
-                </p>
+            <TabsContent value="historie" className="mt-6 flex flex-col h-full min-h-0">
+              {/* Header + Filter – fixed */}
+              <div className="shrink-0 pb-4 space-y-4">
+                <div>
+                  <h3 className="text-base font-semibold">Ereignis-Protokoll</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Zahlungen, Mahnungen und Mitteilungen für{" "}
+                    {selectedMieter?.name}
+                  </p>
+                </div>
+
+                {/* Filter + Notiz-Button */}
+                <div className="flex items-center gap-2">
+                  <Select value={eventFilter} onValueChange={setEventFilter}>
+                    <SelectTrigger className="w-[160px] h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="alle">Alle</SelectItem>
+                      <SelectItem value="zahlungen">Zahlungen</SelectItem>
+                      <SelectItem value="mahnungen">Mahnungen</SelectItem>
+                      <SelectItem value="mitteilungen">Mitteilungen</SelectItem>
+                      <SelectItem value="notizen">Notizen</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={() => setIsAddNoteOpen(true)}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Notiz hinzufügen
+                  </Button>
+                </div>
               </div>
 
-              {/* Filter + Notiz-Button */}
-              <div className="flex items-center gap-2">
-                <Select value={eventFilter} onValueChange={setEventFilter}>
-                  <SelectTrigger className="w-[160px] h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="alle">Alle</SelectItem>
-                    <SelectItem value="zahlungen">Zahlungen</SelectItem>
-                    <SelectItem value="mahnungen">Mahnungen</SelectItem>
-                    <SelectItem value="mitteilungen">Mitteilungen</SelectItem>
-                    <SelectItem value="notizen">Notizen</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => setIsAddNoteOpen(true)}
-                >
-                  <Plus className="h-4 w-4" />
-                  Notiz hinzufügen
-                </Button>
-              </div>
-
-              {/* Timeline oder Ladeindikator */}
+              {/* Timeline oder Ladeindikator – scrollbar */}
+              <div className="flex-1 overflow-auto min-h-0">
               {eventsLoading ? (
                 <div className="flex justify-center py-10">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -1788,7 +1843,31 @@ export function MieterdatenView() {
                                     </p>
                                   )}
                                 </div>
-                                <div className="text-right shrink-0 text-xs text-muted-foreground">
+                                <div className="flex items-start gap-2 shrink-0">
+                                  {event.event_type === "notiz" && (
+                                    <div className="flex items-center gap-1 mt-0.5">
+                                      <button
+                                        type="button"
+                                        title="Notiz bearbeiten"
+                                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                        onClick={() => {
+                                          setEditingEventId(event.id);
+                                          setEditNoteText(event.title);
+                                        }}
+                                      >
+                                        <Pencil className="h-3.5 w-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        title="Notiz löschen"
+                                        className="p-1 rounded hover:bg-destructive/10 text-red-500 hover:text-red-600 transition-colors"
+                                        onClick={() => deleteMieterEvent(event.id)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  )}
+                                  <div className="text-right text-xs text-muted-foreground">
                                   <p>
                                     {new Date(event.created_at).toLocaleDateString(
                                       "de-DE",
@@ -1802,8 +1881,41 @@ export function MieterdatenView() {
                                   {event.created_by && (
                                     <p className="mt-0.5">{event.created_by}</p>
                                   )}
+                                  </div>
                                 </div>
                               </div>
+                              {editingEventId === event.id && (
+                                <div className="flex gap-2 mt-2">
+                                  <Textarea
+                                    rows={2}
+                                    value={editNoteText}
+                                    onChange={(e) => setEditNoteText(e.target.value)}
+                                    className="text-sm"
+                                  />
+                                  <div className="flex flex-col gap-1">
+                                    <Button
+                                      size="sm"
+                                      className="h-7 text-xs"
+                                      disabled={!editNoteText.trim()}
+                                      onClick={() => updateMieterEvent(event.id, editNoteText.trim())}
+                                    >
+                                      <Save className="h-3 w-3 mr-1" />
+                                      OK
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 text-xs"
+                                      onClick={() => {
+                                        setEditingEventId(null);
+                                        setEditNoteText("");
+                                      }}
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              )}
                             </CardContent>
                           </Card>
                         </div>
@@ -1812,89 +1924,30 @@ export function MieterdatenView() {
                   </div>
                 </div>
               )}
+              </div>
             </TabsContent>
 
-            {/* Tab 3: Verteilungsschlüssel */}
-            <TabsContent value="verteilung" className="mt-6 space-y-6">
+            {/* Tab: Vertrag (Platzhalter) */}
+            <TabsContent value="vertrag" className="mt-6 space-y-6 overflow-auto h-full">
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">
-                    Verteilungsschlüssel
-                  </CardTitle>
+                  <CardTitle className="text-base">Mietvertrag</CardTitle>
                   <CardDescription className="text-xs">
-                    Informationen zur Nebenkostenabrechnung für{" "}
-                    {editedMieter?.name}
+                    Vertragsinformationen für {editedMieter?.name}
                   </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="wohnflaeche-anteil">Wohnung</Label>
-                      <Input
-                        id="wohnflaeche-anteil"
-                        value={editedMieter?.geschoss || ""}
-                        readOnly
-                        className="bg-muted"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="prozentanteile">Prozentanteil (%)</Label>
-                      <Input
-                        id="prozentanteile"
-                        type="number"
-                        step="0.1"
-                        value={editedMieter?.prozentanteil || 0}
-                        onChange={(e) =>
-                          updateEditedMieter(
-                            "prozentanteil",
-                            parseFloat(e.target.value) || 0,
-                          )
-                        }
-                        placeholder="z.B. 12.5"
-                      />
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Der Prozentanteil wird für die Verteilung der Nebenkosten
-                    verwendet. Vergessen Sie nicht, die Änderungen zu speichern.
-                  </p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Tab 3: Zählerstände (Zwischenzähler) */}
-            <TabsContent value="zaehler" className="mt-6 space-y-6">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">
-                    Zählerstände (Zwischenzähler)
-                  </CardTitle>
-                  <CardDescription className="text-xs">
-                    Zähler für {editedMieter?.name} - {editedMieter?.geschoss}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
-                    Die Zählerstände werden im Bereich "Zählerstände" verwaltet.
-                  </p>
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <p className="text-sm">
-                      Wohnung:{" "}
-                      <span className="font-medium">
-                        {editedMieter?.geschoss}
-                      </span>
-                    </p>
-                    <p className="text-sm">
-                      Mieter:{" "}
-                      <span className="font-medium">{editedMieter?.name}</span>
-                    </p>
+                <CardContent>
+                  <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
+                    <FileText className="h-10 w-10 mb-3 opacity-25" />
+                    <p className="text-sm font-medium">Vertragsverwaltung</p>
+                    <p className="text-xs mt-1 opacity-70">Hier können zukünftig Vertragsdokumente und -details verwaltet werden.</p>
                   </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
             {/* Tab 4: Zahlungen */}
-            <TabsContent value="zahlungen" className="mt-4 space-y-4">
+            <TabsContent value="zahlungen" className="mt-4 space-y-4 overflow-auto h-full">
               {(() => {
                 const monat = getCurrentMonthKey();
                 const allZahlungen = mieterData.map((m) => getZahlungForMieter(m.id));
@@ -2259,7 +2312,7 @@ export function MieterdatenView() {
             </TabsContent>
 
             {/* Tab 5: Kommunikation */}
-            <TabsContent value="kommunikation" className="mt-6 space-y-6">
+            <TabsContent value="kommunikation" className="mt-6 space-y-6 overflow-auto h-full">
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Mitteilung an den Mieter</CardTitle>
@@ -2333,6 +2386,7 @@ export function MieterdatenView() {
                 </CardContent>
               </Card>
             </TabsContent>
+            </div>
           </Tabs>
         </div>
       )}
