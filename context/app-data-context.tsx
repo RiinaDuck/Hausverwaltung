@@ -50,9 +50,12 @@ export interface Objekt {
   eigentuemer: {
     name: string;
     adresse: string;
+    plz?: string;
+    ort?: string;
     telefon: string;
     email: string;
     mobil: string;
+    fax?: string;
   };
   bankverbindung: {
     kontoinhaber: string;
@@ -67,6 +70,7 @@ export interface Objekt {
     baujahr: string;
     sanierungsjahr: string;
     gesamtwohnflaeche: string;
+    gesamtwohnflaeche2?: string;
     gesamtnutzflaeche: string;
     anzahlEinheiten: string;
     garagen: string;
@@ -82,12 +86,14 @@ export interface Objekt {
     grundstueckGroesse?: string;
     gemarkung?: string;
     // Grundbuch
+    grundbuchbezeichnung?: string;
     amtsgericht?: string;
     blatt?: string;
     lastenAbt2?: string;
     lastenAbt3?: string;
-    // Kontakt
+    // Steuer
     finanzamt?: string;
+    ustIdNr?: string;
   };
   notizen: string;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,13 +22,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Save, Plus, Building2, Trash2, Edit } from "lucide-react";
+import { Save, Plus, Building2, Trash2, Edit, MoreHorizontal } from "lucide-react";
 import { useAppData } from "@/context/app-data-context";
 import { useAuth } from "@/context/auth-context";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { validateRequired, validatePLZ } from "@/lib/validation";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface ObjektdatenViewProps {
   onNavigate?: (view: "wohnungen") => void;
@@ -335,14 +343,6 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-          <Button
-            className="gap-2 bg-success hover:bg-success/90 text-success-foreground button-hover"
-            onClick={handleSave}
-            size="sm"
-          >
-            <Save className="h-4 w-4" />
-            <span className="hidden sm:inline">Speichern</span>
-          </Button>
         </div>
       </div>
 
@@ -428,78 +428,310 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
       </Card>
 
       {selectedObjekt && (
-        <>
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Left Column: Owner */}
-            <div className="space-y-6">
-              {/* Eigentümer und Bankverbindung */}
-              <Card className="hover-glow">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-base">
-                    Eigentümer und Bankverbindung
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+        <Tabs defaultValue="stammdaten" className="space-y-4">
+          <div className="flex flex-col gap-4">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 max-w-4xl h-auto">
+              <TabsTrigger value="stammdaten" className="text-xs sm:text-sm py-2">Stammdaten</TabsTrigger>
+              <TabsTrigger value="eigentuemer" className="text-xs sm:text-sm py-2">Eigentümer</TabsTrigger>
+              <TabsTrigger value="liegenschaft" className="text-xs sm:text-sm py-2">Liegenschaft</TabsTrigger>
+              <TabsTrigger value="energieausweis" className="text-xs sm:text-sm py-2">Energieausweis</TabsTrigger>
+            </TabsList>
+            <div className="flex items-center justify-end gap-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" className="h-9 w-9">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      handleEditObjekt(selectedObjekt);
+                    }}
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Bearbeiten
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => handleDeleteObjekt(selectedObjekt)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Löschen
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <Button
+                className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
+                onClick={handleSave}
+              >
+                <Save className="h-4 w-4" />
+                Speichern
+              </Button>
+            </div>
+          </div>
+
+          {/* TAB 1: Stammdaten */}
+          <TabsContent value="stammdaten" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Objektanschrift</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="obj-name">Objektname</Label>
+                  <Input
+                    id="obj-name"
+                    value={selectedObjekt.name}
+                    onChange={(e) =>
+                      updateObjekt(selectedObjekt.id, { name: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="obj-strasse">Straße</Label>
+                  <Input
+                    id="obj-strasse"
+                    value={selectedObjekt.objektdaten.strasse}
+                    onChange={(e) =>
+                      updateObjekt(selectedObjekt.id, {
+                        objektdaten: {
+                          ...selectedObjekt.objektdaten,
+                          strasse: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="name">Name</Label>
+                    <Label htmlFor="obj-plz">PLZ</Label>
                     <Input
-                      id="name"
-                      value={selectedObjekt.eigentuemer.name}
+                      id="obj-plz"
+                      value={selectedObjekt.objektdaten.plz}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            plz: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label htmlFor="obj-ort">Ort</Label>
+                    <Input
+                      id="obj-ort"
+                      value={selectedObjekt.objektdaten.ort}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            ort: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Notizen zum Objekt</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Textarea
+                  placeholder="Fügen Sie hier allgemeine Notizen zum Objekt hinzu..."
+                  rows={4}
+                  value={selectedObjekt.notizen}
+                  onChange={(e) =>
+                    updateObjekt(selectedObjekt.id, {
+                      notizen: e.target.value,
+                    })
+                  }
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Immobilien-Daten</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="baujahr">Baujahr</Label>
+                    <Input
+                      id="baujahr"
+                      value={selectedObjekt.objektdaten.baujahr}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            baujahr: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sanierungsjahr">Sanierungsjahr</Label>
+                    <Input
+                      id="sanierungsjahr"
+                      value={selectedObjekt.objektdaten.sanierungsjahr}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            sanierungsjahr: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="garagen">Garagen/Stellplätze</Label>
+                    <Input
+                      id="garagen"
+                      value={selectedObjekt.objektdaten.garagen}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            garagen: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="anzahl-mieteinheiten">Anzahl Mieteinheiten</Label>
+                    <Input
+                      id="anzahl-mieteinheiten"
+                      value={wohnungen.filter((w) => w.objektId === selectedObjekt.id).length}
+                      readOnly
+                      className="bg-muted"
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB 2: Eigentümer */}
+          <TabsContent value="eigentuemer" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Eigentümer</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="eig-name">Name</Label>
+                  <Input
+                    id="eig-name"
+                    value={selectedObjekt.eigentuemer.name}
+                    onChange={(e) =>
+                      updateObjekt(selectedObjekt.id, {
+                        eigentuemer: {
+                          ...selectedObjekt.eigentuemer,
+                          name: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="eig-adresse">Adresse</Label>
+                  <Input
+                    id="eig-adresse"
+                    value={selectedObjekt.eigentuemer.adresse}
+                    onChange={(e) =>
+                      updateObjekt(selectedObjekt.id, {
+                        eigentuemer: {
+                          ...selectedObjekt.eigentuemer,
+                          adresse: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="eig-plz">PLZ</Label>
+                    <Input
+                      id="eig-plz"
+                      value={selectedObjekt.eigentuemer.plz || ""}
                       onChange={(e) =>
                         updateObjekt(selectedObjekt.id, {
                           eigentuemer: {
                             ...selectedObjekt.eigentuemer,
-                            name: e.target.value,
+                            plz: e.target.value,
                           },
                         })
                       }
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="adresse">Adresse</Label>
+                  <div className="col-span-2 space-y-2">
+                    <Label htmlFor="eig-ort">Ort</Label>
                     <Input
-                      id="adresse"
-                      value={selectedObjekt.eigentuemer.adresse}
+                      id="eig-ort"
+                      value={selectedObjekt.eigentuemer.ort || ""}
                       onChange={(e) =>
                         updateObjekt(selectedObjekt.id, {
                           eigentuemer: {
                             ...selectedObjekt.eigentuemer,
-                            adresse: e.target.value,
+                            ort: e.target.value,
                           },
                         })
                       }
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="kontoinhaber">Kontoinhaber</Label>
-                    <Input
-                      id="kontoinhaber"
-                      value={selectedObjekt.bankverbindung.kontoinhaber}
-                      onChange={(e) =>
-                        updateObjekt(selectedObjekt.id, {
-                          bankverbindung: {
-                            ...selectedObjekt.bankverbindung,
-                            kontoinhaber: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="bank">Bank</Label>
-                    <Input
-                      id="bank"
-                      value={selectedObjekt.bankverbindung.bank}
-                      onChange={(e) =>
-                        updateObjekt(selectedObjekt.id, {
-                          bankverbindung: {
-                            ...selectedObjekt.bankverbindung,
-                            bank: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Bankverbindung</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="kontoinhaber">Kontoinhaber</Label>
+                  <Input
+                    id="kontoinhaber"
+                    value={selectedObjekt.bankverbindung.kontoinhaber}
+                    onChange={(e) =>
+                      updateObjekt(selectedObjekt.id, {
+                        bankverbindung: {
+                          ...selectedObjekt.bankverbindung,
+                          kontoinhaber: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bank">Bank</Label>
+                  <Input
+                    id="bank"
+                    value={selectedObjekt.bankverbindung.bank}
+                    onChange={(e) =>
+                      updateObjekt(selectedObjekt.id, {
+                        bankverbindung: {
+                          ...selectedObjekt.bankverbindung,
+                          bank: e.target.value,
+                        },
+                      })
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="iban">IBAN</Label>
                     <Input
@@ -530,164 +762,135 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
                       }
                     />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="ustid">USt-IdNr.</Label>
-                      <Input id="ustid" placeholder="DE123456789" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="finanzamt">Finanzamt</Label>
-                      <Input
-                        id="finanzamt"
-                        value={selectedObjekt.objektdaten.finanzamt || ""}
-                        onChange={(e) =>
-                          updateObjekt(selectedObjekt.id, {
-                            objektdaten: {
-                              ...selectedObjekt.objektdaten,
-                              finanzamt: e.target.value,
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                </div>
+              </CardContent>
+            </Card>
 
-              {/* Kontakt */}
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-base">Kontakt</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="telefon">Telefon</Label>
-                      <Input
-                        id="telefon"
-                        value={selectedObjekt.eigentuemer.telefon}
-                        onChange={(e) =>
-                          updateObjekt(selectedObjekt.id, {
-                            eigentuemer: {
-                              ...selectedObjekt.eigentuemer,
-                              telefon: e.target.value,
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="fax">Fax</Label>
-                      <Input id="fax" placeholder="030 12345679" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">E-Mail</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={selectedObjekt.eigentuemer.email}
-                        onChange={(e) =>
-                          updateObjekt(selectedObjekt.id, {
-                            eigentuemer: {
-                              ...selectedObjekt.eigentuemer,
-                              email: e.target.value,
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="mobil">Mobil</Label>
-                      <Input
-                        id="mobil"
-                        value={selectedObjekt.eigentuemer.mobil}
-                        onChange={(e) =>
-                          updateObjekt(selectedObjekt.id, {
-                            eigentuemer: {
-                              ...selectedObjekt.eigentuemer,
-                              mobil: e.target.value,
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Right Column: Property */}
-            <div className="space-y-6">
-              {/* Objektanschrift */}
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-base">Objektanschrift</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Steuer</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="obj-strasse">Straße</Label>
+                    <Label htmlFor="ustid">USt-IdNr.</Label>
                     <Input
-                      id="obj-strasse"
-                      value={selectedObjekt.objektdaten.strasse}
+                      id="ustid"
+                      placeholder="DE123456789"
+                      value={selectedObjekt.objektdaten.ustIdNr || ""}
                       onChange={(e) =>
                         updateObjekt(selectedObjekt.id, {
                           objektdaten: {
                             ...selectedObjekt.objektdaten,
-                            strasse: e.target.value,
+                            ustIdNr: e.target.value,
                           },
                         })
                       }
                     />
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="obj-plz">PLZ</Label>
-                      <Input
-                        id="obj-plz"
-                        value={selectedObjekt.objektdaten.plz}
-                        onChange={(e) =>
-                          updateObjekt(selectedObjekt.id, {
-                            objektdaten: {
-                              ...selectedObjekt.objektdaten,
-                              plz: e.target.value,
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="col-span-2 space-y-2">
-                      <Label htmlFor="obj-ort">Ort</Label>
-                      <Input
-                        id="obj-ort"
-                        value={selectedObjekt.objektdaten.ort}
-                        onChange={(e) =>
-                          updateObjekt(selectedObjekt.id, {
-                            objektdaten: {
-                              ...selectedObjekt.objektdaten,
-                              ort: e.target.value,
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Verteilschlüssel-Basis */}
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-base">
-                    Verteilschlüssel-Basis
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="gesamtwohnflaeche">
-                      Gesamtwohnfläche (m²)
-                    </Label>
+                    <Label htmlFor="finanzamt">Finanzamt</Label>
+                    <Input
+                      id="finanzamt"
+                      value={selectedObjekt.objektdaten.finanzamt || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            finanzamt: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Kontakt</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="telefon">Telefon</Label>
+                    <Input
+                      id="telefon"
+                      value={selectedObjekt.eigentuemer.telefon}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          eigentuemer: {
+                            ...selectedObjekt.eigentuemer,
+                            telefon: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="mobil">Mobil</Label>
+                    <Input
+                      id="mobil"
+                      value={selectedObjekt.eigentuemer.mobil}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          eigentuemer: {
+                            ...selectedObjekt.eigentuemer,
+                            mobil: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="fax">Fax</Label>
+                    <Input
+                      id="fax"
+                      value={selectedObjekt.eigentuemer.fax || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          eigentuemer: {
+                            ...selectedObjekt.eigentuemer,
+                            fax: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">E-Mail</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={selectedObjekt.eigentuemer.email}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          eigentuemer: {
+                            ...selectedObjekt.eigentuemer,
+                            email: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB 3: Liegenschaft */}
+          <TabsContent value="liegenschaft" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Verteilungsschlüssel-Basis</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="gesamtwohnflaeche">Gesamtwohnfläche (m²)</Label>
                     <Input
                       id="gesamtwohnflaeche"
                       value={selectedObjekt.objektdaten.gesamtwohnflaeche}
@@ -702,9 +905,24 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="gesamtnutzflaeche">
-                      Gesamtnutzfläche (m²)
-                    </Label>
+                    <Label htmlFor="gesamtwohnflaeche2">Gesamtwohnfläche 2 (m²)</Label>
+                    <Input
+                      id="gesamtwohnflaeche2"
+                      value={selectedObjekt.objektdaten.gesamtwohnflaeche2 || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            gesamtwohnflaeche2: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="gesamtnutzflaeche">Gesamtnutzfläche (m²)</Label>
                     <Input
                       id="gesamtnutzflaeche"
                       value={selectedObjekt.objektdaten.gesamtnutzflaeche}
@@ -733,223 +951,13 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
                       }
                     />
                   </div>
-                </CardContent>
-              </Card>
-
-              {/* Immobilien-Daten */}
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-base">Immobilien-Daten</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="baujahr">Baujahr</Label>
-                      <Input
-                        id="baujahr"
-                        value={selectedObjekt.objektdaten.baujahr}
-                        onChange={(e) =>
-                          updateObjekt(selectedObjekt.id, {
-                            objektdaten: {
-                              ...selectedObjekt.objektdaten,
-                              baujahr: e.target.value,
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="sanierungsjahr">Sanierungsjahr</Label>
-                      <Input
-                        id="sanierungsjahr"
-                        value={selectedObjekt.objektdaten.sanierungsjahr}
-                        onChange={(e) =>
-                          updateObjekt(selectedObjekt.id, {
-                            objektdaten: {
-                              ...selectedObjekt.objektdaten,
-                              sanierungsjahr: e.target.value,
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="garagen">Garagen/Stellplätze</Label>
-                    <Input
-                      id="garagen"
-                      value={selectedObjekt.objektdaten.garagen}
-                      onChange={(e) =>
-                        updateObjekt(selectedObjekt.id, {
-                          objektdaten: {
-                            ...selectedObjekt.objektdaten,
-                            garagen: e.target.value,
-                          },
-                        })
-                      }
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Energieausweis */}
-              <Card>
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-base">Energieausweis</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="energie-art">
-                        Art (Bedarf/Verbrauch)
-                      </Label>
-                      <Select
-                        value={
-                          selectedObjekt.objektdaten.energieArt || "bedarf"
-                        }
-                        onValueChange={(value) =>
-                          updateObjekt(selectedObjekt.id, {
-                            objektdaten: {
-                              ...selectedObjekt.objektdaten,
-                              energieArt: value,
-                            },
-                          })
-                        }
-                      >
-                        <SelectTrigger id="energie-art">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="bedarf">Bedarfsausweis</SelectItem>
-                          <SelectItem value="verbrauch">
-                            Verbrauchsausweis
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="energie-wert">Wert (kWh/m²)</Label>
-                      <Input
-                        id="energie-wert"
-                        value={selectedObjekt.objektdaten.energieWert || ""}
-                        onChange={(e) =>
-                          updateObjekt(selectedObjekt.id, {
-                            objektdaten: {
-                              ...selectedObjekt.objektdaten,
-                              energieWert: e.target.value,
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="energietraeger">Energieträger</Label>
-                      <Select
-                        value={
-                          selectedObjekt.objektdaten.energietraeger || "gas"
-                        }
-                        onValueChange={(value) =>
-                          updateObjekt(selectedObjekt.id, {
-                            objektdaten: {
-                              ...selectedObjekt.objektdaten,
-                              energietraeger: value,
-                            },
-                          })
-                        }
-                      >
-                        <SelectTrigger id="energietraeger">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="gas">Gas</SelectItem>
-                          <SelectItem value="oel">Öl</SelectItem>
-                          <SelectItem value="fernwaerme">Fernwärme</SelectItem>
-                          <SelectItem value="strom">Strom</SelectItem>
-                          <SelectItem value="waermepumpe">
-                            Wärmepumpe
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="energie-baujahr">Baujahr Heizung</Label>
-                      <Input
-                        id="energie-baujahr"
-                        value={selectedObjekt.objektdaten.energieBaujahr || ""}
-                        onChange={(e) =>
-                          updateObjekt(selectedObjekt.id, {
-                            objektdaten: {
-                              ...selectedObjekt.objektdaten,
-                              energieBaujahr: e.target.value,
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="energie-klasse">Klasse (A-H)</Label>
-                    <Select
-                      value={selectedObjekt.objektdaten.energieKlasse || "d"}
-                      onValueChange={(value) =>
-                        updateObjekt(selectedObjekt.id, {
-                          objektdaten: {
-                            ...selectedObjekt.objektdaten,
-                            energieKlasse: value,
-                          },
-                        })
-                      }
-                    >
-                      <SelectTrigger id="energie-klasse">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="a+">A+</SelectItem>
-                        <SelectItem value="a">A</SelectItem>
-                        <SelectItem value="b">B</SelectItem>
-                        <SelectItem value="c">C</SelectItem>
-                        <SelectItem value="d">D</SelectItem>
-                        <SelectItem value="e">E</SelectItem>
-                        <SelectItem value="f">F</SelectItem>
-                        <SelectItem value="g">G</SelectItem>
-                        <SelectItem value="h">H</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-
-          {/* Bottom Section */}
-          <div className="grid lg:grid-cols-2 gap-6">
-            {/* Notizen zum Objekt */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base">Notizen zum Objekt</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  placeholder="Fügen Sie hier allgemeine Notizen zum Objekt hinzu..."
-                  rows={6}
-                  value={selectedObjekt.notizen}
-                  onChange={(e) =>
-                    updateObjekt(selectedObjekt.id, {
-                      notizen: e.target.value,
-                    })
-                  }
-                />
+                </div>
               </CardContent>
             </Card>
 
-            {/* Daten zum Grundstück */}
             <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-base">
-                  Daten zum Grundstück
-                </CardTitle>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Daten zum Grundstück</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -989,9 +997,7 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
                     <Label htmlFor="grundstueck-groesse">Größe (m²)</Label>
                     <Input
                       id="grundstueck-groesse"
-                      value={
-                        selectedObjekt.objektdaten.grundstueckGroesse || ""
-                      }
+                      value={selectedObjekt.objektdaten.grundstueckGroesse || ""}
                       onChange={(e) =>
                         updateObjekt(selectedObjekt.id, {
                           objektdaten: {
@@ -1020,84 +1026,219 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
                 </div>
               </CardContent>
             </Card>
-          </div>
 
-          {/* Grundbuch */}
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base">Grundbuch</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Grundbuch</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="amtsgericht">Amtsgericht</Label>
+                  <Label htmlFor="grundbuchbezeichnung">Grundbuchbezeichnung</Label>
                   <Input
-                    id="amtsgericht"
-                    value={selectedObjekt.objektdaten.amtsgericht || ""}
+                    id="grundbuchbezeichnung"
+                    value={selectedObjekt.objektdaten.grundbuchbezeichnung || ""}
                     onChange={(e) =>
                       updateObjekt(selectedObjekt.id, {
                         objektdaten: {
                           ...selectedObjekt.objektdaten,
-                          amtsgericht: e.target.value,
+                          grundbuchbezeichnung: e.target.value,
                         },
                       })
                     }
                   />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="amtsgericht">Amtsgericht</Label>
+                    <Input
+                      id="amtsgericht"
+                      value={selectedObjekt.objektdaten.amtsgericht || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            amtsgericht: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="blatt">Blatt</Label>
+                    <Input
+                      id="blatt"
+                      value={selectedObjekt.objektdaten.blatt || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            blatt: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid lg:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="lasten-abt2">Lasten Abteilung II</Label>
+                    <Textarea
+                      id="lasten-abt2"
+                      placeholder="z.B. Wegerechte, Wohnrechte..."
+                      rows={4}
+                      value={selectedObjekt.objektdaten.lastenAbt2 || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            lastenAbt2: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lasten-abt3">Lasten Abteilung III</Label>
+                    <Textarea
+                      id="lasten-abt3"
+                      rows={4}
+                      value={selectedObjekt.objektdaten.lastenAbt3 || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            lastenAbt3: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB 4: Energieausweis */}
+          <TabsContent value="energieausweis" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Energieausweis</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="energie-art">Art (Bedarf/Verbrauch)</Label>
+                    <Select
+                      value={selectedObjekt.objektdaten.energieArt || "bedarf"}
+                      onValueChange={(value) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            energieArt: value,
+                          },
+                        })
+                      }
+                    >
+                      <SelectTrigger id="energie-art">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="bedarf">Bedarfsausweis</SelectItem>
+                        <SelectItem value="verbrauch">Verbrauchsausweis</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="energie-wert">Wert (kWh/m²)</Label>
+                    <Input
+                      id="energie-wert"
+                      value={selectedObjekt.objektdaten.energieWert || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            energieWert: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="energietraeger">Energieträger</Label>
+                    <Select
+                      value={selectedObjekt.objektdaten.energietraeger || "gas"}
+                      onValueChange={(value) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            energietraeger: value,
+                          },
+                        })
+                      }
+                    >
+                      <SelectTrigger id="energietraeger">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="gas">Gas</SelectItem>
+                        <SelectItem value="oel">Öl</SelectItem>
+                        <SelectItem value="fernwaerme">Fernwärme</SelectItem>
+                        <SelectItem value="strom">Strom</SelectItem>
+                        <SelectItem value="waermepumpe">Wärmepumpe</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="energie-baujahr">Baujahr Heizung</Label>
+                    <Input
+                      id="energie-baujahr"
+                      value={selectedObjekt.objektdaten.energieBaujahr || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          objektdaten: {
+                            ...selectedObjekt.objektdaten,
+                            energieBaujahr: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="blatt">Blatt</Label>
-                  <Input
-                    id="blatt"
-                    value={selectedObjekt.objektdaten.blatt || ""}
-                    onChange={(e) =>
+                  <Label htmlFor="energie-klasse">Klasse (A-H)</Label>
+                  <Select
+                    value={selectedObjekt.objektdaten.energieKlasse || "d"}
+                    onValueChange={(value) =>
                       updateObjekt(selectedObjekt.id, {
                         objektdaten: {
                           ...selectedObjekt.objektdaten,
-                          blatt: e.target.value,
+                          energieKlasse: value,
                         },
                       })
                     }
-                  />
+                  >
+                    <SelectTrigger id="energie-klasse">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="a+">A+</SelectItem>
+                      <SelectItem value="a">A</SelectItem>
+                      <SelectItem value="b">B</SelectItem>
+                      <SelectItem value="c">C</SelectItem>
+                      <SelectItem value="d">D</SelectItem>
+                      <SelectItem value="e">E</SelectItem>
+                      <SelectItem value="f">F</SelectItem>
+                      <SelectItem value="g">G</SelectItem>
+                      <SelectItem value="h">H</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-              </div>
-              <div className="grid lg:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="lasten-abt2">Lasten Abteilung II</Label>
-                  <Textarea
-                    id="lasten-abt2"
-                    placeholder="z.B. Wegerechte, Wohnrechte..."
-                    rows={4}
-                    value={selectedObjekt.objektdaten.lastenAbt2 || ""}
-                    onChange={(e) =>
-                      updateObjekt(selectedObjekt.id, {
-                        objektdaten: {
-                          ...selectedObjekt.objektdaten,
-                          lastenAbt2: e.target.value,
-                        },
-                      })
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lasten-abt3">Lasten Abteilung III</Label>
-                  <Textarea
-                    id="lasten-abt3"
-                    rows={4}
-                    value={selectedObjekt.objektdaten.lastenAbt3 || ""}
-                    onChange={(e) =>
-                      updateObjekt(selectedObjekt.id, {
-                        objektdaten: {
-                          ...selectedObjekt.objektdaten,
-                          lastenAbt3: e.target.value,
-                        },
-                      })
-                    }
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       )}
 
       {/* Delete Confirmation Dialog */}
