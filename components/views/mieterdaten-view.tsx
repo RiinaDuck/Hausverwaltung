@@ -67,7 +67,15 @@ import {
   Loader2,
   Pencil,
   Archive,
+  FileSignature,
+  CalendarClock,
+  Building2,
+  Scale,
+  ExternalLink,
+  Star,
+  Info,
 } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -295,6 +303,28 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
   const [editNoteText, setEditNoteText] = useState("");
   const [newNoteText, setNewNoteText] = useState("");
   const [isSendingEmail, setIsSendingEmail] = useState(false);
+
+  // Vertrag-State
+  const [vertragDialogOpen, setVertragDialogOpen] = useState(false);
+  const [vertragTyp, setVertragTyp] = useState<"unbefristet" | "befristet" | "kurzzeit" | null>(null);
+  const [anwaltDialogOpen, setAnwaltDialogOpen] = useState(false);
+  const [vertragForm, setVertragForm] = useState({
+    vermieterName: "",
+    vermieterAdresse: "",
+    mieterAnrede: "",
+    mieterName: "",
+    objektAdresse: "",
+    etage: "",
+    flaeche: "",
+    zimmer: "",
+    einzugsdatum: "",
+    enddatum: "",
+    kaltmiete: "",
+    nebenkosten: "",
+    kaution: "",
+    faelligkeit: "1",
+    iban: "",
+  });
 
   const { toast } = useToast();
 
@@ -1927,20 +1957,143 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
               </div>
             </TabsContent>
 
-            {/* Tab: Vertrag (Platzhalter) */}
+            {/* Tab: Vertrag */}
             <TabsContent value="vertrag" className="mt-6 space-y-6 overflow-auto h-full">
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Mietvertrag</CardTitle>
                   <CardDescription className="text-xs">
-                    Vertragsinformationen für {editedMieter?.name}
+                    Vertragsdokument für {editedMieter?.name} erstellen
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-                    <FileText className="h-10 w-10 mb-3 opacity-25" />
-                    <p className="text-sm font-medium">Vertragsverwaltung</p>
-                    <p className="text-xs mt-1 opacity-70">Hier können zukünftig Vertragsdokumente und -details verwaltet werden.</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* 1. Unbefristeter Mietvertrag */}
+                    <button
+                      type="button"
+                      className="group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                      onClick={() => {
+                        const wohnung = wohnungen.find((w) => w.id === editedMieter?.wohnungId);
+                        setVertragTyp("unbefristet");
+                        setVertragForm({
+                          vermieterName: currentObjekt?.eigentuemer?.name || "",
+                          vermieterAdresse: currentObjekt?.eigentuemer?.adresse
+                            ? `${currentObjekt.eigentuemer.adresse}${currentObjekt.eigentuemer.plz ? `, ${currentObjekt.eigentuemer.plz}` : ""}${currentObjekt.eigentuemer.ort ? ` ${currentObjekt.eigentuemer.ort}` : ""}`
+                            : "",
+                          mieterAnrede: editedMieter?.anrede || "",
+                          mieterName: editedMieter?.name || "",
+                          objektAdresse: currentObjekt?.objektdaten
+                            ? `${currentObjekt.objektdaten.strasse || ""}, ${currentObjekt.objektdaten.plz || ""} ${currentObjekt.objektdaten.ort || ""}`
+                            : currentObjekt?.adresse || "",
+                          etage: wohnung?.etage || "",
+                          flaeche: wohnung?.flaeche?.toString() || "",
+                          zimmer: wohnung?.zimmer?.toString() || "",
+                          einzugsdatum: editedMieter?.einzugsDatumRaw || "",
+                          enddatum: "",
+                          kaltmiete: editedMieter?.kaltmiete?.toString() || "",
+                          nebenkosten: editedMieter?.nebenkosten?.toString() || "",
+                          kaution: editedMieter?.kaution?.toString() || "",
+                          faelligkeit: "1",
+                          iban: currentObjekt?.bankverbindung?.iban || "",
+                        });
+                        setVertragDialogOpen(true);
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <FileSignature className="h-5 w-5 text-primary" />
+                        <span className="text-sm font-medium">Unbefristeter Mietvertrag</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Standardvertrag ohne zeitliche Begrenzung mit gesetzlicher Kündigungsfrist.</p>
+                    </button>
+
+                    {/* 2. Befristeter Mietvertrag */}
+                    <button
+                      type="button"
+                      className="group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                      onClick={() => {
+                        const wohnung = wohnungen.find((w) => w.id === editedMieter?.wohnungId);
+                        setVertragTyp("befristet");
+                        setVertragForm({
+                          vermieterName: currentObjekt?.eigentuemer?.name || "",
+                          vermieterAdresse: currentObjekt?.eigentuemer?.adresse
+                            ? `${currentObjekt.eigentuemer.adresse}${currentObjekt.eigentuemer.plz ? `, ${currentObjekt.eigentuemer.plz}` : ""}${currentObjekt.eigentuemer.ort ? ` ${currentObjekt.eigentuemer.ort}` : ""}`
+                            : "",
+                          mieterAnrede: editedMieter?.anrede || "",
+                          mieterName: editedMieter?.name || "",
+                          objektAdresse: currentObjekt?.objektdaten
+                            ? `${currentObjekt.objektdaten.strasse || ""}, ${currentObjekt.objektdaten.plz || ""} ${currentObjekt.objektdaten.ort || ""}`
+                            : currentObjekt?.adresse || "",
+                          etage: wohnung?.etage || "",
+                          flaeche: wohnung?.flaeche?.toString() || "",
+                          zimmer: wohnung?.zimmer?.toString() || "",
+                          einzugsdatum: editedMieter?.einzugsDatumRaw || "",
+                          enddatum: editedMieter?.mieteBisRaw || "",
+                          kaltmiete: editedMieter?.kaltmiete?.toString() || "",
+                          nebenkosten: editedMieter?.nebenkosten?.toString() || "",
+                          kaution: editedMieter?.kaution?.toString() || "",
+                          faelligkeit: "1",
+                          iban: currentObjekt?.bankverbindung?.iban || "",
+                        });
+                        setVertragDialogOpen(true);
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <CalendarClock className="h-5 w-5 text-primary" />
+                        <span className="text-sm font-medium">Befristeter Mietvertrag</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Zeitlich begrenzter Vertrag mit festem Enddatum und Befristungsgrund.</p>
+                    </button>
+
+                    {/* 3. Kurzzeitvermietung */}
+                    <button
+                      type="button"
+                      className="group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                      onClick={() => {
+                        const wohnung = wohnungen.find((w) => w.id === editedMieter?.wohnungId);
+                        setVertragTyp("kurzzeit");
+                        setVertragForm({
+                          vermieterName: currentObjekt?.eigentuemer?.name || "",
+                          vermieterAdresse: currentObjekt?.eigentuemer?.adresse
+                            ? `${currentObjekt.eigentuemer.adresse}${currentObjekt.eigentuemer.plz ? `, ${currentObjekt.eigentuemer.plz}` : ""}${currentObjekt.eigentuemer.ort ? ` ${currentObjekt.eigentuemer.ort}` : ""}`
+                            : "",
+                          mieterAnrede: editedMieter?.anrede || "",
+                          mieterName: editedMieter?.name || "",
+                          objektAdresse: currentObjekt?.objektdaten
+                            ? `${currentObjekt.objektdaten.strasse || ""}, ${currentObjekt.objektdaten.plz || ""} ${currentObjekt.objektdaten.ort || ""}`
+                            : currentObjekt?.adresse || "",
+                          etage: wohnung?.etage || "",
+                          flaeche: wohnung?.flaeche?.toString() || "",
+                          zimmer: wohnung?.zimmer?.toString() || "",
+                          einzugsdatum: editedMieter?.einzugsDatumRaw || "",
+                          enddatum: editedMieter?.kurzzeitBis || editedMieter?.mieteBisRaw || "",
+                          kaltmiete: editedMieter?.kaltmiete?.toString() || "",
+                          nebenkosten: editedMieter?.nebenkosten?.toString() || "",
+                          kaution: editedMieter?.kaution?.toString() || "",
+                          faelligkeit: "1",
+                          iban: currentObjekt?.bankverbindung?.iban || "",
+                        });
+                        setVertragDialogOpen(true);
+                      }}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-5 w-5 text-primary" />
+                        <span className="text-sm font-medium">Kurzzeitvermietung</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Möblierte Vermietung auf Zeit, z.B. für Monteure oder Studierende.</p>
+                    </button>
+
+                    {/* 4. Individueller Vertrag */}
+                    <button
+                      type="button"
+                      className="group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                      onClick={() => setAnwaltDialogOpen(true)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Scale className="h-5 w-5 text-primary" />
+                        <span className="text-sm font-medium">Individueller Vertrag</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Maßgeschneiderter Vertrag über einen Fachanwalt oder eigene Vorlage.</p>
+                    </button>
                   </div>
                 </CardContent>
               </Card>
@@ -2781,6 +2934,305 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
               {editingHistorieMieterId ? "Aktualisieren" : "Hinzufügen"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Vertrag prüfen & generieren */}
+      <Dialog open={vertragDialogOpen} onOpenChange={setVertragDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle>
+              {vertragTyp === "unbefristet" && "Unbefristeter Mietvertrag"}
+              {vertragTyp === "befristet" && "Befristeter Mietvertrag"}
+              {vertragTyp === "kurzzeit" && "Kurzzeitvermietung"}
+            </DialogTitle>
+            <DialogDescription>
+              Prüfen und korrigieren Sie die vorausgefüllten Daten vor der PDF-Erstellung.
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-1 overflow-auto px-6">
+            <div className="space-y-6 pb-4">
+              {/* Vermieter */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium">Vermieter</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="v-vermieter-name" className="text-xs">Name</Label>
+                    <Input id="v-vermieter-name" value={vertragForm.vermieterName} onChange={(e) => setVertragForm((p) => ({ ...p, vermieterName: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="v-vermieter-adresse" className="text-xs">Adresse</Label>
+                    <Input id="v-vermieter-adresse" value={vertragForm.vermieterAdresse} onChange={(e) => setVertragForm((p) => ({ ...p, vermieterAdresse: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+              {/* Mieter */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium">Mieter</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="v-mieter-anrede" className="text-xs">Anrede</Label>
+                    <Select value={vertragForm.mieterAnrede} onValueChange={(val) => setVertragForm((p) => ({ ...p, mieterAnrede: val }))}>
+                      <SelectTrigger id="v-mieter-anrede"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="herr">Herr</SelectItem>
+                        <SelectItem value="frau">Frau</SelectItem>
+                        <SelectItem value="familie">Familie</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="v-mieter-name" className="text-xs">Name</Label>
+                    <Input id="v-mieter-name" value={vertragForm.mieterName} onChange={(e) => setVertragForm((p) => ({ ...p, mieterName: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+              {/* Objekt */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium">Mietobjekt</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5 sm:col-span-2">
+                    <Label htmlFor="v-objekt-adresse" className="text-xs">Adresse</Label>
+                    <Input id="v-objekt-adresse" value={vertragForm.objektAdresse} onChange={(e) => setVertragForm((p) => ({ ...p, objektAdresse: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="v-etage" className="text-xs">Etage / Lage</Label>
+                    <Input id="v-etage" value={vertragForm.etage} onChange={(e) => setVertragForm((p) => ({ ...p, etage: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="v-flaeche" className="text-xs">Wohnfläche (m²)</Label>
+                    <Input id="v-flaeche" type="number" value={vertragForm.flaeche} onChange={(e) => setVertragForm((p) => ({ ...p, flaeche: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="v-zimmer" className="text-xs">Zimmer</Label>
+                    <Input id="v-zimmer" type="number" value={vertragForm.zimmer} onChange={(e) => setVertragForm((p) => ({ ...p, zimmer: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+              {/* Mietverhältnis */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium">Mietverhältnis</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="v-einzug" className="text-xs">Mietbeginn</Label>
+                    <Input id="v-einzug" type="date" value={vertragForm.einzugsdatum} onChange={(e) => setVertragForm((p) => ({ ...p, einzugsdatum: e.target.value }))} />
+                  </div>
+                  {(vertragTyp === "befristet" || vertragTyp === "kurzzeit") && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="v-ende" className="text-xs">Mietende</Label>
+                      <Input id="v-ende" type="date" value={vertragForm.enddatum} onChange={(e) => setVertragForm((p) => ({ ...p, enddatum: e.target.value }))} />
+                    </div>
+                  )}
+                  {vertragTyp === "unbefristet" && (
+                    <div className="flex items-end pb-2">
+                      <p className="text-xs text-muted-foreground">Unbefristet — gesetzliche Kündigungsfristen gelten.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {/* Finanzen */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium">Finanzen</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="v-kaltmiete" className="text-xs">Kaltmiete (€)</Label>
+                    <Input id="v-kaltmiete" type="number" value={vertragForm.kaltmiete} onChange={(e) => setVertragForm((p) => ({ ...p, kaltmiete: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="v-nebenkosten" className="text-xs">NK-Vorauszahlung (€)</Label>
+                    <Input id="v-nebenkosten" type="number" value={vertragForm.nebenkosten} onChange={(e) => setVertragForm((p) => ({ ...p, nebenkosten: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="v-kaution" className="text-xs">Kaution (€)</Label>
+                    <Input id="v-kaution" type="number" value={vertragForm.kaution} onChange={(e) => setVertragForm((p) => ({ ...p, kaution: e.target.value }))} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="v-faelligkeit" className="text-xs">Fälligkeitstag</Label>
+                    <Select value={vertragForm.faelligkeit} onValueChange={(val) => setVertragForm((p) => ({ ...p, faelligkeit: val }))}>
+                      <SelectTrigger id="v-faelligkeit"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">1. des Monats</SelectItem>
+                        <SelectItem value="3">3. des Monats</SelectItem>
+                        <SelectItem value="15">15. des Monats</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+              {/* Bankverbindung */}
+              <div className="space-y-3">
+                <h4 className="text-sm font-medium">Bankverbindung</h4>
+                <div className="space-y-1.5">
+                  <Label htmlFor="v-iban" className="text-xs">IBAN</Label>
+                  <Input id="v-iban" value={vertragForm.iban} onChange={(e) => setVertragForm((p) => ({ ...p, iban: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+          <div className="border-t px-6 py-4 flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setVertragDialogOpen(false)}>Abbrechen</Button>
+            <Button
+              onClick={() => {
+                const anredeLabel = vertragForm.mieterAnrede === "herr" ? "Herr" : vertragForm.mieterAnrede === "frau" ? "Frau" : "Familie";
+                const vertragLabel = vertragTyp === "unbefristet" ? "Unbefristeter Mietvertrag" : vertragTyp === "befristet" ? "Befristeter Mietvertrag" : "Kurzzeitvermietung";
+                const gesamtmiete = (parseFloat(vertragForm.kaltmiete) || 0) + (parseFloat(vertragForm.nebenkosten) || 0);
+                const content: { type: "heading" | "paragraph" | "table" | "spacer"; text?: string; data?: { headers: string[]; rows: string[][] }; height?: number }[] = [
+                  { type: "heading", text: vertragLabel },
+                  { type: "spacer", height: 5 },
+                  { type: "heading", text: "§ 1 Vertragsparteien" },
+                  { type: "paragraph", text: `Vermieter: ${vertragForm.vermieterName}\n${vertragForm.vermieterAdresse}` },
+                  { type: "paragraph", text: `Mieter: ${anredeLabel} ${vertragForm.mieterName}` },
+                  { type: "spacer", height: 5 },
+                  { type: "heading", text: "§ 2 Mietobjekt" },
+                  { type: "paragraph", text: `Adresse: ${vertragForm.objektAdresse}\nEtage/Lage: ${vertragForm.etage}\nWohnfläche: ${vertragForm.flaeche} m²\nZimmer: ${vertragForm.zimmer}` },
+                  { type: "spacer", height: 5 },
+                  { type: "heading", text: "§ 3 Mietdauer" },
+                  { type: "paragraph", text: vertragTyp === "unbefristet"
+                    ? `Das Mietverhältnis beginnt am ${vertragForm.einzugsdatum ? new Date(vertragForm.einzugsdatum).toLocaleDateString("de-DE") : "___"} und wird auf unbestimmte Zeit geschlossen. Es gelten die gesetzlichen Kündigungsfristen gemäß § 573c BGB.`
+                    : `Das Mietverhältnis beginnt am ${vertragForm.einzugsdatum ? new Date(vertragForm.einzugsdatum).toLocaleDateString("de-DE") : "___"} und endet am ${vertragForm.enddatum ? new Date(vertragForm.enddatum).toLocaleDateString("de-DE") : "___"}.`
+                  },
+                  { type: "spacer", height: 5 },
+                  { type: "heading", text: "§ 4 Miete und Nebenkosten" },
+                  { type: "table", data: {
+                    headers: ["Position", "Betrag"],
+                    rows: [
+                      ["Kaltmiete (mtl.)", `${vertragForm.kaltmiete} €`],
+                      ["NK-Vorauszahlung (mtl.)", `${vertragForm.nebenkosten} €`],
+                      ["Gesamtmiete (mtl.)", `${gesamtmiete.toFixed(2)} €`],
+                      ["Kaution", `${vertragForm.kaution} €`],
+                    ],
+                  }},
+                  { type: "paragraph", text: `Die Miete ist jeweils zum ${vertragForm.faelligkeit}. eines jeden Monats im Voraus zu entrichten.` },
+                  { type: "spacer", height: 5 },
+                  { type: "heading", text: "§ 5 Bankverbindung" },
+                  { type: "paragraph", text: `Die Miete ist auf folgendes Konto zu überweisen:\nIBAN: ${vertragForm.iban}\nKontoinhaber: ${vertragForm.vermieterName}` },
+                  { type: "spacer", height: 15 },
+                  { type: "paragraph", text: "___________________________          ___________________________" },
+                  { type: "paragraph", text: "Ort, Datum, Vermieter                       Ort, Datum, Mieter" },
+                ];
+                const doc = generatePDF({
+                  title: vertragLabel,
+                  subtitle: `${anredeLabel} ${vertragForm.mieterName} — ${vertragForm.objektAdresse}`,
+                  date: new Date().toLocaleDateString("de-DE"),
+                  content,
+                  profile: profile ? {
+                    vorname: profile.vorname || "",
+                    nachname: profile.nachname || "",
+                    email: profile.email || "",
+                    telefon: profile.telefon || "",
+                    anschrift: profile.anschrift || "",
+                  } : undefined,
+                });
+                downloadPDF(doc, `${vertragLabel}_${vertragForm.mieterName}`);
+                setVertragDialogOpen(false);
+                toast({ title: "PDF erstellt", description: `${vertragLabel} wurde als PDF heruntergeladen.` });
+              }}
+            >
+              <FileDown className="h-4 w-4 mr-1" />
+              Als PDF generieren
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Individueller Vertrag / Anwalt finden */}
+      <Dialog open={anwaltDialogOpen} onOpenChange={setAnwaltDialogOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col p-0">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle>Individueller Vertrag</DialogTitle>
+            <DialogDescription>Professionelle Unterstützung bei individueller Vertragsgestaltung</DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="flex-1 overflow-auto px-6">
+            <div className="space-y-4 pb-4">
+              <div>
+                <h4 className="text-sm font-medium mb-2">Eigene Vorlage importieren</h4>
+                <p className="text-xs text-muted-foreground mb-3">Laden Sie einen bestehenden Vertrag als PDF oder DOCX hoch.</p>
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="file"
+                    accept=".pdf,.docx"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        toast({ title: "Vorlage importiert", description: `${file.name} wurde hochgeladen.` });
+                      }
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button variant="outline" size="sm" className="gap-1" asChild>
+                    <span>
+                      <Upload className="h-4 w-4" />
+                      Eigene Vorlage importieren
+                    </span>
+                  </Button>
+                </label>
+              </div>
+
+              <div className="border-t pt-4">
+                <div className="rounded-lg border border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/30 p-4 mb-4">
+                  <div className="flex gap-2">
+                    <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                    <p className="text-xs text-blue-800 dark:text-blue-300">
+                      Für individuelle Vertragsgestaltung empfehlen wir einen Fachanwalt für Mietrecht. So stellen Sie sicher, dass Ihr Vertrag rechtssicher und auf Ihre Bedürfnisse zugeschnitten ist.
+                    </p>
+                  </div>
+                </div>
+                <h4 className="text-sm font-medium mb-1">Oder professionelle Hilfe nutzen:</h4>
+                <p className="text-xs text-muted-foreground mb-3">Fachanwälte für Mietrecht</p>
+              </div>
+              {[
+                { initials: "RA", name: "Kanzlei Recht & Wohnen", desc: "Spezialisiert auf Miet- und WEG-Recht. Individuelle Vertragserstellung und Prüfung.", rating: 5, tags: ["Empfohlen", "Mietrecht"] },
+                { initials: "MR", name: "Dr. Müller & Partner", desc: "Fachanwälte für Immobilien- und Mietrecht mit über 20 Jahren Erfahrung.", rating: 4, tags: ["Erfahren", "Bundesweit"] },
+                { initials: "JK", name: "Jura Consulting GmbH", desc: "Digitale Rechtsberatung für Vermieter. Schnelle Vertragserstellung online.", rating: 4, tags: ["Digital", "Günstig"] },
+                { initials: "IH", name: "Immobilien & Haus Recht", desc: "Ganzheitliche Beratung für Vermieter – von Vertrag bis Kündigung.", rating: 5, tags: ["Ganzheitlich", "Top-Bewertung"] },
+              ].map((partner) => (
+                <Card key={partner.initials} className="relative">
+                  <span className="absolute top-2 right-3 text-[10px] text-muted-foreground">Anzeige</span>
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex gap-3">
+                      <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">
+                        {partner.initials}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <p className="text-sm font-medium">{partner.name}</p>
+                        <p className="text-xs text-muted-foreground">{partner.desc}</p>
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`h-3 w-3 ${i < partner.rating ? "fill-amber-400 text-amber-400" : "text-muted-foreground/30"}`}
+                            />
+                          ))}
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {partner.tags.map((tag) => (
+                            <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-1 h-7 text-xs gap-1"
+                          onClick={() => window.open("#", "_blank")}
+                        >
+                          <ExternalLink className="h-3 w-3" />
+                          Anwalt finden →
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </ScrollArea>
+          <div className="border-t px-6 py-3">
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              Die aufgeführten Partner sind unverbindliche Empfehlungen. Bitte prüfen Sie Angebote eigenständig.
+            </p>
+          </div>
         </DialogContent>
       </Dialog>
 

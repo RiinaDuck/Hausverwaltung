@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import { AppHeader } from "@/components/app-header";
 import { DashboardView } from "@/components/views/dashboard-view";
@@ -28,6 +28,11 @@ export type AppView =
   | "hausmanager"
   | "statistiken";
 
+const validViews: AppView[] = [
+  "dashboard", "objekte", "wohnungen", "mieter", "nebenkosten",
+  "nebenkosten-abrechnung", "rechnungen", "zaehler", "hausmanager", "statistiken",
+];
+
 interface AppDashboardProps {
   onSwitchToLanding?: () => void;
 }
@@ -38,10 +43,30 @@ export function AppDashboard({ onSwitchToLanding }: AppDashboardProps) {
   const [navMieterId, setNavMieterId] = useState<string | undefined>();
   const isMobile = useIsMobile();
 
-  const handleNavigate = (view: AppView, options?: { mieterId?: string }) => {
+  // Sync browser history with view navigation
+  useEffect(() => {
+    // Set initial history state on mount
+    window.history.replaceState({ view: "dashboard" }, "", window.location.pathname);
+  }, []);
+
+  // Listen for browser back/forward button
+  useEffect(() => {
+    const onPopState = (e: PopStateEvent) => {
+      const view = e.state?.view;
+      if (view && validViews.includes(view)) {
+        setNavMieterId(e.state?.mieterId);
+        setCurrentView(view);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const handleNavigate = useCallback((view: AppView, options?: { mieterId?: string }) => {
     setNavMieterId(options?.mieterId);
     setCurrentView(view);
-  };
+    window.history.pushState({ view, mieterId: options?.mieterId }, "", window.location.pathname);
+  }, []);
 
   const renderView = () => {
     switch (currentView) {
