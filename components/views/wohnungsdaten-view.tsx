@@ -64,6 +64,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Check,
+  Download,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -72,11 +74,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Table,
   TableBody,
@@ -426,7 +423,10 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [selectedFotoIds, setSelectedFotoIds] = useState<Set<string>>(new Set());
+  const dragIndexRef = useRef<number | null>(null);
+  const dragHappenedRef = useRef(false);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const loadFotos = useCallback(async (wohnungId: string) => {
     const supabase = createClient();
@@ -504,10 +504,41 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     }
   }, [fotos, lightboxIndex]);
 
+  const handleBulkDelete = useCallback(async () => {
+    if (!selectedFotoIds.size) return;
+    const supabase = createClient();
+    if (!supabase) return;
+    const toDelete = fotos.filter((f) => selectedFotoIds.has(f.id));
+    await supabase.storage.from("wohnung-fotos").remove(toDelete.map((f) => f.file_path));
+    await supabase.from("wohnung_fotos").delete().in("id", toDelete.map((f) => f.id));
+    setFotos((prev) => prev.filter((f) => !selectedFotoIds.has(f.id)));
+    setSelectedFotoIds(new Set());
+    if (lightboxIndex !== null) setLightboxIndex(null);
+  }, [fotos, selectedFotoIds, lightboxIndex]);
+
+  const handleBulkDownload = useCallback(async () => {
+    const selected = fotos.filter((f) => selectedFotoIds.has(f.id));
+    for (const foto of selected) {
+      try {
+        const resp = await fetch(foto.signedUrl);
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = foto.file_name;
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch {
+        toast({ title: "Fehler beim Download", description: foto.file_name, variant: "destructive" });
+      }
+    }
+  }, [fotos, selectedFotoIds, toast]);
+
   // Load fotos when selected unit changes
   useEffect(() => {
     if (selectedUnit) loadFotos(selectedUnit.id);
     else setFotos([]);
+    setSelectedFotoIds(new Set());
   }, [selectedUnit?.id]);
   // --- end Fotos state ---
 
@@ -1368,9 +1399,27 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
               {/* Photo grid */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">
-                    Fotos {fotos.length > 0 && `(${fotos.length})`}
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">
+                      Fotos {fotos.length > 0 && `(${fotos.length})`}
+                    </CardTitle>
+                    {selectedFotoIds.size > 0 && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">{selectedFotoIds.size} ausgewählt</span>
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1.5" onClick={handleBulkDownload}>
+                          <Download className="h-3 w-3" />
+                          Runterladen
+                        </Button>
+                        <Button size="sm" variant="destructive" className="h-7 text-xs gap-1.5" onClick={handleBulkDelete}>
+                          <Trash2 className="h-3 w-3" />
+                          Löschen
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => setSelectedFotoIds(new Set())}>
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {fotosLoading ? (
@@ -1384,74 +1433,85 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                      {fotos.map((foto, idx) => (
-                        <div
-                          key={foto.id}
-                          className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer"
-                          onClick={() => setLightboxIndex(idx)}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={foto.signedUrl}
-                            alt={foto.file_name}
-                            className="w-full h-full object-cover"
-                          />
-                          {/* Hover overlay */}
-                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
-                            <p className="text-white text-xs font-medium truncate">{foto.file_name}</p>
-                            <p className="text-white/70 text-xs">
-                              {new Date(foto.uploaded_at).toLocaleDateString("de-DE")}
-                            </p>
-                          </div>
-                          {/* Delete button with confirmation */}
-                          <Popover
-                            open={confirmDeleteId === foto.id}
-                            onOpenChange={(open) => {
-                              if (!open) setConfirmDeleteId(null);
+                      {fotos.map((foto, idx) => {
+                        const isSelected = selectedFotoIds.has(foto.id);
+                        return (
+                          <div
+                            key={foto.id}
+                            draggable
+                            onDragStart={() => { dragIndexRef.current = idx; dragHappenedRef.current = true; }}
+                            onDragEnd={() => { setTimeout(() => { dragHappenedRef.current = false; }, 50); }}
+                            onDragOver={(e) => { e.preventDefault(); setDragOverIndex(idx); }}
+                            onDragLeave={() => setDragOverIndex(null)}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              setDragOverIndex(null);
+                              const from = dragIndexRef.current;
+                              if (from === null || from === idx) return;
+                              setFotos((prev) => {
+                                const next = [...prev];
+                                const [item] = next.splice(from, 1);
+                                next.splice(idx, 0, item);
+                                return next;
+                              });
+                              dragIndexRef.current = null;
+                            }}
+                            className={cn(
+                              "group relative aspect-square rounded-lg overflow-hidden border bg-muted cursor-pointer transition-all select-none",
+                              isSelected ? "border-primary ring-2 ring-primary" : "border-border",
+                              dragOverIndex === idx && dragIndexRef.current !== idx ? "scale-95 opacity-60" : ""
+                            )}
+                            onClick={() => {
+                              if (dragHappenedRef.current) return;
+                              if (selectedFotoIds.size > 0) {
+                                setSelectedFotoIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(foto.id)) next.delete(foto.id);
+                                  else next.add(foto.id);
+                                  return next;
+                                });
+                              } else {
+                                setLightboxIndex(idx);
+                              }
                             }}
                           >
-                            <PopoverTrigger asChild>
-                              <button
-                                className="absolute top-1 right-1 bg-black/60 hover:bg-destructive text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                                onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(foto.id); }}
-                                aria-label="Foto löschen"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                              className="w-44 p-3"
-                              side="top"
-                              align="end"
-                              onClick={(e) => e.stopPropagation()}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={foto.signedUrl}
+                              alt={foto.file_name}
+                              className="w-full h-full object-cover"
+                            />
+                            {/* Hover overlay */}
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 pointer-events-none">
+                              <p className="text-white text-xs font-medium truncate">{foto.file_name}</p>
+                              <p className="text-white/70 text-xs">
+                                {new Date(foto.uploaded_at).toLocaleDateString("de-DE")}
+                              </p>
+                            </div>
+                            {/* Checkbox */}
+                            <button
+                              className={cn(
+                                "absolute top-1 left-1 rounded-full w-5 h-5 flex items-center justify-center transition-all z-10 border",
+                                isSelected
+                                  ? "bg-primary border-primary text-primary-foreground opacity-100"
+                                  : "bg-black/40 border-white/60 text-white opacity-0 group-hover:opacity-100"
+                              )}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedFotoIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(foto.id)) next.delete(foto.id);
+                                  else next.add(foto.id);
+                                  return next;
+                                });
+                              }}
+                              aria-label={isSelected ? "Abwählen" : "Auswählen"}
                             >
-                              <p className="text-sm font-medium mb-2">Foto löschen?</p>
-                              <div className="flex gap-2">
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  className="flex-1 h-7 text-xs"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setConfirmDeleteId(null);
-                                    handleFotoDelete(foto);
-                                  }}
-                                >
-                                  Ja, löschen
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="flex-1 h-7 text-xs"
-                                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }}
-                                >
-                                  Abbrechen
-                                </Button>
-                              </div>
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      ))}
+                              {isSelected && <Check className="h-3 w-3" />}
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </CardContent>
