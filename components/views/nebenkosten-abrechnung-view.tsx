@@ -676,7 +676,7 @@ export function NebenkostenAbrechnungView() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="rounded-md border p-4 grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+              <div className="rounded-md border p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                 <div>
                   <p className="text-xs text-muted-foreground">Gesamtkosten</p>
                   <p className="font-semibold tabular-nums">{formatEuro(abrechnung.gesamtkostenBrutto)}</p>

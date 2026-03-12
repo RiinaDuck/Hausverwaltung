@@ -191,7 +191,7 @@ export function ZaehlerView() {
         <p className="text-sm sm:text-base text-muted-foreground">
           Verwalten Sie alle Zähler und Rauchmelder Ihrer Objekte.
         </p>
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 sm:gap-3">
           <div className="flex items-center gap-2">
             <span
               className={`text-xs sm:text-sm ${
@@ -382,7 +382,7 @@ export function ZaehlerView() {
                 : "Erfassen Sie die Daten für einen Rauchmelder."}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-3 py-4">
             <div className="space-y-2">
               <Label htmlFor="modal-wohnung">Wohnung</Label>
               <Select
@@ -420,7 +420,7 @@ export function ZaehlerView() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="modal-montageort">Montageort</Label>
                 <Input
@@ -511,7 +511,7 @@ export function ZaehlerView() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="modal-hersteller">Hersteller</Label>
                 <Input

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Card,
   CardContent,
@@ -58,6 +58,12 @@ import {
   Building,
   Wifi,
   ClipboardList,
+  Upload,
+  X,
+  ImageIcon,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -67,6 +73,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Table,
   TableBody,
   TableCell,
@@ -75,6 +86,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { useAppData } from "@/context/app-data-context";
 import { useAuth } from "@/context/auth-context";
@@ -400,6 +412,105 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     kelleranteil: true,
     kabel: true,
   });
+  const { toast } = useToast();
+  // --- Fotos state ---
+  type FotoItem = {
+    id: string;
+    file_path: string;
+    file_name: string;
+    uploaded_at: string;
+    signedUrl: string;
+  };
+  const [fotos, setFotos] = useState<FotoItem[]>([]);
+  const [fotosLoading, setFotosLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const loadFotos = useCallback(async (wohnungId: string) => {
+    const supabase = createClient();
+    if (!supabase) return;
+    setFotosLoading(true);
+    try {
+      const { data: rows, error } = await supabase
+        .from("wohnung_fotos")
+        .select("*")
+        .eq("wohnung_id", wohnungId)
+        .order("uploaded_at", { ascending: false });
+      if (error) throw error;
+      if (!rows?.length) { setFotos([]); return; }
+      const withUrls = await Promise.all(
+        rows.map(async (row: any) => {
+          const { data: signed } = await supabase.storage
+            .from("wohnung-fotos")
+            .createSignedUrl(row.file_path, 3600);
+          return { ...row, signedUrl: signed?.signedUrl ?? "" };
+        })
+      );
+      setFotos(withUrls);
+    } catch (e) {
+      console.error("loadFotos:", e);
+    } finally {
+      setFotosLoading(false);
+    }
+  }, []);
+
+  const handleFotoUpload = useCallback(async (files: FileList | null) => {
+    if (!files || !selectedUnit) return;
+    const supabase = createClient();
+    if (!supabase) return;
+    const { user } = (await supabase.auth.getUser()).data;
+    const uploadedBy = user?.email ?? "unknown";
+    for (const file of Array.from(files)) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast({ title: "Datei zu groß", description: `${file.name} überschreitet 10 MB.`, variant: "destructive" });
+        continue;
+      }
+      const allowed = ["image/jpeg", "image/png", "image/webp"];
+      if (!allowed.includes(file.type)) {
+        toast({ title: "Ungültiges Format", description: `${file.name}: nur JPG, PNG, WEBP erlaubt.`, variant: "destructive" });
+        continue;
+      }
+      const path = `${selectedUnit.id}/${Date.now()}_${file.name}`;
+      setUploadProgress((p) => ({ ...p, [file.name]: 0 }));
+      const { error: upErr } = await supabase.storage
+        .from("wohnung-fotos")
+        .upload(path, file, { upsert: false });
+      if (upErr) {
+        toast({ title: "Fehler beim Upload", description: file.name, variant: "destructive" });
+        setUploadProgress((p) => { const n = { ...p }; delete n[file.name]; return n; });
+        continue;
+      }
+      await supabase.from("wohnung_fotos").insert({
+        wohnung_id: selectedUnit.id,
+        file_path: path,
+        file_name: file.name,
+        uploaded_by: uploadedBy,
+      });
+      setUploadProgress((p) => { const n = { ...p }; delete n[file.name]; return n; });
+    }
+    await loadFotos(selectedUnit.id);
+  }, [selectedUnit, loadFotos, toast]);
+
+  const handleFotoDelete = useCallback(async (foto: FotoItem) => {
+    const supabase = createClient();
+    if (!supabase) return;
+    await supabase.storage.from("wohnung-fotos").remove([foto.file_path]);
+    await supabase.from("wohnung_fotos").delete().eq("id", foto.id);
+    setFotos((prev) => prev.filter((f) => f.id !== foto.id));
+    if (lightboxIndex !== null && lightboxIndex >= fotos.length - 1) {
+      setLightboxIndex(null);
+    }
+  }, [fotos, lightboxIndex]);
+
+  // Load fotos when selected unit changes
+  useEffect(() => {
+    if (selectedUnit) loadFotos(selectedUnit.id);
+    else setFotos([]);
+  }, [selectedUnit?.id]);
+  // --- end Fotos state ---
+
   const [isNewUnitOpen, setIsNewUnitOpen] = useState(false);
   const initialNewUnit: {
     lage: string;
@@ -421,7 +532,6 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     status: "frei",
   };
   const [newUnit, setNewUnit] = useState(initialNewUnit);
-  const { toast } = useToast();
 
   // Aktualisiere selectedUnit wenn sich units ändert
   useEffect(() => {
@@ -593,154 +703,152 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     );
   }
 
-  if (units.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-12rem)]">
-        <Card className="p-8 text-center">
-          <Home className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-lg font-semibold mb-2">Keine Wohnungen</h2>
-          <p className="text-muted-foreground mb-4">
-            Für &quot;{currentObjekt?.name}&quot; sind noch keine Wohnungen
-            angelegt.
-          </p>
-          <Button
-            className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
-            onClick={() => setIsNewUnitOpen(true)}
-          >
-            <Plus className="h-4 w-4" />
-            Erste Wohnung anlegen
-          </Button>
-        </Card>
-
-        {/* New Unit Dialog */}
-        <Dialog
-          open={isNewUnitOpen}
-          onOpenChange={(open) => {
-            setIsNewUnitOpen(open);
-            if (!open) setNewUnit(initialNewUnit);
-          }}
+ if (units.length === 0) {
+  return (
+    <div className="flex items-center justify-center h-[calc(100vh-12rem)]">
+      <Card className="p-8 text-center">
+        <Home className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <h2 className="text-lg font-semibold mb-2">Keine Wohnungen</h2>
+        <p className="text-muted-foreground mb-4">
+          Für &quot;{currentObjekt?.name}&quot; sind noch keine Wohnungen
+          angelegt.
+        </p>
+        <Button
+          className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
+          onClick={() => setIsNewUnitOpen(true)}
         >
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>Neue Einheit anlegen</DialogTitle>
-              <DialogDescription>
-                Erfassen Sie die Daten für eine neue Wohneinheit.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
+          <Plus className="h-4 w-4" />
+          Erste Wohnung anlegen
+        </Button>
+      </Card>
+      <Dialog
+        open={isNewUnitOpen}
+        onOpenChange={(open) => {
+          setIsNewUnitOpen(open);
+          if (!open) setNewUnit(initialNewUnit);
+        }}
+      >
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Neue Einheit anlegen</DialogTitle>
+            <DialogDescription>
+              Erfassen Sie die Daten für eine neue Wohneinheit.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-lage-empty">Geschosslage</Label>
+              <Input
+                id="new-lage-empty"
+                value={newUnit.lage}
+                onChange={(e) =>
+                  setNewUnit((prev) => ({ ...prev, lage: e.target.value }))
+                }
+                placeholder="z.B. EG links"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="new-lage-empty">Geschosslage</Label>
+                <Label htmlFor="new-wohnflaeche-empty">Wohnfläche (m²)</Label>
                 <Input
-                  id="new-lage-empty"
-                  value={newUnit.lage}
+                  id="new-wohnflaeche-empty"
+                  type="number"
+                  step="0.1"
+                  value={newUnit.wohnflaeche}
                   onChange={(e) =>
-                    setNewUnit((prev) => ({ ...prev, lage: e.target.value }))
+                    setNewUnit((prev) => ({
+                      ...prev,
+                      wohnflaeche: Number.parseFloat(e.target.value) || 0,
+                    }))
                   }
-                  placeholder="z.B. EG links"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="new-wohnflaeche-empty">Wohnfläche (m²)</Label>
-                  <Input
-                    id="new-wohnflaeche-empty"
-                    type="number"
-                    step="0.1"
-                    value={newUnit.wohnflaeche}
-                    onChange={(e) =>
-                      setNewUnit((prev) => ({
-                        ...prev,
-                        wohnflaeche: Number.parseFloat(e.target.value) || 0,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-nutzflaeche-empty">Nutzfläche (m²)</Label>
-                  <Input
-                    id="new-nutzflaeche-empty"
-                    type="number"
-                    step="0.1"
-                    value={newUnit.nutzflaeche}
-                    onChange={(e) =>
-                      setNewUnit((prev) => ({
-                        ...prev,
-                        nutzflaeche: Number.parseFloat(e.target.value) || 0,
-                      }))
-                    }
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="new-raeume-empty">Räume</Label>
-                  <Input
-                    id="new-raeume-empty"
-                    type="number"
-                    value={newUnit.raeume}
-                    onChange={(e) =>
-                      setNewUnit((prev) => ({
-                        ...prev,
-                        raeume: Number.parseInt(e.target.value) || 0,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-miete-empty">Kaltmiete (€)</Label>
-                  <Input
-                    id="new-miete-empty"
-                    type="number"
-                    value={newUnit.miete}
-                    onChange={(e) =>
-                      setNewUnit((prev) => ({
-                        ...prev,
-                        miete: Number.parseFloat(e.target.value) || 0,
-                      }))
-                    }
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-status-empty">Status</Label>
-                  <Select
-                    value={newUnit.status}
-                    onValueChange={(value) =>
-                      setNewUnit((prev) => ({
-                        ...prev,
-                        status: value as "frei" | "vermietet",
-                      }))
-                    }
-                  >
-                    <SelectTrigger id="new-status-empty">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="frei">Frei</SelectItem>
-                      <SelectItem value="vermietet">Vermietet</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-nutzflaeche-empty">Nutzfläche (m²)</Label>
+                <Input
+                  id="new-nutzflaeche-empty"
+                  type="number"
+                  step="0.1"
+                  value={newUnit.nutzflaeche}
+                  onChange={(e) =>
+                    setNewUnit((prev) => ({
+                      ...prev,
+                      nutzflaeche: Number.parseFloat(e.target.value) || 0,
+                    }))
+                  }
+                />
               </div>
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsNewUnitOpen(false)}>
-                Abbrechen
-              </Button>
-              <Button
-                className="bg-success hover:bg-success/90 text-success-foreground"
-                onClick={handleCreateUnit}
-              >
-                Einheit anlegen
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </div>
-    );
-  }
+            <div className="grid grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="new-raeume-empty">Räume</Label>
+                <Input
+                  id="new-raeume-empty"
+                  type="number"
+                  value={newUnit.raeume}
+                  onChange={(e) =>
+                    setNewUnit((prev) => ({
+                      ...prev,
+                      raeume: Number.parseInt(e.target.value) || 0,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-miete-empty">Kaltmiete (€)</Label>
+                <Input
+                  id="new-miete-empty"
+                  type="number"
+                  value={newUnit.miete}
+                  onChange={(e) =>
+                    setNewUnit((prev) => ({
+                      ...prev,
+                      miete: Number.parseFloat(e.target.value) || 0,
+                    }))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-status-empty">Status</Label>
+                <Select
+                  value={newUnit.status}
+                  onValueChange={(value) =>
+                    setNewUnit((prev) => ({
+                      ...prev,
+                      status: value as "frei" | "vermietet",
+                    }))
+                  }
+                >
+                  <SelectTrigger id="new-status-empty">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="frei">Frei</SelectItem>
+                    <SelectItem value="vermietet">Vermietet</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsNewUnitOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button
+              className="bg-success hover:bg-success/90 text-success-foreground"
+              onClick={handleCreateUnit}
+            >
+              Einheit anlegen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
 
   return (
-    <div className="flex flex-col md:flex-row gap-4 md:gap-6 h-auto md:h-[calc(100vh-8rem)]">
+    <div className="flex flex-col md:flex-row gap-3 md:gap-3 h-auto md:h-[calc(100vh-8rem)]">
       {/* Left: Units List */}
       <Card className="w-full md:w-80 shrink-0 flex flex-col overflow-hidden md:max-h-full">
         <CardHeader className="pb-3 space-y-3">
@@ -819,11 +927,12 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
         <div className="flex-1 flex flex-col min-h-0">
           <Tabs defaultValue="daten" className="flex flex-col flex-1 min-h-0">
             <div className="shrink-0 pb-4 pr-2">
-              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 max-w-4xl h-auto">
+              <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 h-auto">
                 <TabsTrigger value="daten" className="text-xs sm:text-sm py-2">Flächendaten</TabsTrigger>
                 <TabsTrigger value="ausstattung" className="text-xs sm:text-sm py-2">Ausstattung</TabsTrigger>
                 <TabsTrigger value="zaehler" className="text-xs sm:text-sm py-2">Zähler</TabsTrigger>
                 <TabsTrigger value="schluessel" className="text-xs sm:text-sm py-2">Schlüssel</TabsTrigger>
+                <TabsTrigger value="fotos" className="text-xs sm:text-sm py-2">Fotos</TabsTrigger>
               </TabsList>
               <div className="flex items-center justify-end gap-3 mt-4">
                 <DropdownMenu>
@@ -875,7 +984,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     <div className="space-y-2">
                       <Label htmlFor="lage">Geschosslage</Label>
                       <Input
@@ -1049,7 +1158,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                     {ausstattungCategories.map((category) => (
                       <Card
                         key={category.title}
@@ -1192,7 +1301,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                     return unitMieter.map((m) => (
                       <div key={m.id} className="p-4 bg-muted/50 rounded-lg space-y-2">
                         <p className="text-sm font-medium">{m.name}</p>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-3">
                           <div>
                             <p className="text-xs text-muted-foreground">Wohnung</p>
                             <p className="text-sm">{selectedUnit?.lage}</p>
@@ -1210,6 +1319,185 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                   </p>
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* TAB 5: Fotos */}
+            <TabsContent value="fotos" className="space-y-4">
+              {/* Upload area */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Fotos hochladen</CardTitle>
+                  <CardDescription>JPG, PNG, WEBP – max. 10 MB pro Datei</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div
+                    className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-muted/30 transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      handleFotoUpload(e.dataTransfer.files);
+                    }}
+                  >
+                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                    <p className="text-sm font-medium">Dateien hierher ziehen oder klicken</p>
+                    <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WEBP bis 10 MB</p>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => handleFotoUpload(e.target.files)}
+                    />
+                  </div>
+                  {Object.keys(uploadProgress).length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {Object.keys(uploadProgress).map((name) => (
+                        <div key={name} className="flex items-center gap-2 text-sm">
+                          <Loader2 className="h-3 w-3 animate-spin shrink-0" />
+                          <span className="truncate flex-1">{name}</span>
+                          <span className="text-muted-foreground text-xs">Wird hochgeladen…</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Photo grid */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">
+                    Fotos {fotos.length > 0 && `(${fotos.length})`}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {fotosLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : fotos.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <ImageIcon className="h-10 w-10 mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Noch keine Fotos vorhanden</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {fotos.map((foto, idx) => (
+                        <div
+                          key={foto.id}
+                          className="group relative aspect-square rounded-lg overflow-hidden border border-border bg-muted cursor-pointer"
+                          onClick={() => setLightboxIndex(idx)}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={foto.signedUrl}
+                            alt={foto.file_name}
+                            className="w-full h-full object-cover"
+                          />
+                          {/* Hover overlay */}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2">
+                            <p className="text-white text-xs font-medium truncate">{foto.file_name}</p>
+                            <p className="text-white/70 text-xs">
+                              {new Date(foto.uploaded_at).toLocaleDateString("de-DE")}
+                            </p>
+                          </div>
+                          {/* Delete button with confirmation */}
+                          <Popover
+                            open={confirmDeleteId === foto.id}
+                            onOpenChange={(open) => {
+                              if (!open) setConfirmDeleteId(null);
+                            }}
+                          >
+                            <PopoverTrigger asChild>
+                              <button
+                                className="absolute top-1 right-1 bg-black/60 hover:bg-destructive text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                                onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(foto.id); }}
+                                aria-label="Foto löschen"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-44 p-3"
+                              side="top"
+                              align="end"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <p className="text-sm font-medium mb-2">Foto löschen?</p>
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="flex-1 h-7 text-xs"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setConfirmDeleteId(null);
+                                    handleFotoDelete(foto);
+                                  }}
+                                >
+                                  Ja, löschen
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1 h-7 text-xs"
+                                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }}
+                                >
+                                  Abbrechen
+                                </Button>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Lightbox */}
+              {lightboxIndex !== null && fotos[lightboxIndex] && (
+                <div
+                  className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center"
+                  onClick={() => setLightboxIndex(null)}
+                >
+                  <button
+                    className="absolute top-4 right-4 text-white bg-white/10 hover:bg-white/20 rounded-full p-2"
+                    onClick={() => setLightboxIndex(null)}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                  {lightboxIndex > 0 && (
+                    <button
+                      className="absolute left-4 text-white bg-white/10 hover:bg-white/20 rounded-full p-2"
+                      onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex - 1); }}
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                  )}
+                  {lightboxIndex < fotos.length - 1 && (
+                    <button
+                      className="absolute right-4 text-white bg-white/10 hover:bg-white/20 rounded-full p-2"
+                      onClick={(e) => { e.stopPropagation(); setLightboxIndex(lightboxIndex + 1); }}
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
+                  )}
+                  <div className="max-w-4xl max-h-[90vh] px-16" onClick={(e) => e.stopPropagation()}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={fotos[lightboxIndex].signedUrl}
+                      alt={fotos[lightboxIndex].file_name}
+                      className="max-w-full max-h-[80vh] object-contain rounded-lg"
+                    />
+                    <p className="text-white/70 text-sm text-center mt-2">
+                      {fotos[lightboxIndex].file_name} · {new Date(fotos[lightboxIndex].uploaded_at).toLocaleDateString("de-DE")}
+                    </p>
+                  </div>
+                </div>
+              )}
             </TabsContent>
 
             </div>
@@ -1232,7 +1520,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
               Erfassen Sie die Daten für eine neue Wohneinheit.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-3 py-4">
             <div className="space-y-2">
               <Label htmlFor="new-lage">Geschosslage</Label>
               <Input
@@ -1244,7 +1532,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                 placeholder="z.B. EG links"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="new-wohnflaeche">Wohnfläche (m²)</Label>
                 <Input
@@ -1276,7 +1564,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                 />
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="new-raeume">Räume</Label>
                 <Input

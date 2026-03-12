@@ -288,36 +288,34 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
       {/* Full-width Status-Karten (gelb/grün/rot) unterhalb beider Karten */}
       <div ref={setStatusContainer} className="flex flex-col gap-2 empty:hidden" />
 
-      <div className="grid grid-cols-1 lg:grid-cols-1 gap-4 md:gap-6">
-
-        {/* Inkasso-Partner Anzeige */}
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="rounded-full bg-blue-100 p-2">
-                  <Handshake className="h-5 w-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Mietschulden? Professionelle Hilfe nutzen</p>
-                  <p className="text-xs text-muted-foreground">Geprüfte Inkasso-Partner für Hausverwaltungen</p>
-                </div>
+      {/* Inkasso-Partner Anzeige */}
+      <Card>
+        <CardContent className="pt-4 pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="rounded-full bg-blue-100 p-2">
+                <Handshake className="h-5 w-5 text-blue-600" />
               </div>
-              <div className="flex items-center gap-2">
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-blue-300 text-blue-700 hover:bg-blue-100"
-                  onClick={() => setInkassoOpen(true)}
-                >
-                  Jetzt informieren
-                </Button>
+              <div>
+                <p className="text-sm font-medium">Mietschulden? Professionelle Hilfe nutzen</p>
+                <p className="text-xs text-muted-foreground">Geprüfte Inkasso-Partner für Hausverwaltungen</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                onClick={() => setInkassoOpen(true)}
+              >
+                Jetzt informieren
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-4 md:gap-6">
         {/* Active Objects Table */}
         <Card>
           <CardHeader className="pb-3">

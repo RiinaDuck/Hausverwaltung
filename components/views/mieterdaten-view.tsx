@@ -74,6 +74,7 @@ import {
   ExternalLink,
   Star,
   Info,
+  Handshake,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
@@ -308,6 +309,7 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
   const [vertragDialogOpen, setVertragDialogOpen] = useState(false);
   const [vertragTyp, setVertragTyp] = useState<"unbefristet" | "befristet" | "kurzzeit" | null>(null);
   const [anwaltDialogOpen, setAnwaltDialogOpen] = useState(false);
+  const [anwaltAdOpen, setAnwaltAdOpen] = useState(false);
   const [vertragForm, setVertragForm] = useState({
     vermieterName: "",
     vermieterAdresse: "",
@@ -1457,7 +1459,7 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
         <div className="flex-1 flex flex-col min-h-0">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
             <div className="shrink-0 pb-4 pr-2">
-              <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 max-w-4xl h-auto">
+              <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 h-auto">
               <TabsTrigger
                 value="stammdaten"
                 className="text-xs sm:text-sm py-2"
@@ -1971,7 +1973,8 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
                     {/* 1. Unbefristeter Mietvertrag */}
                     <button
                       type="button"
-                      className="group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                      disabled={editedMieter?.isKurzzeitvermietung}
+                      className={`group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors ${editedMieter?.isKurzzeitvermietung ? "opacity-40 cursor-not-allowed" : "hover:border-primary/50 hover:bg-muted/50"}`}
                       onClick={() => {
                         const wohnung = wohnungen.find((w) => w.id === editedMieter?.wohnungId);
                         setVertragTyp("unbefristet");
@@ -2009,7 +2012,8 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
                     {/* 2. Befristeter Mietvertrag */}
                     <button
                       type="button"
-                      className="group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                      disabled={editedMieter?.isKurzzeitvermietung}
+                      className={`group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors ${editedMieter?.isKurzzeitvermietung ? "opacity-40 cursor-not-allowed" : "hover:border-primary/50 hover:bg-muted/50"}`}
                       onClick={() => {
                         const wohnung = wohnungen.find((w) => w.id === editedMieter?.wohnungId);
                         setVertragTyp("befristet");
@@ -2085,7 +2089,8 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
                     {/* 4. Individueller Vertrag */}
                     <button
                       type="button"
-                      className="group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left hover:border-primary/50 hover:bg-muted/50 transition-colors"
+                      disabled={editedMieter?.isKurzzeitvermietung}
+                      className={`group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors ${editedMieter?.isKurzzeitvermietung ? "opacity-40 cursor-not-allowed" : "hover:border-primary/50 hover:bg-muted/50"}`}
                       onClick={() => setAnwaltDialogOpen(true)}
                     >
                       <div className="flex items-center gap-2">
@@ -2094,6 +2099,31 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
                       </div>
                       <p className="text-xs text-muted-foreground">Maßgeschneiderter Vertrag über einen Fachanwalt oder eigene Vorlage.</p>
                     </button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Anwalt-Werbung */}
+              <Card>
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="rounded-full bg-blue-100 p-2">
+                        <Handshake className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">Rechtssicherer Vertrag? Professionelle Hilfe nutzen</p>
+                        <p className="text-xs text-muted-foreground">Geprüfte Fachanwälte für Mietrecht</p>
+                      </div>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-blue-300 text-blue-700 hover:bg-blue-100"
+                      onClick={() => setAnwaltAdOpen(true)}
+                    >
+                      Jetzt informieren
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -3135,52 +3165,48 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: Individueller Vertrag / Anwalt finden */}
+      {/* Dialog: Individueller Vertrag – nur Import */}
       <Dialog open={anwaltDialogOpen} onOpenChange={setAnwaltDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Individueller Vertrag</DialogTitle>
+            <DialogDescription>Eigene Vertragsvorlage importieren</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-xs text-muted-foreground">Laden Sie einen bestehenden Vertrag als PDF oder DOCX hoch.</p>
+            <label className="inline-flex items-center gap-2 cursor-pointer">
+              <input
+                type="file"
+                accept=".pdf,.docx"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    toast({ title: "Vorlage importiert", description: `${file.name} wurde hochgeladen.` });
+                  }
+                  e.target.value = "";
+                }}
+              />
+              <Button variant="outline" size="sm" className="gap-1" asChild>
+                <span>
+                  <Upload className="h-4 w-4" />
+                  Eigene Vorlage importieren
+                </span>
+              </Button>
+            </label>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog: Anwalt-Werbung (nur Partnerliste, kein Import) */}
+      <Dialog open={anwaltAdOpen} onOpenChange={setAnwaltAdOpen}>
         <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col p-0">
           <DialogHeader className="p-6 pb-2">
-            <DialogTitle>Individueller Vertrag</DialogTitle>
-            <DialogDescription>Professionelle Unterstützung bei individueller Vertragsgestaltung</DialogDescription>
+            <DialogTitle>Fachanwälte für Mietrecht</DialogTitle>
+            <DialogDescription>Professionelle Unterstützung bei Vertragsgestaltung</DialogDescription>
           </DialogHeader>
           <ScrollArea className="flex-1 overflow-auto px-6">
             <div className="space-y-4 pb-4">
-              <div>
-                <h4 className="text-sm font-medium mb-2">Eigene Vorlage importieren</h4>
-                <p className="text-xs text-muted-foreground mb-3">Laden Sie einen bestehenden Vertrag als PDF oder DOCX hoch.</p>
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="file"
-                    accept=".pdf,.docx"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        toast({ title: "Vorlage importiert", description: `${file.name} wurde hochgeladen.` });
-                      }
-                      e.target.value = "";
-                    }}
-                  />
-                  <Button variant="outline" size="sm" className="gap-1" asChild>
-                    <span>
-                      <Upload className="h-4 w-4" />
-                      Eigene Vorlage importieren
-                    </span>
-                  </Button>
-                </label>
-              </div>
-
-              <div className="border-t pt-4">
-                <div className="rounded-lg border border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/30 p-4 mb-4">
-                  <div className="flex gap-2">
-                    <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
-                    <p className="text-xs text-blue-800 dark:text-blue-300">
-                      Für individuelle Vertragsgestaltung empfehlen wir einen Fachanwalt für Mietrecht. So stellen Sie sicher, dass Ihr Vertrag rechtssicher und auf Ihre Bedürfnisse zugeschnitten ist.
-                    </p>
-                  </div>
-                </div>
-                <h4 className="text-sm font-medium mb-1">Oder professionelle Hilfe nutzen:</h4>
-                <p className="text-xs text-muted-foreground mb-3">Fachanwälte für Mietrecht</p>
-              </div>
               {[
                 { initials: "RA", name: "Kanzlei Recht & Wohnen", desc: "Spezialisiert auf Miet- und WEG-Recht. Individuelle Vertragserstellung und Prüfung.", rating: 5, tags: ["Empfohlen", "Mietrecht"] },
                 { initials: "MR", name: "Dr. Müller & Partner", desc: "Fachanwälte für Immobilien- und Mietrecht mit über 20 Jahren Erfahrung.", rating: 4, tags: ["Erfahren", "Bundesweit"] },

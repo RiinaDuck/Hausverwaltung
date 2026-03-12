@@ -48,6 +48,9 @@ export interface Objekt {
   einheiten: number;
   status: "aktiv" | "inaktiv";
   eigentuemer: {
+    anrede?: string;
+    vorname?: string;
+    nachname?: string;
     name: string;
     adresse: string;
     plz?: string;
@@ -279,6 +282,9 @@ const DEMO_OBJEKTE: Objekt[] = [
     einheiten: 8,
     status: "aktiv",
     eigentuemer: {
+      anrede: "Herr",
+      vorname: "Max",
+      nachname: "Mustermann",
       name: "Max Mustermann",
       adresse: "Musterstraße 123, 12345 Berlin",
       telefon: "030 12345678",

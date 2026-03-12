@@ -305,7 +305,7 @@ export function AbrechnungErstellenView() {
           <CardTitle className="text-base">Abrechnungsparameter</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
             {/* Zeitraum */}
             <div className="space-y-2">
               <Label>Von</Label>
