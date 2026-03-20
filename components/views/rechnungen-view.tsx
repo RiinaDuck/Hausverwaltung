@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,7 +30,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Save, Plus, Trash2, FileDown, Eye, Pencil } from "lucide-react";
+import { Save, Plus, Trash2, FileDown, Eye, Pencil, Upload, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   generateRechnungPDF,
   downloadPDF,
@@ -50,6 +56,8 @@ export function RechnungenView() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingRechnung, setEditingRechnung] = useState<Rechnung | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [importFormat, setImportFormat] = useState<"datev" | "lexware" | null>(null);
   const THIS_YEAR = new Date().getFullYear();
   const [newRechnung, setNewRechnung] = useState<Partial<Rechnung>>({
     nummer: `${THIS_YEAR}-${String(rechnungen.length + 1).padStart(3, "0")}`,
@@ -238,6 +246,160 @@ export function RechnungenView() {
     }
   };
 
+  // CSV Import Handler
+  const handleImportCSV = async (format: "datev" | "lexware") => {
+    fileInputRef.current?.click();
+    setImportFormat(format);
+  };
+
+  const processImportFile = async (file: File) => {
+    if (!importFormat) return;
+    
+    try {
+      const text = await file.text();
+      const lines = text.split("\n").filter((line) => line.trim());
+      let imported = 0;
+
+      if (importFormat === "datev") {
+        // DATEV Format: skip header, parse each line
+        for (let i = 1; i < lines.length; i++) {
+          const parts = lines[i].split(";");
+          if (parts.length < 5) continue;
+
+          await addRechnung({
+            nummer: parts[0]?.trim() || `${THIS_YEAR}-${i}`,
+            datum: parts[1]?.trim() || new Date().toISOString().split("T")[0],
+            empfaengerName: parts[2]?.trim() || "Unbekannt",
+            empfaengerAdresse: parts[3]?.trim() || "",
+            positionen: [
+              {
+                id: "1",
+                beschreibung: parts[4]?.trim() || "Import",
+                menge: 1,
+                einzelpreis: parseFloat(parts[5]?.trim() || "0") || 0,
+              },
+            ],
+            bemerkung: parts[6]?.trim() || "",
+            status: "offen",
+          });
+          imported++;
+        }
+      } else if (importFormat === "lexware") {
+        // Lexware Format: skip header, parse each line
+        for (let i = 1; i < lines.length; i++) {
+          const parts = lines[i].split("\t");
+          if (parts.length < 5) continue;
+
+          await addRechnung({
+            nummer: parts[0]?.trim() || `${THIS_YEAR}-${i}`,
+            datum: parts[1]?.trim() || new Date().toISOString().split("T")[0],
+            empfaengerName: parts[2]?.trim() || "Unbekannt",
+            empfaengerAdresse: parts[3]?.trim() || "",
+            positionen: [
+              {
+                id: "1",
+                beschreibung: parts[4]?.trim() || "Import",
+                menge: 1,
+                einzelpreis: parseFloat(parts[5]?.trim() || "0") || 0,
+              },
+            ],
+            bemerkung: parts[6]?.trim() || "",
+            status: "offen",
+          });
+          imported++;
+        }
+      }
+
+      toast({
+        title: "Import erfolgreich",
+        description: `${imported} Rechnungen importiert.`,
+      });
+      setImportFormat(null);
+    } catch (error: any) {
+      console.error("Import Fehler:", error);
+      toast({
+        title: "Import Fehler",
+        description: error?.message ?? "Die Datei konnte nicht importiert werden.",
+        variant: "destructive",
+      });
+      setImportFormat(null);
+    }
+  };
+
+  // CSV Export Handler
+  const handleExportCSV = (format: "datev" | "lexware") => {
+    try {
+      let csv = "";
+      
+      if (format === "datev") {
+        // DATEV Header
+        csv = "Rechnungsnummer;Datum;Empfänger;Adresse;Beschreibung;Betrag;Bemerkung\n";
+        rechnungen.forEach((r) => {
+          const netto = r.positionen.reduce((sum, p) => sum + p.menge * p.einzelpreis, 0);
+          csv += `${r.nummer};${r.datum};${r.empfaengerName};"${r.empfaengerAdresse}";${r.positionen[0]?.beschreibung || ""};${netto.toFixed(2)};"${r.bemerkung}"\n`;
+        });
+      } else if (format === "lexware") {
+        // Lexware Header  
+        csv = "Rechnungsnummer\tDatum\tEmpfänger\tAdresse\tBeschreibung\tBetrag\tBemerkung\n";
+        rechnungen.forEach((r) => {
+          const netto = r.positionen.reduce((sum, p) => sum + p.menge * p.einzelpreis, 0);
+          csv += `${r.nummer}\t${r.datum}\t${r.empfaengerName}\t${r.empfaengerAdresse}\t${r.positionen[0]?.beschreibung || ""}\t${netto.toFixed(2)}\t${r.bemerkung}\n`;
+        });
+      }
+
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `rechnungen_${format}_${new Date().toISOString().split("T")[0]}.csv`;
+      link.click();
+
+      toast({
+        title: "Export erfolgreich",
+        description: `${rechnungen.length} Rechnungen im ${format.toUpperCase()}-Format exportiert.`,
+      });
+    } catch (error: any) {
+      console.error("Export Fehler:", error);
+      toast({
+        title: "Export Fehler",
+        description: error?.message ?? "Der Export konnte nicht durchgeführt werden.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Excel Export Handler
+  const handleExportExcel = () => {
+    try {
+      // Create a simple Excel-compatible CSV
+      let excel = "Rechnungsnummer\tDatum\tEmpfänger\tAdresse\tBeschreibung\tMenge\tEinzelpreis\tGesamt\tStatus\n";
+      
+      rechnungen.forEach((r) => {
+        r.positionen.forEach((p, idx) => {
+          const gesamt = p.menge * p.einzelpreis;
+          excel += `${r.nummer}\t${r.datum}\t${r.empfaengerName}\t${r.empfaengerAdresse}\t${p.beschreibung}\t${p.menge}\t${p.einzelpreis.toFixed(2)}\t${gesamt.toFixed(2)}\t${r.status}\n`;
+        });
+      });
+
+      const blob = new Blob([excel], { type: "application/vnd.ms-excel;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `rechnungen_${new Date().toISOString().split("T")[0]}.xlsx`;
+      link.click();
+
+      toast({
+        title: "Export erfolgreich",
+        description: `${rechnungen.length} Rechnungen ins Excel-Format exportiert.`,
+      });
+    } catch (error: any) {
+      console.error("Excel Export Fehler:", error);
+      toast({
+        title: "Export Fehler",
+        description: error?.message ?? "Der Excel-Export konnte nicht durchgeführt werden.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const getStatusBadge = (status: Rechnung["status"]) => {
     const styles = {
       offen: "bg-yellow-100 text-yellow-800",
@@ -264,18 +426,63 @@ export function RechnungenView() {
         <p className="text-sm sm:text-base text-muted-foreground">
           Verwalten Sie Ihre Rechnungen und Kalkulationen.
         </p>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button
-              size="sm"
-              className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
-            >
-              <Plus className="h-4 w-4" />
-              <span className="hidden sm:inline">Neue Rechnung</span>
-              <span className="sm:hidden">Neu</span>
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div className="flex flex-wrap gap-2">
+          {/* Import Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="gap-2">
+                <Upload className="h-4 w-4" />
+                <span className="hidden sm:inline">Importieren</span>
+                <span className="sm:hidden">Imp.</span>
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleImportCSV("datev")}>
+                DATEV Import (CSV)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleImportCSV("lexware")}>
+                Lexware Import (CSV)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Export Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" variant="outline" className="gap-2">
+                <FileDown className="h-4 w-4" />
+                <span className="hidden sm:inline">Exportieren</span>
+                <span className="sm:hidden">Exp.</span>
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExportCSV("datev")}>
+                DATEV Export (CSV)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportCSV("lexware")}>
+                Lexware Export (CSV)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportExcel}>
+                Excel Export (.xlsx)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Create Rechnung */}
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button
+                size="sm"
+                className="gap-2 bg-success hover:bg-success/90 text-success-foreground"
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline">Neue Rechnung</span>
+                <span className="sm:hidden">Neu</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Neue Rechnung erstellen</DialogTitle>
               <DialogDescription>
@@ -481,9 +688,10 @@ export function RechnungenView() {
           </DialogContent>
         </Dialog>
       </div>
+    </div>
 
-      {/* Edit Dialog */}
-      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+    {/* Edit Dialog */}
+    <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Rechnung bearbeiten</DialogTitle>
@@ -859,6 +1067,20 @@ export function RechnungenView() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Hidden file input for CSV import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv,.txt"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) processImportFile(file);
+          // Reset input
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        }}
+      />
     </div>
   );
 }
