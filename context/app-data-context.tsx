@@ -37,6 +37,10 @@ import {
   createRechnung as createRechnungDB,
   updateRechnung as updateRechnungDB,
   deleteRechnung as deleteRechnungDB,
+  getBuchungen,
+  createBuchung as createBuchungDB,
+  updateBuchung as updateBuchungDB,
+  deleteBuchung as deleteBuchungDB,
 } from "@/lib/supabase/queries";
 
 // Types für die Datenstrukturen
@@ -194,6 +198,29 @@ export interface Rechnung {
   updatedAt: string;
 }
 
+export interface Buchung {
+  id: string;
+  userId: string;
+  typ: "einnahme" | "ausgabe";
+  kategorie: string;
+  datum: string; // ISO Date
+  betragNetto: number;
+  mwstProzent: number;
+  betragBrutto: number;
+  objektId?: string | null;
+  wohnungId?: string | null;
+  mieterId?: string | null;
+  beschreibung: string;
+  rechnungssteller?: string | null; // For Ausgaben
+  rechnungsnummer?: string | null; // For Ausgaben
+  belegPfad?: string | null; // Path to PDF in storage
+  stornoVon?: string | null; // Reference to original entry for reversals
+  legacyRechnungId?: string | null; // For migration from rechnungen
+  legacyStatus?: "offen" | "bezahlt" | "storniert" | null; // For migration
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type Verteilerschluessel =
   | "wohnflaeche"
   | "nutzflaeche"
@@ -262,6 +289,7 @@ interface AppDataContextType {
   zaehler: Zaehler[];
   rauchmelder: Rauchmelder[];
   rechnungen: Rechnung[];
+  buchungen: Buchung[];
   addZaehler: (z: Omit<Zaehler, "id">) => Promise<void>;
   updateZaehler: (id: string, z: Partial<Zaehler>) => Promise<void>;
   deleteZaehler: (id: string) => Promise<void>;
@@ -271,6 +299,9 @@ interface AppDataContextType {
   addRechnung: (r: Omit<Rechnung, "id" | "userId" | "createdAt" | "updatedAt">) => Promise<void>;
   updateRechnung: (id: string, r: Partial<Rechnung>) => Promise<void>;
   deleteRechnung: (id: string) => Promise<void>;
+  addBuchung: (b: Omit<Buchung, "id" | "userId" | "createdAt" | "updatedAt">) => Promise<void>;
+  updateBuchung: (id: string, b: Partial<Buchung>) => Promise<void>;
+  deleteBuchung: (id: string) => Promise<void>;
   zahlungen: ZahlungEintrag[];
   setZahlungen: React.Dispatch<React.SetStateAction<ZahlungEintrag[]>>;
   setSelectedObjektId: (id: string | null) => void;
@@ -477,6 +508,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [zaehler, setZaehler] = useState<Zaehler[]>([]);
   const [rauchmelder, setRauchmelder] = useState<Rauchmelder[]>([]);
   const [rechnungen, setRechnungen] = useState<Rechnung[]>([]);
+  const [buchungen, setBuchungen] = useState<Buchung[]>([]);
   const [zahlungenState, setZahlungenState] = useState<ZahlungEintrag[]>([]);
   const [selectedObjektId, setSelectedObjektIdState] = useState<string | null>(() => {
     // Beim ersten Render: gespeichertes Objekt aus localStorage laden
@@ -600,6 +632,29 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     updatedAt: db.updated_at,
   });
 
+  const mapDBToBuchung = (db: any): Buchung => ({
+    id: db.id,
+    userId: db.user_id,
+    typ: db.typ,
+    kategorie: db.kategorie,
+    datum: db.datum,
+    betragNetto: Number(db.betrag_netto),
+    mwstProzent: db.mwst_prozent ?? 0,
+    betragBrutto: Number(db.betrag_brutto),
+    objektId: db.objekt_id ?? null,
+    wohnungId: db.wohnung_id ?? null,
+    mieterId: db.mieter_id ?? null,
+    beschreibung: db.beschreibung,
+    rechnungssteller: db.rechnungssteller ?? null,
+    rechnungsnummer: db.rechnungsnummer ?? null,
+    belegPfad: db.beleg_pfad ?? null,
+    stornoVon: db.storno_von ?? null,
+    legacyRechnungId: db.legacy_rechnung_id ?? null,
+    legacyStatus: db.legacy_status ?? null,
+    createdAt: db.created_at,
+    updatedAt: db.updated_at,
+  });
+
   // Lade alle Daten von Supabase
   const refreshData = async () => {
     // Demo-Modus oder Admin-Account: Zeige Demo-Daten
@@ -613,6 +668,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setZaehler(DEMO_ZAEHLER);
       setRauchmelder(DEMO_RAUCHMELDER);
       setRechnungen(DEMO_RECHNUNGEN);
+      setBuchungen([]);
       setSelectedObjektId(DEMO_OBJEKTE[0]?.id || null);
       setLoading(false);
       return;
@@ -620,7 +676,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
     try {
       setLoading(true);
-      const [objekteData, wohnungenData, mieterData, expensesData, zaehlerData, rauchmelderData, rechnungenData] = await Promise.all([
+      const [objekteData, wohnungenData, mieterData, expensesData, zaehlerData, rauchmelderData, rechnungenData, buchungenData] = await Promise.all([
         getObjekte(user.id),
         getWohnungen(user.id),
         getMieter(user.id),
@@ -628,6 +684,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         getZaehler(user.id),
         getRauchmelder(user.id),
         getRechnungen(user.id),
+        getBuchungen(user.id),
       ]);
 
       setObjekte(objekteData.map(mapDBToObjekt));
@@ -636,6 +693,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       setZaehler(zaehlerData.map(mapDBToZaehler));
       setRauchmelder(rauchmelderData.map(mapDBToRauchmelder));
       setRechnungen(rechnungenData.map(mapDBToRechnung));
+      setBuchungen(buchungenData.map(mapDBToBuchung));
 
       const allMieter = mieterData.map(mapDBToMieter);
       setMieter(allMieter.filter((m: Mieter) => m.isAktiv));
@@ -1330,6 +1388,88 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ---- Buchungen CRUD ----
+
+  const addBuchung = async (b: Omit<Buchung, "id" | "userId" | "createdAt" | "updatedAt">) => {
+    if (!user || isAdmin) {
+      const newB: Buchung = {
+        ...b,
+        id: `local-bu-${Date.now()}`,
+        userId: "demo",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setBuchungen((prev) => [newB, ...prev]);
+      return;
+    }
+    try {
+      const created = await createBuchungDB({
+        user_id: user.id,
+        typ: b.typ,
+        kategorie: b.kategorie,
+        datum: b.datum,
+        betrag_netto: b.betragNetto,
+        mwst_prozent: b.mwstProzent,
+        betrag_brutto: b.betragBrutto,
+        objekt_id: b.objektId ?? null,
+        wohnung_id: b.wohnungId ?? null,
+        mieter_id: b.mieterId ?? null,
+        beschreibung: b.beschreibung,
+        rechnungssteller: b.rechnungssteller ?? null,
+        rechnungsnummer: b.rechnungsnummer ?? null,
+        beleg_pfad: b.belegPfad ?? null,
+        storno_von: b.stornoVon ?? null,
+      });
+      setBuchungen((prev) => [mapDBToBuchung(created), ...prev]);
+    } catch (error) {
+      console.error("Error adding buchung:", error);
+      throw error;
+    }
+  };
+
+  const updateBuchung = async (id: string, b: Partial<Buchung>) => {
+    if (!user || isAdmin) {
+      setBuchungen((prev) => prev.map((e) => (e.id === id ? { ...e, ...b } : e)));
+      return;
+    }
+    try {
+      const dbUpdates: any = {};
+      if (b.typ !== undefined) dbUpdates.typ = b.typ;
+      if (b.kategorie !== undefined) dbUpdates.kategorie = b.kategorie;
+      if (b.datum !== undefined) dbUpdates.datum = b.datum;
+      if (b.betragNetto !== undefined) dbUpdates.betrag_netto = b.betragNetto;
+      if (b.mwstProzent !== undefined) dbUpdates.mwst_prozent = b.mwstProzent;
+      if (b.betragBrutto !== undefined) dbUpdates.betrag_brutto = b.betragBrutto;
+      if (b.objektId !== undefined) dbUpdates.objekt_id = b.objektId;
+      if (b.wohnungId !== undefined) dbUpdates.wohnung_id = b.wohnungId;
+      if (b.mieterId !== undefined) dbUpdates.mieter_id = b.mieterId;
+      if (b.beschreibung !== undefined) dbUpdates.beschreibung = b.beschreibung;
+      if (b.rechnungssteller !== undefined) dbUpdates.rechnungssteller = b.rechnungssteller;
+      if (b.rechnungsnummer !== undefined) dbUpdates.rechnungsnummer = b.rechnungsnummer;
+      if (b.belegPfad !== undefined) dbUpdates.beleg_pfad = b.belegPfad;
+      const updated = await updateBuchungDB(id, dbUpdates);
+      setBuchungen((prev) => prev.map((e) => (e.id === id ? mapDBToBuchung(updated) : e)));
+    } catch (error) {
+      console.error("Error updating buchung:", error);
+      throw error;
+    }
+  };
+
+  const deleteBuchung = async (id: string) => {
+    if (id.startsWith("local-")) return;
+    if (!user || isAdmin) {
+      setBuchungen((prev) => prev.filter((e) => e.id !== id));
+      return;
+    }
+    try {
+      await deleteBuchungDB(id);
+      setBuchungen((prev) => prev.filter((e) => e.id !== id));
+    } catch (error) {
+      console.error("Error deleting buchung:", error);
+      throw error;
+    }
+  };
+
   return (
     <AppDataContext.Provider
       value={{
@@ -1357,6 +1497,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         zaehler,
         rauchmelder,
         rechnungen,
+        buchungen,
         addZaehler,
         updateZaehler,
         deleteZaehler,
@@ -1366,6 +1507,9 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         addRechnung,
         updateRechnung,
         deleteRechnung,
+        addBuchung,
+        updateBuchung,
+        deleteBuchung,
         zahlungen: zahlungenState,
         setZahlungen: setZahlungenState,
         setSelectedObjektId,

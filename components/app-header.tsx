@@ -493,6 +493,7 @@ const viewTitles: Record<AppView, string> = {
   objekte: "Objektdaten (Stammdaten)",
   wohnungen: "Wohnungsdaten",
   mieter: "Mieter",
+  "einnahmen-ausgaben": "Einnahmen & Ausgaben",
   nebenkosten: "Nebenkosten",
   "nebenkosten-abrechnung": "Nebenkosten – Abrechnung erstellen",
   zaehler: "Zähler & Rauchmelder",

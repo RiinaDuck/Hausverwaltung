@@ -302,6 +302,54 @@ export async function deleteRechnung(id: string) {
 }
 
 // ============================================
+// BUCHUNGEN (Financial Entries - Einnahmen/Ausgaben)
+// ============================================
+
+export async function getBuchungen(userId: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("buchungen")
+    .select("*")
+    .eq("user_id", userId)
+    .order("datum", { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function createBuchung(buchung: any) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("buchungen")
+    .insert(buchung)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function updateBuchung(id: string, updates: any) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("buchungen")
+    .update(updates)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteBuchung(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("buchungen").delete().eq("id", id);
+
+  if (error) throw error;
+}
+
+// ============================================
 // HAUSMANAGER STAMMDATEN
 // ============================================
 
