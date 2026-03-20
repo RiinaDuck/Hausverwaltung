@@ -196,8 +196,8 @@ export interface Rechnung {
   kostenart?: string;
   faelligkeitsdatum?: string;
   betragNetto?: number;
-  mwstProzent?: number;
   betragBrutto?: number;
+  mwstProzent?: number;
   notizen?: string;
   dateiPfad?: string;
   stornoVon?: string;
