@@ -366,6 +366,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     addWohnung,
     updateWohnung,
     deleteWohnung,
+    updateMieter,
   } = useAppData();
   const { isDemo } = useAuth();
 
@@ -398,6 +399,12 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
 
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [editedUnit, setEditedUnit] = useState<Unit | null>(null);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [archiveDialogData, setArchiveDialogData] = useState<{
+    activeMieter: (typeof mieter)[0] | null;
+    newStatus: "frei" | "renovierung";
+  } | null>(null);
+  const [archiveProcessing, setArchiveProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({
     "bad-dusche": true,
@@ -601,6 +608,76 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
   ) => {
     if (!editedUnit) return;
     setEditedUnit((prev) => (prev ? { ...prev, [field]: value } : null));
+  };
+
+  // Handle status change with archive confirmation
+  const handleStatusChange = (newStatus: "vermietet" | "frei" | "renovierung") => {
+    if (!selectedUnit || !editedUnit) {
+      updateEditedUnit("status", newStatus);
+      return;
+    }
+
+    // Wenn Status zu "frei" oder "renovierung" geändert wird, prüfe auf aktive Mieter
+    if (newStatus === "frei" || newStatus === "renovierung") {
+      const activeMieter = mieter.find(
+        (m) => m.wohnungId === selectedUnit.id && m.isAktiv !== false
+      );
+
+      if (activeMieter) {
+        // Es gibt einen aktiven Mieter - zeige Archive Dialog
+        setArchiveDialogData({
+          activeMieter,
+          newStatus: newStatus as "frei" | "renovierung",
+        });
+        setArchiveDialogOpen(true);
+        return;
+      }
+    }
+
+    // Kein aktiver Mieter oder Status ändert sich zu "vermietet" - ändere direkt
+    updateEditedUnit("status", newStatus);
+  };
+
+  // Archive mieter and update status
+  const handleArchiveMieter = async () => {
+    if (!archiveDialogData?.activeMieter || !selectedUnit || !editedUnit) return;
+
+    setArchiveProcessing(true);
+    try {
+      // Archiviere den Mieter
+      await updateMieter(archiveDialogData.activeMieter.id, {
+        isAktiv: false,
+      });
+
+      updateEditedUnit("status", archiveDialogData.newStatus);
+
+      toast({
+        title: "Mieter archiviert",
+        description: `${archiveDialogData.activeMieter.name} wurde archiviert und die Wohnung auf "${
+          archiveDialogData.newStatus === "frei" ? "Frei" : "Renovierung"
+        }" gesetzt.`,
+      });
+    } catch (error: any) {
+      console.error("Fehler beim Archivieren:", error);
+      toast({
+        title: "Fehler beim Archivieren",
+        description: error?.message ?? "Der Mieter konnte nicht archiviert werden.",
+        variant: "destructive",
+      });
+    } finally {
+      setArchiveProcessing(false);
+      setArchiveDialogOpen(false);
+      setArchiveDialogData(null);
+    }
+  };
+
+  // Skip archive and just update status
+  const handleSkipArchive = () => {
+    if (!archiveDialogData || !editedUnit) return;
+    // Just update status without archiving mieter
+    updateEditedUnit("status", archiveDialogData.newStatus);
+    setArchiveDialogOpen(false);
+    setArchiveDialogData(null);
   };
 
   const [isSaving, setIsSaving] = useState(false);
@@ -1104,8 +1181,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       <Select
                         value={editedUnit?.status || "frei"}
                         onValueChange={(value) =>
-                          updateEditedUnit(
-                            "status",
+                          handleStatusChange(
                             value as "vermietet" | "frei" | "renovierung",
                           )
                         }
@@ -1684,6 +1760,58 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
               onClick={handleCreateUnit}
             >
               Einheit anlegen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Archive Confirmation Dialog */}
+      <Dialog open={archiveDialogOpen} onOpenChange={setArchiveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mieter archivieren?</DialogTitle>
+            <DialogDescription>
+              Diese Wohnung ist aktuell von{" "}
+              <span className="font-semibold">{archiveDialogData?.activeMieter?.name}</span>{" "}
+              bewohnt. Was soll mit dem Mietverhältnis passieren?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              • <span className="font-medium">Ja, archivieren:</span> Der Mieter wird archiviert und die
+              Wohnung auf &quot;{archiveDialogData?.newStatus === "frei"
+                ? "Frei"
+                : "Renovierung"}&quot; gesetzt.
+            </p>
+            <p>
+              • <span className="font-medium">Nein, nur Status ändern:</span> Die Wohnung wird auf &quot;
+              {archiveDialogData?.newStatus === "frei" ? "Frei" : "Renovierung"}&quot; gesetzt, der Mieter bleibt aktiv.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setArchiveDialogOpen(false);
+                setArchiveDialogData(null);
+              }}
+              disabled={archiveProcessing}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleSkipArchive}
+              disabled={archiveProcessing}
+            >
+              Nein, nur Status ändern
+            </Button>
+            <Button
+              className="bg-destructive hover:bg-destructive/90"
+              onClick={handleArchiveMieter}
+              disabled={archiveProcessing}
+            >
+              {archiveProcessing ? "Wird archiviert..." : "Ja, archivieren"}
             </Button>
           </DialogFooter>
         </DialogContent>
