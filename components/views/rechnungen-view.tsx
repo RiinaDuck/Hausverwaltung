@@ -40,18 +40,7 @@ import {
 } from "@/components/ui/drawer";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import {
-  Save,
-  Plus,
-  Trash2,
-  FileDown,
-  Eye,
-  Pencil,
-  Upload,
-  ChevronDown,
-  Filter,
-  X,
-} from "lucide-react";
+import { Save, Plus, Trash2, FileDown, Eye, Pencil, Upload, ChevronDown, Filter, X, ToggleLeft, ToggleRight } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,13 +48,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/ui/toggle-group";
+import {
   generateRechnungPDF,
   downloadPDF,
   sanitizeFilename,
 } from "@/lib/pdf-generator";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
-import { useAppData, type Rechnung, type RechnungsPosition } from "@/context/app-data-context";
+import { useAppData, type Rechnung, type RechnungsPosition, type Objekt, type Wohnung, type Mieter } from "@/context/app-data-context";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const KOSTENART_OPTIONS = [
@@ -94,7 +87,7 @@ interface RechnungFilter {
 export function RechnungenView() {
   const { profile, isDemo } = useAuth();
   const { toast } = useToast();
-  const { rechnungen, addRechnung, updateRechnung, deleteRechnung } = useAppData();
+  const { rechnungen, addRechnung, updateRechnung, deleteRechnung, objekte, wohnungen, mieter } = useAppData();
   const isMobile = useIsMobile();
   const [selectedRechnung, setSelectedRechnung] = useState<Rechnung | null>(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -117,15 +110,25 @@ export function RechnungenView() {
     bisBetrag: null,
   });
 
+  // New invoice form state
+  const [empfaengerType, setEmpfaengerType] = useState<"objekt" | "wohnung" | "mieter" | null>(null);
+  const [selectedObjekt, setSelectedObjekt] = useState<string>("");
+  const [selectedWohnung, setSelectedWohnung] = useState<string>("");
+  const [selectedMieter, setSelectedMieter] = useState<string>("");
+  const [mwstSatz, setMwstSatz] = useState<string>("19");
+
   const [newRechnung, setNewRechnung] = useState<Partial<Rechnung>>({
     nummer: `${THIS_YEAR}-${String(rechnungen.length + 1).padStart(3, "0")}`,
     datum: new Date().toISOString().split("T")[0],
     empfaengerName: "",
     empfaengerAdresse: "",
-    positionen: [{ id: "1", beschreibung: "", menge: 1, einzelpreis: 0 }],
+    positionen: [{ id: "1", beschreibung: "Rechnung", menge: 1, einzelpreis: 0 }],
     bemerkung: "",
     status: "offen",
     kostenart: "",
+    faelligkeitsdatum: "",
+    betragNetto: 0,
+    mwstProzent: 19,
   });
 
   // Memoized calculation functions
@@ -317,26 +320,141 @@ export function RechnungenView() {
       return;
     }
 
+    if (!empfaengerType) {
+      toast({
+        title: "Empfänger erforderlich",
+        description: "Bitte wählen Sie einen Empfänger-Typ (Objekt, Wohnung oder Mieter).",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newRechnung.betragNetto === undefined || newRechnung.betragNetto === null || newRechnung.betragNetto <= 0) {
+      toast({
+        title: "Betrag erforderlich",
+        description: "Bitte geben Sie einen gültigen Netto-Betrag ein.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const mwst = (newRechnung.betragNetto || 0) * (parseInt(mwstSatz) / 100);
+    const brutto = (newRechnung.betragNetto || 0) + mwst;
+
     await addRechnung({
       nummer: newRechnung.nummer || "",
       datum: newRechnung.datum || "",
       empfaengerName: newRechnung.empfaengerName || "",
-      empfaengerAdresse: newRechnung.empfaengerAdresse || "",
-      positionen: newRechnung.positionen || [],
+      empfaengerAdresse: "", // No longer used in new form
+      positionen: [
+        {
+          id: "1",
+          beschreibung: "Rechnung",
+          menge: 1,
+          einzelpreis: newRechnung.betragNetto || 0,
+        },
+      ],
       bemerkung: newRechnung.bemerkung || "",
-      status: newRechnung.status || "offen",
+      status: "offen", // Always "offen" for new invoices
+      kostenart: newRechnung.kostenart || "",
+      faelligkeitsdatum: newRechnung.faelligkeitsdatum || "",
+      betragNetto: newRechnung.betragNetto || 0,
+      mwstProzent: parseInt(mwstSatz),
+      betragBrutto: brutto,
     });
+
     setIsCreateOpen(false);
+    resetCreateForm();
+    toast({ title: "Rechnung erstellt" });
+  };
+
+  const resetCreateForm = () => {
+    setEmpfaengerType(null);
+    setSelectedObjekt("");
+    setSelectedWohnung("");
+    setSelectedMieter("");
+    setMwstSatz("19");
     setNewRechnung({
       nummer: `${THIS_YEAR}-${String(rechnungen.length + 2).padStart(3, "0")}`,
       datum: new Date().toISOString().split("T")[0],
       empfaengerName: "",
       empfaengerAdresse: "",
-      positionen: [{ id: "1", beschreibung: "", menge: 1, einzelpreis: 0 }],
+      positionen: [{ id: "1", beschreibung: "Rechnung", menge: 1, einzelpreis: 0 }],
       bemerkung: "",
       status: "offen",
+      kostenart: "",
+      faelligkeitsdatum: "",
+      betragNetto: 0,
+      mwstProzent: 19,
     });
-    toast({ title: "Rechnung erstellt" });
+  };
+
+  // Calculate empfänger name based on selected type
+  const getEmpfaengerName = (): string => {
+    if (empfaengerType === "objekt" && selectedObjekt) {
+      return objekte.find((o) => o.id === selectedObjekt)?.name || "";
+    }
+    if (empfaengerType === "wohnung" && selectedWohnung) {
+      return getWohnungDisplay(selectedWohnung);
+    }
+    if (empfaengerType === "mieter" && selectedMieter) {
+      return mieter.find((m) => m.id === selectedMieter)?.name || "";
+    }
+    return "";
+  };
+
+  // Update empfänger name when selection changes
+  const handleEmpfaengerTypeChange = (type: "objekt" | "wohnung" | "mieter") => {
+    setEmpfaengerType(type);
+    setSelectedObjekt("");
+    setSelectedWohnung("");
+    setSelectedMieter("");
+  };
+
+  const handleObjektChange = (objektId: string) => {
+    setSelectedObjekt(objektId);
+    setSelectedWohnung("");
+    setSelectedMieter("");
+    const empName = objekte.find((o) => o.id === objektId)?.name || "";
+    setNewRechnung((prev) => ({
+      ...prev,
+      empfaengerName: empName,
+    }));
+  };
+
+  const handleWohnungChange = (wohnungId: string) => {
+    setSelectedWohnung(wohnungId);
+    setSelectedMieter("");
+    const empName = getWohnungDisplay(wohnungId);
+    setNewRechnung((prev) => ({
+      ...prev,
+      empfaengerName: empName,
+    }));
+  };
+
+  const handleMieterChange = (mieterId: string) => {
+    setSelectedMieter(mieterId);
+    const empName = mieter.find((m) => m.id === mieterId)?.name || "";
+    setNewRechnung((prev) => ({
+      ...prev,
+      empfaengerName: empName,
+    }));
+  };
+
+  // Get filtered wohnungen for selected objekt
+  const filteredWohnungen = selectedObjekt
+    ? wohnungen.filter((w) => w.objektId === selectedObjekt)
+    : [];
+
+  // Get filtered mieter for selected wohnung
+  const filteredMieter = selectedWohnung
+    ? mieter.filter((m) => m.wohnungId === selectedWohnung && m.isAktiv !== false)
+    : [];
+
+  // Get display name for wohnung
+  const getWohnungDisplay = (wohnungId: string) => {
+    const wohnung = wohnungen.find((w) => w.id === wohnungId);
+    return wohnung ? `${wohnung.bezeichnung} - ${wohnung.flaeche}m²` : "";
   };
 
   const handleEditRechnung = (rechnung: Rechnung) => {
@@ -909,23 +1027,19 @@ export function RechnungenView() {
               <DialogHeader>
                 <DialogTitle>Neue Rechnung erstellen</DialogTitle>
                 <DialogDescription>
-                  Erstellen Sie eine neue Rechnung für einen Mieter oder
-                  Eigentümer.
+                  Erstellen Sie eine neue Rechnung für einen Objekt, eine Wohnung oder einen Mieter.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 mt-4">
-                <div className="grid grid-cols-2 gap-4">
+                {/* Row 1: Rechnungsnummer | Datum | Fälligkeitsdatum */}
+                <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="nummer">Rechnungsnummer</Label>
                     <Input
                       id="nummer"
                       value={newRechnung.nummer}
-                      onChange={(e) =>
-                        setNewRechnung((prev) => ({
-                          ...prev,
-                          nummer: e.target.value,
-                        }))
-                      }
+                      readOnly
+                      className="bg-muted"
                     />
                   </div>
                   <div className="space-y-2">
@@ -942,140 +1056,23 @@ export function RechnungenView() {
                       }
                     />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="empfaenger">Empfänger Name</Label>
-                  <Input
-                    id="empfaenger"
-                    value={newRechnung.empfaengerName}
-                    onChange={(e) =>
-                      setNewRechnung((prev) => ({
-                        ...prev,
-                        empfaengerName: e.target.value,
-                      }))
-                    }
-                    placeholder="z.B. Familie Müller"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="adresse">Empfänger Adresse</Label>
-                  <Textarea
-                    id="adresse"
-                    value={newRechnung.empfaengerAdresse}
-                    onChange={(e) =>
-                      setNewRechnung((prev) => ({
-                        ...prev,
-                        empfaengerAdresse: e.target.value,
-                      }))
-                    }
-                    placeholder="Straße, PLZ Ort"
-                    rows={2}
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label>Rechnungspositionen</Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={addPosition}
-                      className="gap-1 bg-transparent"
-                    >
-                      <Plus className="h-3 w-3" />
-                      Position
-                    </Button>
+                  <div className="space-y-2">
+                    <Label htmlFor="faelligkeitsdatum">Fälligkeitsdatum</Label>
+                    <Input
+                      id="faelligkeitsdatum"
+                      type="date"
+                      value={newRechnung.faelligkeitsdatum || ""}
+                      onChange={(e) =>
+                        setNewRechnung((prev) => ({
+                          ...prev,
+                          faelligkeitsdatum: e.target.value,
+                        }))
+                      }
+                    />
                   </div>
-                  {newRechnung.positionen?.map((pos) => (
-                    <div
-                      key={pos.id}
-                      className="grid grid-cols-12 gap-2 items-end"
-                    >
-                      <div className="col-span-5 space-y-1">
-                        <Label className="text-xs">Beschreibung</Label>
-                        <Input
-                          value={pos.beschreibung}
-                          onChange={(e) =>
-                            updatePosition(pos.id, "beschreibung", e.target.value)
-                          }
-                          placeholder="Beschreibung"
-                        />
-                      </div>
-                      <div className="col-span-2 space-y-1">
-                        <Label className="text-xs">Menge</Label>
-                        <Input
-                          type="number"
-                          value={pos.menge}
-                          onChange={(e) =>
-                            updatePosition(
-                              pos.id,
-                              "menge",
-                              Number(e.target.value),
-                            )
-                          }
-                        />
-                      </div>
-                      <div className="col-span-2 space-y-1">
-                        <Label className="text-xs">Preis (€)</Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={pos.einzelpreis}
-                          onChange={(e) =>
-                            updatePosition(
-                              pos.id,
-                              "einzelpreis",
-                              Number(e.target.value),
-                            )
-                          }
-                        />
-                      </div>
-                      <div className="col-span-2 space-y-1">
-                        <Label className="text-xs">Gesamt</Label>
-                        <Input
-                          value={`${calculatePositionTotal(pos).toFixed(2)} €`}
-                          readOnly
-                          className="bg-muted"
-                        />
-                      </div>
-                      <div className="col-span-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-9 w-9 text-destructive"
-                          onClick={() => removePosition(pos.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={newRechnung.status || "offen"}
-                    onValueChange={(value) =>
-                      setNewRechnung((prev) => ({
-                        ...prev,
-                        status: value as Rechnung["status"],
-                      }))
-                    }
-                  >
-                    <SelectTrigger id="status">
-                      <SelectValue placeholder="Status wählen" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="offen">Offen</SelectItem>
-                      <SelectItem value="bezahlt">Bezahlt</SelectItem>
-                      <SelectItem value="storniert">Storniert</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
+                {/* Row 2: Kostenart */}
                 <div className="space-y-2">
                   <Label htmlFor="kostenart">Kostenart</Label>
                   <Select
@@ -1100,8 +1097,216 @@ export function RechnungenView() {
                   </Select>
                 </div>
 
+                {/* Row 3: Empfänger-Typ Toggle Buttons */}
                 <div className="space-y-2">
-                  <Label htmlFor="bemerkung">Bemerkung</Label>
+                  <Label>Empfänger-Typ</Label>
+                  <ToggleGroup
+                    type="single"
+                    value={empfaengerType || ""}
+                    onValueChange={(value) => {
+                      if (value) {
+                        handleEmpfaengerTypeChange(value as "objekt" | "wohnung" | "mieter");
+                      }
+                    }}
+                    className="justify-start"
+                  >
+                    <ToggleGroupItem value="objekt" aria-label="Objekt">
+                      Objekt
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="wohnung" aria-label="Wohnung">
+                      Wohnung
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="mieter" aria-label="Mieter">
+                      Mieter
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+                </div>
+
+                {/* Empfänger Selection Dropdowns */}
+                {empfaengerType === "objekt" && (
+                  <div className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="objekt-select">Objekt</Label>
+                      <Select
+                        value={selectedObjekt}
+                        onValueChange={handleObjektChange}
+                      >
+                        <SelectTrigger id="objekt-select">
+                          <SelectValue placeholder="Objekt wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {objekte.map((obj) => (
+                            <SelectItem key={obj.id} value={obj.id}>
+                              {obj.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {selectedObjekt && (
+                      <p className="text-xs text-muted-foreground italic">
+                        Diese Rechnung wird bei der Nebenkostenabrechnung auf alle Mieter verteilt.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {empfaengerType === "wohnung" && (
+                  <div className="space-y-2">
+                    <div>
+                      <Label htmlFor="obj-select-wohnung">Objekt</Label>
+                      <Select
+                        value={selectedObjekt}
+                        onValueChange={handleObjektChange}
+                      >
+                        <SelectTrigger id="obj-select-wohnung">
+                          <SelectValue placeholder="Objekt wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {objekte.map((obj) => (
+                            <SelectItem key={obj.id} value={obj.id}>
+                              {obj.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="wohnung-select">Wohnung</Label>
+                      <Select
+                        value={selectedWohnung}
+                        onValueChange={handleWohnungChange}
+                        disabled={!selectedObjekt}
+                      >
+                        <SelectTrigger id="wohnung-select">
+                          <SelectValue placeholder="Wohnung wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredWohnungen.map((wohnung) => (
+                            <SelectItem key={wohnung.id} value={wohnung.id}>
+                              {getWohnungDisplay(wohnung.id)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
+                {empfaengerType === "mieter" && (
+                  <div className="space-y-2">
+                    <div>
+                      <Label htmlFor="obj-select-mieter">Objekt</Label>
+                      <Select
+                        value={selectedObjekt}
+                        onValueChange={handleObjektChange}
+                      >
+                        <SelectTrigger id="obj-select-mieter">
+                          <SelectValue placeholder="Objekt wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {objekte.map((obj) => (
+                            <SelectItem key={obj.id} value={obj.id}>
+                              {obj.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="wohnung-select-mieter">Wohnung</Label>
+                      <Select
+                        value={selectedWohnung}
+                        onValueChange={handleWohnungChange}
+                        disabled={!selectedObjekt}
+                      >
+                        <SelectTrigger id="wohnung-select-mieter">
+                          <SelectValue placeholder="Wohnung wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredWohnungen.map((wohnung) => (
+                            <SelectItem key={wohnung.id} value={wohnung.id}>
+                              {getWohnungDisplay(wohnung.id)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="mieter-select">Mieter</Label>
+                      <Select
+                        value={selectedMieter}
+                        onValueChange={handleMieterChange}
+                        disabled={!selectedWohnung}
+                      >
+                        <SelectTrigger id="mieter-select">
+                          <SelectValue placeholder="Mieter wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredMieter.map((mieterItem) => (
+                            <SelectItem key={mieterItem.id} value={mieterItem.id}>
+                              {mieterItem.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+
+                {/* Row 4: Betrag netto | MwSt % | Betrag brutto */}
+                {empfaengerType && (
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="betrag-netto">Betrag netto (€)</Label>
+                      <Input
+                        id="betrag-netto"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0,00"
+                        value={newRechnung.betragNetto ?? ""}
+                        onChange={(e) =>
+                          setNewRechnung((prev) => ({
+                            ...prev,
+                            betragNetto: e.target.value ? parseFloat(e.target.value) : 0,
+                          }))
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="mwst-satz">MwSt. (%)</Label>
+                      <Select value={mwstSatz} onValueChange={setMwstSatz}>
+                        <SelectTrigger id="mwst-satz">
+                          <SelectValue placeholder="MwSt. wählen" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">0%</SelectItem>
+                          <SelectItem value="7">7%</SelectItem>
+                          <SelectItem value="19">19%</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="betrag-brutto">Betrag brutto (€)</Label>
+                      <Input
+                        id="betrag-brutto"
+                        type="number"
+                        step="0.01"
+                        readOnly
+                        className="bg-muted"
+                        value={(
+                          (newRechnung.betragNetto || 0) *
+                          (1 + parseInt(mwstSatz) / 100)
+                        ).toFixed(2)}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Row 5: Notizen */}
+                <div className="space-y-2">
+                  <Label htmlFor="bemerkung">Notizen</Label>
                   <Textarea
                     id="bemerkung"
                     value={newRechnung.bemerkung}
@@ -1111,7 +1316,7 @@ export function RechnungenView() {
                         bemerkung: e.target.value,
                       }))
                     }
-                    placeholder="Optionale Bemerkungen zur Rechnung"
+                    placeholder="Optionale Notizen zur Rechnung"
                     rows={2}
                   />
                 </div>
@@ -1119,7 +1324,10 @@ export function RechnungenView() {
                 <div className="flex justify-end gap-2 pt-4">
                   <Button
                     variant="outline"
-                    onClick={() => setIsCreateOpen(false)}
+                    onClick={() => {
+                      setIsCreateOpen(false);
+                      resetCreateForm();
+                    }}
                   >
                     Abbrechen
                   </Button>
