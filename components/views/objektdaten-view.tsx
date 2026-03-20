@@ -22,12 +22,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Save, Plus, Building2, Trash2, Edit, MoreHorizontal } from "lucide-react";
+import { Save, Plus, Building2, Trash2, Edit, MoreHorizontal, Archive, Loader2 } from "lucide-react";
 import { useAppData } from "@/context/app-data-context";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { validateRequired, validatePLZ } from "@/lib/validation";
+import { createClient } from "@/lib/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DropdownMenu,
@@ -65,6 +66,11 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
   const [validationErrors, setValidationErrors] = useState<
     Record<string, string>
   >({});
+  const [archiveConfirmOpen, setArchiveConfirmOpen] = useState(false);
+  const [objektToArchive, setObjektToArchive] = useState<
+    (typeof objekte)[0] | null
+  >(null);
+  const [archiveProcessing, setArchiveProcessing] = useState(false);
   const { toast } = useToast();
 
   const selectedObjekt =
@@ -219,6 +225,55 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
     setDeleteConfirmOpen(false);
   };
 
+  const handleArchiveObjekt = (objekt: (typeof objekte)[0]) => {
+    setObjektToArchive(objekt);
+    setArchiveConfirmOpen(true);
+  };
+
+  const confirmArchive = async () => {
+    if (!objektToArchive) return;
+
+    setArchiveProcessing(true);
+    try {
+      const supabase = createClient();
+      if (!supabase) throw new Error("Supabase client not available");
+
+      // Update objekt: set archived_at=now(), archive_reason="Archiviert"
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from("objekte")
+        .update({
+          archived_at: now,
+          archive_reason: "Archiviert",
+        })
+        .eq("id", objektToArchive.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Archiviert",
+        description: `Objekt "${objektToArchive.name}" wurde archiviert.`,
+      });
+
+      setObjektToArchive(null);
+      setArchiveConfirmOpen(false);
+      
+      // Deselect the archived objekt
+      if (selectedObjektId === objektToArchive.id) {
+        setSelectedObjektId(objekte.find((o) => o.id !== objektToArchive.id)?.id ?? null);
+      }
+    } catch (error: any) {
+      console.error("Error archiving objekt:", error);
+      toast({
+        title: "Fehler beim Archivieren",
+        description: error?.message ?? "Das Objekt konnte nicht archiviert werden.",
+        variant: "destructive",
+      });
+    } finally {
+      setArchiveProcessing(false);
+    }
+  };
+
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -370,6 +425,14 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Bearbeiten
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => handleArchiveObjekt(selectedObjekt)}
+                    className="text-amber-600 focus:text-amber-600"
+                  >
+                    <Archive className="h-4 w-4 mr-2" />
+                    Archivieren
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
@@ -1226,6 +1289,52 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
         cancelText="Abbrechen"
         variant="destructive"
       />
+
+      {/* Archive Confirmation Dialog */}
+      <Dialog open={archiveConfirmOpen} onOpenChange={setArchiveConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Objekt archivieren?</DialogTitle>
+            <DialogDescription>
+              Möchten Sie das Objekt <span className="font-semibold">"{objektToArchive?.name}"</span> wirklich archivieren?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              Das Objekt wird archiviert und ist nicht mehr in der aktiven Liste sichtbar. Sie können es jederzeit in der Archiv-Section wiederherstellen.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setArchiveConfirmOpen(false);
+                setObjektToArchive(null);
+              }}
+              disabled={archiveProcessing}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              className="bg-amber-600 hover:bg-amber-700"
+              onClick={confirmArchive}
+              disabled={archiveProcessing}
+            >
+              {archiveProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Wird archiviert...
+                </>
+              ) : (
+                <>
+                  <Archive className="mr-2 h-4 w-4" />
+                  Ja, archivieren
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

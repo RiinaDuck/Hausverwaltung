@@ -499,6 +499,7 @@ const viewTitles: Record<AppView, string> = {
   hausmanager: "Hausmanager / Finanzamt",
   rechnungen: "Rechnungen",
   statistiken: "Statistiken",
+  archiv: "Archiv",
 };
 
 export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {

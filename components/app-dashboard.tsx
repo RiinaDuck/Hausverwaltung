@@ -13,6 +13,7 @@ import { ZaehlerView } from "@/components/views/zaehler-view";
 import { HausmanagerView } from "@/components/views/hausmanager-view";
 import { RechnungenView } from "@/components/views/rechnungen-view";
 import { StatistikenView } from "@/components/views/statistiken-view";
+import { ArchivView } from "@/components/views/archiv-view";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { OnboardingModal } from "@/components/onboarding-modal";
 
@@ -26,11 +27,12 @@ export type AppView =
   | "rechnungen"
   | "zaehler"
   | "hausmanager"
-  | "statistiken";
+  | "statistiken"
+  | "archiv";
 
 const validViews: AppView[] = [
   "dashboard", "objekte", "wohnungen", "mieter", "nebenkosten",
-  "nebenkosten-abrechnung", "rechnungen", "zaehler", "hausmanager", "statistiken",
+  "nebenkosten-abrechnung", "rechnungen", "zaehler", "hausmanager", "statistiken", "archiv",
 ];
 
 interface AppDashboardProps {
@@ -90,6 +92,8 @@ export function AppDashboard({ onSwitchToLanding }: AppDashboardProps) {
         return <HausmanagerView />;
       case "statistiken":
         return <StatistikenView />;
+      case "archiv":
+        return <ArchivView />;
       default:
         return <DashboardView onNavigate={handleNavigate} />;
     }

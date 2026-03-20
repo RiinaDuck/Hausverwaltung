@@ -23,7 +23,7 @@ import {
   BarChart3,
   ChevronLeft,
   ChevronRight,
-
+  Archive,
   X,
 } from "lucide-react";
 import type { AppView } from "@/components/app-dashboard";
@@ -48,6 +48,7 @@ const navItems = [
   { id: "zaehler" as const, label: "Zähler", icon: Gauge },
   { id: "statistiken" as const, label: "Statistiken", icon: BarChart3 },
   { id: "hausmanager" as const, label: "Hausmanager", icon: Landmark },
+  { id: "archiv" as const, label: "Archiv", icon: Archive, dividerBefore: true },
 ];
 
 
@@ -209,18 +210,25 @@ export function AppSidebar({
               </Button>
             );
 
-            if (!isMobile && isCollapsed) {
-              return (
-                <Tooltip key={item.id}>
-                  <TooltipTrigger asChild>{button}</TooltipTrigger>
-                  <TooltipContent side="right" className="font-medium">
-                    {item.label}
-                  </TooltipContent>
-                </Tooltip>
-              );
-            }
+            const itemContent = !isMobile && isCollapsed ? (
+              <Tooltip key={item.id}>
+                <TooltipTrigger asChild>{button}</TooltipTrigger>
+                <TooltipContent side="right" className="font-medium">
+                  {item.label}
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              button
+            );
 
-            return button;
+            return (
+              <div key={item.id}>
+                {(item as any).dividerBefore && (
+                  <div className="my-2 border-t border-sidebar-border" />
+                )}
+                {itemContent}
+              </div>
+            );
           })}
 
 

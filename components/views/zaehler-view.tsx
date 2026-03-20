@@ -5,6 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+// Helper function to format dates from ISO (YYYY-MM-DD) to German format (DD.MM.YYYY)
+const formatDateGerman = (dateString?: string | null) => {
+  if (!dateString) return "-";
+  const [year, month, day] = dateString.split("-");
+  if (year && month && day) {
+    return `${day}.${month}.${year}`;
+  }
+  return dateString;
+};
 import {
   Select,
   SelectContent,
@@ -185,6 +195,19 @@ export function ZaehlerView() {
     return "";
   };
 
+  // Filter zaehler and rauchmelder by selected object
+  const filteredZaehler = zaehlerData.filter((z) => {
+    if (!selectedObjektId) return true;
+    const wohnung = wohnungen.find((w) => w.id === z.wohnungId);
+    return wohnung?.objektId === selectedObjektId;
+  });
+
+  const filteredRauchmelder = rauchmelderData.filter((r) => {
+    if (!selectedObjektId) return true;
+    const wohnung = wohnungen.find((w) => w.id === r.wohnungId);
+    return wohnung?.objektId === selectedObjektId;
+  });
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -220,7 +243,7 @@ export function ZaehlerView() {
         <Card>
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <CardTitle className="text-base sm:text-lg">
-              Wasser- & Wärmezähler
+              Zähler
             </CardTitle>
             <Button
               size="sm"
@@ -236,32 +259,28 @@ export function ZaehlerView() {
             <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Whg</TableHead>
-                  <TableHead className="hidden sm:table-cell">
-                    Geschoss
-                  </TableHead>
+                  <TableHead>Wohnung</TableHead>
                   <TableHead>Montageort</TableHead>
                   <TableHead>Geräteart</TableHead>
                   <TableHead className="hidden md:table-cell">
                     Gerätenummer
                   </TableHead>
-                  <TableHead>Geeicht bis</TableHead>
+                  <TableHead>Gültig bis</TableHead>
                   <TableHead className="w-[80px]">Aktionen</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {zaehlerData.map((zaehler) => (
+                {filteredZaehler.map((zaehler) => {
+                  const wohnung = wohnungen.find((w) => w.id === zaehler.wohnungId);
+                  return (
                   <TableRow key={zaehler.id}>
-                    <TableCell className="text-xs">{wohnungLabel(zaehler.wohnungId)}</TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      {zaehler.geschoss}
-                    </TableCell>
+                    <TableCell className="text-xs">{wohnung?.bezeichnung || wohnungLabel(zaehler.wohnungId)}</TableCell>
                     <TableCell>{zaehler.montageort}</TableCell>
                     <TableCell>{zaehler.geraeteart}</TableCell>
                     <TableCell className="hidden md:table-cell font-mono text-sm">
                       {zaehler.geraetnummer}
                     </TableCell>
-                    <TableCell>{zaehler.geeichtBis}</TableCell>
+                    <TableCell>{formatDateGerman(zaehler.geeichtBis)}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         <Button
@@ -283,7 +302,8 @@ export function ZaehlerView() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </CardContent>
@@ -309,32 +329,28 @@ export function ZaehlerView() {
             <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Whg</TableHead>
-                  <TableHead className="hidden sm:table-cell">
-                    Geschoss
-                  </TableHead>
+                  <TableHead>Wohnung</TableHead>
                   <TableHead>Montageort</TableHead>
                   <TableHead>Geräteart</TableHead>
                   <TableHead className="hidden md:table-cell">
                     Gerätenummer
                   </TableHead>
-                  <TableHead>Lebensdauer</TableHead>
+                  <TableHead>Gültig bis</TableHead>
                   <TableHead className="w-[80px]">Aktionen</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rauchmelderData.map((rm) => (
+                {filteredRauchmelder.map((rm) => {
+                  const wohnung = wohnungen.find((w) => w.id === rm.wohnungId);
+                  return (
                   <TableRow key={rm.id}>
-                    <TableCell className="text-xs">{wohnungLabel(rm.wohnungId)}</TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      {rm.geschoss}
-                    </TableCell>
+                    <TableCell className="text-xs">{wohnung?.bezeichnung || wohnungLabel(rm.wohnungId)}</TableCell>
                     <TableCell>{rm.montageort}</TableCell>
                     <TableCell>{rm.geraeteart}</TableCell>
                     <TableCell className="hidden md:table-cell font-mono text-sm">
                       {rm.geraetnummer}
                     </TableCell>
-                    <TableCell>{rm.lebensdauerBis}</TableCell>
+                    <TableCell>{formatDateGerman(rm.lebensdauerBis)}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         <Button
@@ -356,7 +372,8 @@ export function ZaehlerView() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                );
+                })}
               </TableBody>
             </Table>
           </CardContent>
