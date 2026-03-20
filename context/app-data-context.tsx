@@ -183,6 +183,13 @@ export interface Rechnung {
   positionen: RechnungsPosition[];
   bemerkung: string;
   status: "offen" | "bezahlt" | "storniert";
+  kostenart?: string;
+  faelligkeitsdatum?: string;
+  betragNetto?: number;
+  betragBrutto?: number;
+  mwstProzent?: number;
+  notizen?: string;
+  stornoVon?: string;
   createdAt: string;
   updatedAt: string;
 }
