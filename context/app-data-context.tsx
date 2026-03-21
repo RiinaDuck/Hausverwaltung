@@ -749,6 +749,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         : objekteData[0]?.id || null;
       setSelectedObjektId(validId);
     } catch (error) {
+      // eslint-disable-next-line no-console
       console.error("Error loading data from Supabase:", error);
     } finally {
       setLoading(false);
