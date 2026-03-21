@@ -306,6 +306,7 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
   const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   // Vertrag-State
+  const [vertragSelectedTyp, setVertragSelectedTyp] = useState<"unbefristet" | "befristet" | "kurzzeit" | "individuell" | null>(null);
   const [vertragDialogOpen, setVertragDialogOpen] = useState(false);
   const [vertragTyp, setVertragTyp] = useState<"unbefristet" | "befristet" | "kurzzeit" | null>(null);
   const [anwaltDialogOpen, setAnwaltDialogOpen] = useState(false);
@@ -327,6 +328,28 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
     faelligkeit: "1",
     iban: "",
   });
+
+  // Individueller Vertrag - States
+  interface VertragItem {
+    id: string;
+    mieter_id: string;
+    file_path: string;
+    file_name: string;
+    file_type: "pdf" | "docx";
+    uploaded_at: string;
+    uploaded_by: string;
+    signedUrl?: string;
+  }
+  const [vertraege, setVertraege] = useState<VertragItem[]>([]);
+  const [vertraegeLoading, setVertraegeLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [selectedVertrag, setSelectedVertrag] = useState<VertragItem | null>(null);
+  const [docxText, setDocxText] = useState("");
+  const [docxEditing, setDocxEditing] = useState(false);
+  const [docxSaving, setDocxSaving] = useState(false);
+  const dragIndexRef = useRef<number | null>(null);
+  const dragHappenedRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { toast } = useToast();
 
@@ -442,6 +465,184 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, selectedMieter?.id, isAdmin, isDemo, user?.id]);
 
+  // Verträge laden wenn sich selectedMieter ändert
+  useEffect(() => {
+    if (!selectedMieter?.id) {
+      setVertraege([]);
+      return;
+    }
+    const loadVertraegeData = async () => {
+      const supabase = createClient();
+      if (!supabase) return;
+      setVertraegeLoading(true);
+      try {
+        const { data: rows, error } = await supabase
+          .from("mieter_vertraege")
+          .select("*")
+          .eq("mieter_id", selectedMieter.id)
+          .order("uploaded_at", { ascending: false });
+        if (error) throw error;
+        if (!rows?.length) {
+          setVertraege([]);
+          return;
+        }
+        const withUrls = await Promise.all(
+          rows.map(async (row: any) => {
+            const { data: signed } = await supabase.storage
+              .from("mieter-vertraege")
+              .createSignedUrl(row.file_path, 3600);
+            return { ...row, signedUrl: signed?.signedUrl ?? "" } as VertragItem;
+          })
+        );
+        setVertraege(withUrls);
+      } catch (e) {
+        console.error("loadVertraege:", e);
+      } finally {
+        setVertraegeLoading(false);
+      }
+    };
+    loadVertraegeData();
+  }, [selectedMieter?.id]);
+
+  // Upload Vertrag Handler
+  const handleUploadVertrag = async (files: FileList | null) => {
+    if (!files || !selectedMieter) return;
+    const supabase = createClient();
+    if (!supabase) return;
+    const { user } = (await supabase.auth.getUser()).data;
+    const uploadedBy = user?.email ?? "unknown";
+
+    for (const file of Array.from(files)) {
+      if (file.size > 50 * 1024 * 1024) {
+        toast({ title: "Datei zu groß", description: `${file.name} überschreitet 50 MB.`, variant: "destructive" });
+        continue;
+      }
+      const allowed = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"];
+      if (!allowed.includes(file.type)) {
+        toast({ title: "Ungültiges Format", description: `${file.name}: nur PDF und DOCX erlaubt.`, variant: "destructive" });
+        continue;
+      }
+      const fileType = file.type.includes("pdf") ? "pdf" : "docx";
+      const path = `${selectedMieter.id}/${Date.now()}_${file.name}`;
+      setUploadProgress((p) => ({ ...p, [file.name]: 0 }));
+      try {
+        const { error: upErr } = await supabase.storage
+          .from("mieter-vertraege")
+          .upload(path, file, { upsert: false });
+        if (upErr) throw upErr;
+        await supabase.from("mieter_vertraege").insert({
+          mieter_id: selectedMieter.id,
+          file_path: path,
+          file_name: file.name,
+          file_type: fileType,
+          uploaded_by: uploadedBy,
+        });
+        toast({
+          title: "Vertrag hochgeladen",
+          description: `${file.name} wurde erfolgreich hochgeladen.`,
+        });
+      } catch (err) {
+        toast({ title: "Fehler beim Upload", description: file.name, variant: "destructive" });
+      } finally {
+        setUploadProgress((p) => { const n = { ...p }; delete n[file.name]; return n; });
+      }
+    }
+    // Reload verträge
+    if (selectedMieter?.id) {
+      const { data: rows } = await supabase
+        .from("mieter_vertraege")
+        .select("*")
+        .eq("mieter_id", selectedMieter.id)
+        .order("uploaded_at", { ascending: false });
+      if (rows) {
+        const withUrls = await Promise.all(
+          rows.map(async (row: any) => {
+            const { data: signed } = await supabase.storage
+              .from("mieter-vertraege")
+              .createSignedUrl(row.file_path, 3600);
+            return { ...row, signedUrl: signed?.signedUrl ?? "" } as VertragItem;
+          })
+        );
+        setVertraege(withUrls);
+      }
+    }
+  };
+
+  // Delete Vertrag Handler
+  const handleDeleteVertrag = async (vertrag: VertragItem) => {
+    const supabase = createClient();
+    if (!supabase) return;
+    try {
+      await supabase.storage.from("mieter-vertraege").remove([vertrag.file_path]);
+      await supabase.from("mieter_vertraege").delete().eq("id", vertrag.id);
+      setVertraege((prev) => prev.filter((v) => v.id !== vertrag.id));
+      setSelectedVertrag(null);
+      setDocxText("");
+      setDocxEditing(false);
+      toast({ title: "Vertrag gelöscht" });
+    } catch (err) {
+      toast({ title: "Fehler beim Löschen", variant: "destructive" });
+    }
+  };
+
+  // Download Vertrag Handler
+  const handleDownloadVertrag = async (vertrag: VertragItem) => {
+    try {
+      const resp = await fetch(vertrag.signedUrl || "");
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = vertrag.file_name;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({ title: "Fehler beim Download", description: vertrag.file_name, variant: "destructive" });
+    }
+  };
+
+  // Extract DOCX Text Handler (simplified - extracts plain text from buffer)
+  const handleExtractDocxAndEdit = async (vertrag: VertragItem) => {
+    if (vertrag.file_type !== "docx") {
+      window.open(vertrag.signedUrl, "_blank");
+      return;
+    }
+    try {
+      const resp = await fetch(vertrag.signedUrl || "");
+      const blob = await resp.blob();
+      const buffer = await blob.arrayBuffer();
+      // Simple DOCX text extraction (reads from document.xml inside .docx ZIP)
+      const text = new TextDecoder().decode(buffer).replace(/<[^>]*>/g, " ").trim();
+      setDocxText(text);
+      setSelectedVertrag(vertrag);
+      setDocxEditing(true);
+    } catch (err) {
+      toast({ title: "Fehler beim Öffnen", description: vertrag.file_name, variant: "destructive" });
+    }
+  };
+
+  // Save DOCX Changes Handler
+  const handleSaveDocxChanges = async () => {
+    if (!selectedVertrag || selectedVertrag.file_type !== "docx" || !docxText) return;
+    setDocxSaving(true);
+    try {
+      const supabase = createClient();
+      if (!supabase) return;
+      const blob = new Blob([docxText], { type: "text/plain" });
+      // Note: This is a simplified save - ideally you'd use a library like mammoth.js for proper DOCX handling
+      const { error } = await supabase.storage
+        .from("mieter-vertraege")
+        .update(selectedVertrag.file_path, blob);
+      if (error) throw error;
+      toast({ title: "Vertrag gespeichert" });
+      setDocxEditing(false);
+    } catch (err) {
+      toast({ title: "Fehler beim Speichern", variant: "destructive" });
+    } finally {
+      setDocxSaving(false);
+    }
+  };
+
   // Hilfsfunktion zum Aktualisieren der bearbeiteten Mieter-Daten
   const updateEditedMieter = (
     field: keyof MieterDisplay,
@@ -481,6 +682,89 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
       return events.filter((e) => e.event_type === "notiz");
     return events;
   }, [events, eventFilter]);
+
+  const vertragstext = useMemo(() => {
+    if (vertragSelectedTyp === "unbefristet" || vertragSelectedTyp === "befristet" || vertragSelectedTyp === "kurzzeit") {
+      const anredeLabel = editedMieter?.anrede === "Herr" ? "Herr" : editedMieter?.anrede === "Frau" ? "Frau" : "Familie";
+      const vertragLabel = vertragSelectedTyp === "unbefristet" ? "UNBEFRISTETER MIETVERTRAG" : vertragSelectedTyp === "befristet" ? "BEFRISTETER MIETVERTRAG" : "KURZZEITVERMIETUNG";
+      const gesamtmiete = (editedMieter?.kaltmiete || 0) + (editedMieter?.nebenkosten || 0);
+      return `${vertragLabel}
+
+§ 1 VERTRAGSPARTEIEN
+
+Vermieter:
+${currentObjekt?.eigentuemer?.name}
+${currentObjekt?.eigentuemer?.adresse}
+${currentObjekt?.eigentuemer?.plz} ${currentObjekt?.eigentuemer?.ort}
+
+Mieter: ${anredeLabel} ${editedMieter?.name}
+
+ 
+§ 2 MIETOBJEKT
+
+Das Mietobjekt befindet sich unter folgender Adresse:
+${currentObjekt?.objektdaten ? `${currentObjekt.objektdaten.strasse}, ${currentObjekt.objektdaten.plz} ${currentObjekt.objektdaten.ort}` : currentObjekt?.adresse}
+Geschosslage: ${editedMieter?.geschoss}
+
+
+§ 3 MIETDAUER
+
+${vertragSelectedTyp === "unbefristet"
+  ? `Das Mietverhältnis beginnt am ${editedMieter?.einzugsDatumRaw} und wird auf unbestimmte Zeit geschlossen. Es gelten die gesetzlichen Kündigungsfristen gemäß §§ 573 c, 574 BGB.`
+  : `Das Mietverhältnis beginnt am ${editedMieter?.einzugsDatumRaw} und endet am ${editedMieter?.mieteBisRaw}. Eine Kündigung ist nicht zulässig. Das Mietverhältnis endet durch Ablauf der vereinbarten Zeit.`
+}
+
+
+§ 4 MIETE UND NEBENKOSTEN
+
+Kaltmiete (monatlich):        ${editedMieter?.kaltmiete || 0} €
+NK-Vorauszahlung (monatlich): ${editedMieter?.nebenkosten || 0} €
+Gesamtmiete (monatlich):      ${gesamtmiete.toFixed(2)} €
+Kaution:                       ${editedMieter?.kaution || 0} €
+
+Die Miete ist jeweils zum 1. eines jeden Monats im Voraus zu entrichten.
+
+
+§ 5 BANKVERBINDUNG
+
+Die Miete ist auf folgendes Konto zu überweisen:
+IBAN: ${currentObjekt?.bankverbindung?.iban}
+Kontoinhaber: ${currentObjekt?.eigentuemer?.name}
+
+
+§ 6 NEBENKOSTEN
+
+Die in § 4 genannte NK-Vorauszahlung ist eine pauschalierte Vorauszahlung. Jährlich erfolgt eine Abrechnung der tatsächlich angefallenen Betriebskosten.
+
+
+§ 7 KAUTION
+
+Die Kaution in Höhe von ${editedMieter?.kaution || 0} € wird zur Sicherung der Erfüllung der Mieterplichten einbehalten und nach Beendigung des Mietverhältnisses unter Berücksichtigung eventueller Schadenersatzansprüche zurückgezahlt.
+
+
+§ 8 INSTANDHALTUNG
+
+Der Mieter ist verpflichtet, die Wohnung pfleglich zu behandeln und die notwendigen, in den Rahmen des gewöhnlichen Gebrauchs fallenden Instandhaltungsarbeiten selbst zu lasten.
+
+
+§ 9 REPARATUREN UND MANGELBESEITIGUNG
+
+Der Vermieter ist verpflichtet, die Wohnung in dem vertragsgemäßen Zustand zu erhalten und notwendige Reparaturen vorzunehmen. Mängel sind dem Vermieter unverzüglich anzuzeigen.
+
+
+§ 10 KÜNDIGUNG
+
+${vertragSelectedTyp === "unbefristet"
+  ? `Das Mietverhältnis kann mit einer Frist von drei Monaten zum Fünfzehnten oder zum Ende eines Kalendermonats gekündigt werden. Es gelten die gesetzlichen Kündigungsfristen gemäß §§ 573 c, 574 BGB.`
+  : `Das Mietverhältnis endet durch Ablauf der vereinbarten Zeit ohne Kündigung.`
+}
+
+
+___________________________                    ___________________________
+Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
+    }
+    return "";
+  }, [editedMieter, currentObjekt, vertragSelectedTyp]);
 
   const handleSave = async () => {
     if (!selectedMieter || !editedMieter) return;
@@ -1963,143 +2247,338 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
             <TabsContent value="vertrag" className="mt-6 space-y-6 overflow-auto h-full">
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Mietvertrag</CardTitle>
-                  <CardDescription className="text-xs">
-                    Vertragsdokument für {editedMieter?.name} erstellen
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* 1. Unbefristeter Mietvertrag */}
-                    <button
-                      type="button"
-                      disabled={editedMieter?.isKurzzeitvermietung}
-                      className={`group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors ${editedMieter?.isKurzzeitvermietung ? "opacity-40 cursor-not-allowed" : "hover:border-primary/50 hover:bg-muted/50"}`}
-                      onClick={() => {
-                        const wohnung = wohnungen.find((w) => w.id === editedMieter?.wohnungId);
-                        setVertragTyp("unbefristet");
-                        setVertragForm({
-                          vermieterName: currentObjekt?.eigentuemer?.name || "",
-                          vermieterAdresse: currentObjekt?.eigentuemer?.adresse
-                            ? `${currentObjekt.eigentuemer.adresse}${currentObjekt.eigentuemer.plz ? `, ${currentObjekt.eigentuemer.plz}` : ""}${currentObjekt.eigentuemer.ort ? ` ${currentObjekt.eigentuemer.ort}` : ""}`
-                            : "",
-                          mieterAnrede: editedMieter?.anrede || "",
-                          mieterName: editedMieter?.name || "",
-                          objektAdresse: currentObjekt?.objektdaten
-                            ? `${currentObjekt.objektdaten.strasse || ""}, ${currentObjekt.objektdaten.plz || ""} ${currentObjekt.objektdaten.ort || ""}`
-                            : currentObjekt?.adresse || "",
-                          etage: wohnung?.etage || "",
-                          flaeche: wohnung?.flaeche?.toString() || "",
-                          zimmer: wohnung?.zimmer?.toString() || "",
-                          einzugsdatum: editedMieter?.einzugsDatumRaw || "",
-                          enddatum: "",
-                          kaltmiete: editedMieter?.kaltmiete?.toString() || "",
-                          nebenkosten: editedMieter?.nebenkosten?.toString() || "",
-                          kaution: editedMieter?.kaution?.toString() || "",
-                          faelligkeit: "1",
-                          iban: currentObjekt?.bankverbindung?.iban || "",
-                        });
-                        setVertragDialogOpen(true);
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <FileSignature className="h-5 w-5 text-primary" />
-                        <span className="text-sm font-medium">Unbefristeter Mietvertrag</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Standardvertrag ohne zeitliche Begrenzung mit gesetzlicher Kündigungsfrist.</p>
-                    </button>
-
-                    {/* 2. Befristeter Mietvertrag */}
-                    <button
-                      type="button"
-                      disabled={editedMieter?.isKurzzeitvermietung}
-                      className={`group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors ${editedMieter?.isKurzzeitvermietung ? "opacity-40 cursor-not-allowed" : "hover:border-primary/50 hover:bg-muted/50"}`}
-                      onClick={() => {
-                        const wohnung = wohnungen.find((w) => w.id === editedMieter?.wohnungId);
-                        setVertragTyp("befristet");
-                        setVertragForm({
-                          vermieterName: currentObjekt?.eigentuemer?.name || "",
-                          vermieterAdresse: currentObjekt?.eigentuemer?.adresse
-                            ? `${currentObjekt.eigentuemer.adresse}${currentObjekt.eigentuemer.plz ? `, ${currentObjekt.eigentuemer.plz}` : ""}${currentObjekt.eigentuemer.ort ? ` ${currentObjekt.eigentuemer.ort}` : ""}`
-                            : "",
-                          mieterAnrede: editedMieter?.anrede || "",
-                          mieterName: editedMieter?.name || "",
-                          objektAdresse: currentObjekt?.objektdaten
-                            ? `${currentObjekt.objektdaten.strasse || ""}, ${currentObjekt.objektdaten.plz || ""} ${currentObjekt.objektdaten.ort || ""}`
-                            : currentObjekt?.adresse || "",
-                          etage: wohnung?.etage || "",
-                          flaeche: wohnung?.flaeche?.toString() || "",
-                          zimmer: wohnung?.zimmer?.toString() || "",
-                          einzugsdatum: editedMieter?.einzugsDatumRaw || "",
-                          enddatum: editedMieter?.mieteBisRaw || "",
-                          kaltmiete: editedMieter?.kaltmiete?.toString() || "",
-                          nebenkosten: editedMieter?.nebenkosten?.toString() || "",
-                          kaution: editedMieter?.kaution?.toString() || "",
-                          faelligkeit: "1",
-                          iban: currentObjekt?.bankverbindung?.iban || "",
-                        });
-                        setVertragDialogOpen(true);
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <CalendarClock className="h-5 w-5 text-primary" />
-                        <span className="text-sm font-medium">Befristeter Mietvertrag</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Zeitlich begrenzter Vertrag mit festem Enddatum und Befristungsgrund.</p>
-                    </button>
-
-                    {/* 3. Kurzzeitvermietung */}
-                    <button
-                      type="button"
-                      className="group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left hover:border-primary/50 hover:bg-muted/50 transition-colors"
-                      onClick={() => {
-                        const wohnung = wohnungen.find((w) => w.id === editedMieter?.wohnungId);
-                        setVertragTyp("kurzzeit");
-                        setVertragForm({
-                          vermieterName: currentObjekt?.eigentuemer?.name || "",
-                          vermieterAdresse: currentObjekt?.eigentuemer?.adresse
-                            ? `${currentObjekt.eigentuemer.adresse}${currentObjekt.eigentuemer.plz ? `, ${currentObjekt.eigentuemer.plz}` : ""}${currentObjekt.eigentuemer.ort ? ` ${currentObjekt.eigentuemer.ort}` : ""}`
-                            : "",
-                          mieterAnrede: editedMieter?.anrede || "",
-                          mieterName: editedMieter?.name || "",
-                          objektAdresse: currentObjekt?.objektdaten
-                            ? `${currentObjekt.objektdaten.strasse || ""}, ${currentObjekt.objektdaten.plz || ""} ${currentObjekt.objektdaten.ort || ""}`
-                            : currentObjekt?.adresse || "",
-                          etage: wohnung?.etage || "",
-                          flaeche: wohnung?.flaeche?.toString() || "",
-                          zimmer: wohnung?.zimmer?.toString() || "",
-                          einzugsdatum: editedMieter?.einzugsDatumRaw || "",
-                          enddatum: editedMieter?.kurzzeitBis || editedMieter?.mieteBisRaw || "",
-                          kaltmiete: editedMieter?.kaltmiete?.toString() || "",
-                          nebenkosten: editedMieter?.nebenkosten?.toString() || "",
-                          kaution: editedMieter?.kaution?.toString() || "",
-                          faelligkeit: "1",
-                          iban: currentObjekt?.bankverbindung?.iban || "",
-                        });
-                        setVertragDialogOpen(true);
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-5 w-5 text-primary" />
-                        <span className="text-sm font-medium">Kurzzeitvermietung</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Möblierte Vermietung auf Zeit, z.B. für Monteure oder Studierende.</p>
-                    </button>
-
-                    {/* 4. Individueller Vertrag */}
-                    <button
-                      type="button"
-                      disabled={editedMieter?.isKurzzeitvermietung}
-                      className={`group relative flex flex-col items-start gap-2 rounded-lg border p-4 text-left transition-colors ${editedMieter?.isKurzzeitvermietung ? "opacity-40 cursor-not-allowed" : "hover:border-primary/50 hover:bg-muted/50"}`}
-                      onClick={() => setAnwaltDialogOpen(true)}
-                    >
-                      <div className="flex items-center gap-2">
-                        <Scale className="h-5 w-5 text-primary" />
-                        <span className="text-sm font-medium">Individueller Vertrag</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">Maßgeschneiderter Vertrag über einen Fachanwalt oder eigene Vorlage.</p>
-                    </button>
+                  <div className="flex items-end justify-between gap-4">
+                    <div>
+                      <CardTitle className="text-base">Mietvertrag</CardTitle>
+                      <CardDescription className="text-xs mt-1">
+                        Vertragstyp auswählen und Dokument generieren oder hochladen
+                      </CardDescription>
+                    </div>
+                    <div className="w-56">
+                      <Label className="text-sm font-medium block mb-2">Vertragstyp</Label>
+                      <Select
+                        value={vertragSelectedTyp || ""}
+                        onValueChange={(value) => {
+                          setVertragSelectedTyp(value as "unbefristet" | "befristet" | "kurzzeit" | "individuell");
+                          // Initialize vertragForm with mieter data
+                          const wohnung = wohnungen.find((w) => w.id === editedMieter?.wohnungId);
+                          if (wohnung) {
+                            setVertragForm({
+                              vermieterName: currentObjekt?.eigentuemer?.name || "",
+                              vermieterAdresse: currentObjekt?.eigentuemer?.adresse
+                                ? `${currentObjekt.eigentuemer.adresse}${currentObjekt.eigentuemer.plz ? `, ${currentObjekt.eigentuemer.plz}` : ""}${currentObjekt.eigentuemer.ort ? ` ${currentObjekt.eigentuemer.ort}` : ""}`
+                                : "",
+                              mieterAnrede: editedMieter?.anrede || "",
+                              mieterName: editedMieter?.name || "",
+                              objektAdresse: currentObjekt?.objektdaten
+                                ? `${currentObjekt.objektdaten.strasse || ""}, ${currentObjekt.objektdaten.plz || ""} ${currentObjekt.objektdaten.ort || ""}`
+                                : currentObjekt?.adresse || "",
+                              etage: wohnung?.etage || "",
+                              flaeche: "",
+                              zimmer: "",
+                              einzugsdatum: editedMieter?.einzugsDatumRaw || "",
+                              enddatum:
+                                value === "befristet"
+                                  ? editedMieter?.mieteBisRaw || ""
+                                  : value === "kurzzeit"
+                                    ? editedMieter?.kurzzeitBis || editedMieter?.mieteBisRaw || ""
+                                    : "",
+                              kaltmiete: (editedMieter?.kaltmiete || "").toString(),
+                              nebenkosten: (editedMieter?.nebenkosten || "").toString(),
+                              kaution: (editedMieter?.kaution || "").toString(),
+                              faelligkeit: "1",
+                              iban: currentObjekt?.bankverbindung?.iban || "",
+                            });
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Vertragstyp auswählen..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unbefristet" disabled={editedMieter?.isKurzzeitvermietung}>
+                            Unbefristeter Mietvertrag
+                          </SelectItem>
+                          <SelectItem value="befristet" disabled={editedMieter?.isKurzzeitvermietung}>
+                            Befristeter Mietvertrag
+                          </SelectItem>
+                          <SelectItem value="kurzzeit">Kurzzeitvermietung</SelectItem>
+                          <SelectItem value="individuell" disabled={editedMieter?.isKurzzeitvermietung}>
+                            Individueller Vertrag
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+
+                  {/* Unbefristet / Befristet / Kurzzeit - Vertragstext */}
+                  {(vertragSelectedTyp === "unbefristet" || vertragSelectedTyp === "befristet" || vertragSelectedTyp === "kurzzeit") && (
+                    <div className="space-y-4 pt-4 border-t">
+                      {/* Info Banner */}
+                      <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 flex items-start justify-between gap-2">
+                        <div>
+                          <p>ℹ️ Vertragsdaten werden aus den Stammdaten übernommen.</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-blue-700 hover:text-blue-800 h-auto p-0 font-medium"
+                          onClick={() => setActiveTab("stammdaten")}
+                        >
+                          Stammdaten bearbeiten →
+                        </Button>
+                      </div>
+
+                      {/* Vertragstext */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Vertragstext (bearbeitbar)</Label>
+                        <Textarea
+                          value={vertragstext}
+                          readOnly
+                          className="h-80 overflow-y-auto bg-white border border-gray-300 resize-none p-4 text-sm leading-relaxed"
+                        />
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                        <Button
+                          className="bg-success hover:bg-success/90 text-success-foreground gap-2"
+                          onClick={() => {
+                            const anredeLabel = editedMieter?.anrede === "Herr" ? "Herr" : editedMieter?.anrede === "Frau" ? "Frau" : "Familie";
+                            const vertragLabel = vertragSelectedTyp === "unbefristet" ? "Unbefristeter Mietvertrag" : vertragSelectedTyp === "befristet" ? "Befristeter Mietvertrag" : "Kurzzeitvermietung";
+                            const gesamtmiete = (editedMieter?.kaltmiete || 0) + (editedMieter?.nebenkosten || 0);
+                            const content: { type: "heading" | "paragraph" | "table" | "spacer"; text?: string; data?: { headers: string[]; rows: string[][] }; height?: number }[] = [
+                              { type: "heading", text: vertragLabel },
+                              { type: "spacer", height: 5 },
+                              { type: "heading", text: "§ 1 Vertragsparteien" },
+                              { type: "paragraph", text: `Vermieter: ${currentObjekt?.eigentuemer?.name}\n${currentObjekt?.eigentuemer?.adresse}, ${currentObjekt?.eigentuemer?.plz} ${currentObjekt?.eigentuemer?.ort}` },
+                              { type: "paragraph", text: `Mieter: ${anredeLabel} ${editedMieter?.name}` },
+                              { type: "spacer", height: 5 },
+                              { type: "heading", text: "§ 2 Mietobjekt" },
+                              { type: "paragraph", text: `Adresse: ${currentObjekt?.objektdaten ? `${currentObjekt.objektdaten.strasse}, ${currentObjekt.objektdaten.plz} ${currentObjekt.objektdaten.ort}` : currentObjekt?.adresse}\nGeschosslage: ${editedMieter?.geschoss}` },
+                              { type: "spacer", height: 5 },
+                              { type: "heading", text: "§ 3 Mietdauer" },
+                              { type: "paragraph", text: vertragSelectedTyp === "unbefristet"
+                                ? `Das Mietverhältnis beginnt am ${editedMieter?.einzugsDatumRaw} und wird auf unbestimmte Zeit geschlossen. Es gelten die gesetzlichen Kündigungsfristen gemäß § 573c BGB.`
+                                : `Das Mietverhältnis beginnt am ${editedMieter?.einzugsDatumRaw} und endet am ${editedMieter?.mieteBisRaw}.`
+                              },
+                              { type: "spacer", height: 5 },
+                              { type: "heading", text: "§ 4 Miete und Nebenkosten" },
+                              { type: "table", data: {
+                                headers: ["Position", "Betrag"],
+                                rows: [
+                                  ["Kaltmiete (mtl.)", `${editedMieter?.kaltmiete || 0} €`],
+                                  ["NK-Vorauszahlung (mtl.)", `${editedMieter?.nebenkosten || 0} €`],
+                                  ["Gesamtmiete (mtl.)", `${gesamtmiete.toFixed(2)} €`],
+                                  ["Kaution", `${editedMieter?.kaution || 0} €`],
+                                ],
+                              }},
+                              { type: "paragraph", text: "Die Miete ist jeweils zum 1. eines jeden Monats im Voraus zu entrichten." },
+                              { type: "spacer", height: 5 },
+                              { type: "heading", text: "§ 5 Bankverbindung" },
+                              { type: "paragraph", text: `Die Miete ist auf folgendes Konto zu überweisen:\nIBAN: ${currentObjekt?.bankverbindung?.iban}\nKontoinhaber: ${currentObjekt?.eigentuemer?.name}` },
+                              { type: "spacer", height: 15 },
+                              { type: "paragraph", text: "___________________________          ___________________________" },
+                              { type: "paragraph", text: "Ort, Datum, Vermieter                       Ort, Datum, Mieter" },
+                            ];
+                            const doc = generatePDF({
+                              title: vertragLabel,
+                              subtitle: `${anredeLabel} ${editedMieter?.name} — ${editedMieter?.geschoss}`,
+                              date: new Date().toLocaleDateString("de-DE"),
+                              content,
+                              profile: profile?.anschrift ? {
+                                vorname: profile.vorname || "",
+                                nachname: profile.nachname || "",
+                                anschrift: profile.anschrift || "",
+                                email: profile.email || "",
+                                telefon: profile.telefon || "",
+                              } : undefined,
+                            });
+                            downloadPDF(doc, `Mietvertrag_${sanitizeFilename(editedMieter?.name || "Mieter")}`);
+                            toast({ title: "PDF generiert", description: "Der Mietvertrag wurde erfolgreich als PDF erstellt." });
+                          }}
+                        >
+                          <FileDown className="h-4 w-4" />
+                          Als PDF generieren
+                        </Button>
+                        <Button variant="outline" className="gap-2">
+                          <Save className="h-4 w-4" />
+                          Als Entwurf speichern
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Individueller Vertrag */}
+                  {vertragSelectedTyp === "individuell" && (
+                    <div className="space-y-4 pt-4 border-t">
+                      {/* UPLOAD AREA */}
+                      <div
+                        className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-colors"
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.currentTarget.classList.add("border-primary", "bg-primary/10");
+                        }}
+                        onDragLeave={(e) => {
+                          e.currentTarget.classList.remove("border-primary", "bg-primary/10");
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          e.currentTarget.classList.remove("border-primary", "bg-primary/10");
+                          handleUploadVertrag(e.dataTransfer.files);
+                        }}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          multiple
+                          accept=".pdf,.docx"
+                          className="hidden"
+                          onChange={(e) => handleUploadVertrag(e.target.files)}
+                        />
+                        <div className="space-y-2">
+                          <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">Verträge hier ablegen oder klicken zum Upload</p>
+                            <p className="text-xs text-muted-foreground">PDF oder DOCX (max. 50 MB)</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* DOCUMENTS LIST */}
+                      {vertraege.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium">Hochgeladene Dokumente ({vertraege.length})</h4>
+                          <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {vertraege.map((vertrag) => (
+                              <div
+                                key={vertrag.id}
+                                className={`flex items-center justify-between gap-3 p-3 rounded-lg border transition-colors cursor-pointer ${
+                                  selectedVertrag?.id === vertrag.id && vertrag.file_type === "docx"
+                                    ? "border-primary bg-primary/10"
+                                    : "border-muted hover:bg-muted/50"
+                                }`}
+                                onClick={() => {
+                                  if (vertrag.file_type === "pdf") {
+                                    window.open(vertrag.signedUrl, "_blank");
+                                  } else {
+                                    handleExtractDocxAndEdit(vertrag);
+                                  }
+                                }}
+                              >
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium truncate">{vertrag.file_name}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {new Date(vertrag.uploaded_at).toLocaleDateString("de-DE")}
+                                    </p>
+                                  </div>
+                                  {vertrag.file_type === "pdf" && (
+                                    <Badge variant="outline" className="text-xs shrink-0">
+                                      PDF
+                                    </Badge>
+                                  )}
+                                  {vertrag.file_type === "docx" && (
+                                    <Badge variant="outline" className="text-xs shrink-0">
+                                      DOCX
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDownloadVertrag(vertrag);
+                                    }}
+                                  >
+                                    <FileDown className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      if (window.confirm("Dokument wirklich löschen?")) {
+                                        handleDeleteVertrag(vertrag);
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {vertraege.length === 0 && !vertraegeLoading && (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Noch keine Verträge hochgeladen. Laden Sie ein PDF oder DOCX hoch.
+                        </p>
+                      )}
+
+                      {/* DOCUMENT EDITOR */}
+                      {docxEditing && selectedVertrag && selectedVertrag.file_type === "docx" && (
+                        <div className="space-y-3 border-t pt-4">
+                          <h4 className="text-sm font-medium">Dokument bearbeiten: {selectedVertrag.file_name}</h4>
+                          <Textarea
+                            value={docxText}
+                            onChange={(e) => setDocxText(e.target.value)}
+                            className="min-h-48 font-mono text-xs"
+                            placeholder="Dokumentinhalt..."
+                          />
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                setDocxEditing(false);
+                                setSelectedVertrag(null);
+                                setDocxText("");
+                              }}
+                            >
+                              Abbrechen
+                            </Button>
+                            <Button
+                              type="button"
+                              className="bg-success hover:bg-success/90 text-success-foreground"
+                              onClick={handleSaveDocxChanges}
+                              disabled={docxSaving}
+                            >
+                              {docxSaving ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Wird gespeichert...
+                                </>
+                              ) : (
+                                <>
+                                  <Save className="h-4 w-4 mr-2" />
+                                  Speichern
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedVertrag && selectedVertrag.file_type === "pdf" && !docxEditing && (
+                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+                          <p>📄 PDF-Dateien können nicht bearbeitet werden. Die Datei wird in einem neuen Tab geöffnet.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

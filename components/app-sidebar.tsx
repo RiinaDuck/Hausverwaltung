@@ -23,7 +23,7 @@ import {
   BarChart3,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
+  Archive,
   X,
 } from "lucide-react";
 import type { AppView } from "@/components/app-dashboard";
@@ -38,30 +38,17 @@ interface AppSidebarProps {
   onClose?: () => void;
 }
 
-interface NavItem {
-  id: AppView | "finanzen";
-  label: string;
-  icon: any;
-  submenu?: Array<{ id: AppView; label: string }>;
-}
-
-const navItems: NavItem[] = [
-  { id: "dashboard", label: "Dashboard", icon: Home },
-  { id: "objekte", label: "Objekte", icon: Building2 },
-  { id: "wohnungen", label: "Wohnungen", icon: DoorOpen },
-  { id: "mieter", label: "Mieter", icon: Users },
-  {
-    id: "finanzen",
-    label: "Finanzen",
-    icon: Receipt,
-    submenu: [
-      { id: "einnahmen-ausgaben", label: "Einnahmen/Ausgaben" },
-      { id: "nebenkosten", label: "Nebenkosten" },
-    ],
-  },
-  { id: "zaehler", label: "Zähler", icon: Gauge },
-  { id: "statistiken", label: "Statistiken", icon: BarChart3 },
-  { id: "hausmanager", label: "Hausmanager", icon: Landmark },
+const navItems = [
+  { id: "dashboard" as const, label: "Dashboard", icon: Home },
+  { id: "objekte" as const, label: "Objekte", icon: Building2 },
+  { id: "wohnungen" as const, label: "Wohnungen", icon: DoorOpen },
+  { id: "mieter" as const, label: "Mieter", icon: Users },
+  { id: "nebenkosten" as const, label: "Nebenkosten", icon: Receipt },
+  { id: "rechnungen" as const, label: "Rechnungen", icon: FileText },
+  { id: "zaehler" as const, label: "Zähler", icon: Gauge },
+  { id: "statistiken" as const, label: "Statistiken", icon: BarChart3 },
+  { id: "hausmanager" as const, label: "Hausmanager", icon: Landmark },
+  { id: "archiv" as const, label: "Archiv", icon: Archive, dividerBefore: true },
 ];
 
 
@@ -73,9 +60,6 @@ export function AppSidebar({
   onClose,
 }: AppSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(
-    new Set(["finanzen"]) // Finanzen expanded by default
-  );
   const isMobile = useIsMobile();
   const { profile, getInitials, logout } = useAuth();
 
@@ -85,17 +69,6 @@ export function AppSidebar({
     if (isMobile && onClose) {
       onClose();
     }
-  };
-
-  // Toggle expandable menu
-  const toggleExpanded = (id: string) => {
-    const newExpanded = new Set(expandedItems);
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id);
-    } else {
-      newExpanded.add(id);
-    }
-    setExpandedItems(newExpanded);
   };
 
   // Handle logout and switch to landing
@@ -209,77 +182,6 @@ export function AppSidebar({
           )}
         >
           {navItems.map((item) => {
-            const isExpanded = expandedItems.has(item.id);
-            const isActive =
-              currentView === item.id ||
-              (item.submenu?.some((sub) => sub.id === currentView) ?? false);
-
-            if (item.submenu) {
-              // Expandable menu item
-              return (
-                <div key={item.id}>
-                  <Button
-                    variant="ghost"
-                    className={cn(
-                      "w-full h-10 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-300",
-                      isActive && "bg-sidebar-accent text-sidebar-foreground",
-                      !isMobile && isCollapsed
-                        ? "justify-center px-0"
-                        : "justify-between gap-3",
-                    )}
-                    onClick={() => {
-                      if (!isCollapsed || isMobile) {
-                        toggleExpanded(item.id);
-                      }
-                    }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <item.icon className="h-4 w-4 shrink-0" />
-                      <span
-                        className={cn(
-                          "text-sm transition-all duration-300 overflow-hidden whitespace-nowrap",
-                          !isMobile && isCollapsed
-                            ? "w-0 opacity-0"
-                            : "w-auto opacity-100",
-                        )}
-                      >
-                        {item.label}
-                      </span>
-                    </div>
-                    {!isCollapsed && (
-                      <ChevronDown
-                        className={cn(
-                          "h-4 w-4 shrink-0 transition-transform duration-300",
-                          isExpanded && "rotate-180",
-                        )}
-                      />
-                    )}
-                  </Button>
-
-                  {/* Submenu items */}
-                  {isExpanded && !isCollapsed && (
-                    <div className="ml-2 mt-1 space-y-1 pl-2 border-l border-sidebar-border">
-                      {item.submenu.map((subitem) => (
-                        <Button
-                          key={subitem.id}
-                          variant="ghost"
-                          className={cn(
-                            "w-full h-9 text-xs text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-300 justify-start",
-                            currentView === subitem.id &&
-                              "bg-sidebar-accent text-sidebar-foreground",
-                          )}
-                          onClick={() => handleNavigate(subitem.id)}
-                        >
-                          {subitem.label}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            }
-
-            // Regular menu item
             const button = (
               <Button
                 key={item.id}
@@ -292,7 +194,7 @@ export function AppSidebar({
                     ? "justify-center px-0"
                     : "justify-start gap-3",
                 )}
-                onClick={() => handleNavigate(item.id as AppView)}
+                onClick={() => handleNavigate(item.id)}
               >
                 <item.icon className="h-4 w-4 shrink-0" />
                 <span
@@ -308,19 +210,28 @@ export function AppSidebar({
               </Button>
             );
 
-            if (!isMobile && isCollapsed) {
-              return (
-                <Tooltip key={item.id}>
-                  <TooltipTrigger asChild>{button}</TooltipTrigger>
-                  <TooltipContent side="right" className="font-medium">
-                    {item.label}
-                  </TooltipContent>
-                </Tooltip>
-              );
-            }
+            const itemContent = !isMobile && isCollapsed ? (
+              <Tooltip key={item.id}>
+                <TooltipTrigger asChild>{button}</TooltipTrigger>
+                <TooltipContent side="right" className="font-medium">
+                  {item.label}
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              button
+            );
 
-            return button;
+            return (
+              <div key={item.id}>
+                {(item as any).dividerBefore && (
+                  <div className="my-2 border-t border-sidebar-border" />
+                )}
+                {itemContent}
+              </div>
+            );
           })}
+
+
         </nav>
 
         {/* User Profile */}

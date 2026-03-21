@@ -93,7 +93,7 @@ useEffect(() => {
         <div className="space-y-2">
           <h1 className="text-2xl font-bold">E-Mail bestätigt!</h1>
           <p className="text-muted-foreground">
-            Ihre E-Mail-Adresse wurde erfolgreich bestätigt. Sie können sich jetzt anmelden.
+            Ihre E-Mail-Adresse wurde erfolgreich bestätigt. Sie werden gleich automatisch weitergeleitet.
           </p>
         </div>
 
@@ -108,7 +108,7 @@ useEffect(() => {
           className="bg-success hover:bg-success/90 text-success-foreground gap-2 w-full"
         >
           <Home className="w-4 h-4" />
-          Jetzt anmelden
+          Zum Dashboard
         </Button>
       </div>
     </div>

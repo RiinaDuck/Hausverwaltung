@@ -66,6 +66,9 @@ import {
   Loader2,
   Check,
   Download,
+  Edit,
+  AlertCircle,
+  Wrench,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -74,6 +77,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  HoverCard,
+  HoverCardTrigger,
+  HoverCardContent,
+} from "@/components/ui/hover-card";
 import {
   Table,
   TableBody,
@@ -88,6 +96,16 @@ import { cn } from "@/lib/utils";
 import { useAppData } from "@/context/app-data-context";
 import { useAuth } from "@/context/auth-context";
 import type { AppView } from "@/components/app-dashboard";
+
+// Helper function to format dates from ISO (YYYY-MM-DD) to German format (DD.MM.YYYY)
+const formatDateGerman = (dateString?: string | null) => {
+  if (!dateString) return "-";
+  const [year, month, day] = dateString.split("-");
+  if (year && month && day) {
+    return `${day}.${month}.${year}`;
+  }
+  return dateString;
+};
 
 interface Unit {
   id: string;
@@ -366,9 +384,14 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     addWohnung,
     updateWohnung,
     deleteWohnung,
-    updateMieter,
+    addZaehler,
+    updateZaehler,
+    deleteZaehler,
+    addRauchmelder,
+    updateRauchmelder,
+    deleteRauchmelder,
   } = useAppData();
-  const { isDemo } = useAuth();
+  const { isDemo, profile, user } = useAuth();
 
   // Finde das aktuelle Objekt für den Namen
   const currentObjekt = objekte.find((o) => o.id === selectedObjektId);
@@ -392,19 +415,15 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
           ? "vermietet"
           : w.status === "leer"
             ? "frei"
-            : ("vermietet" as const),
+            : w.status === "eigennutzung"
+              ? "renovierung"
+              : ("vermietet" as const),
       miete: w.miete,
     }));
   }, [wohnungen, selectedObjektId]);
 
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [editedUnit, setEditedUnit] = useState<Unit | null>(null);
-  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
-  const [archiveDialogData, setArchiveDialogData] = useState<{
-    activeMieter: (typeof mieter)[0] | null;
-    newStatus: "frei" | "renovierung";
-  } | null>(null);
-  const [archiveProcessing, setArchiveProcessing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({
     "bad-dusche": true,
@@ -571,6 +590,45 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
   };
   const [newUnit, setNewUnit] = useState(initialNewUnit);
 
+  // Archive dialog state
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [archiveDialogData, setArchiveDialogData] = useState<{
+    newStatus: "frei" | "vermietet" | "renovierung";
+    activeMieter: { id: string; name: string } | null;
+  } | null>(null);
+  const [archiveProcessing, setArchiveProcessing] = useState(false);
+
+  // Zähler form state
+  const [zaehlerFormOpen, setZaehlerFormOpen] = useState(false);
+  const [zaehlerEditingId, setZaehlerEditingId] = useState<string | null>(null);
+  const [zaehlerForm, setZaehlerForm] = useState({
+    geraeteart: "Kaltwasser" as const,
+    montageort: "",
+    geraetnummer: "",
+    einbaudatum: "",
+    geeichtBis: "",
+    aktuellerStand: 0,
+    standDatum: "",
+  });
+
+  // Rauchmelder form state
+  const [rauchmelderFormOpen, setRauchmelderFormOpen] = useState(false);
+  const [rauchmelderEditingId, setRauchmelderEditingId] = useState<string | null>(null);
+  const [rauchmelderForm, setRauchmelderForm] = useState({
+    montageort: "",
+    modell: "",
+    geraetnummer: "",
+    einbaudatum: "",
+    lebensdauerBis: "",
+    letztewartung: "",
+    naechsteWartung: "",
+    batteriGeWechselt: "",
+    status: "OK" as const,
+  });
+
+  const [zaehlerPartnerDialogOpen, setZaehlerPartnerDialogOpen] = useState(false);
+  const [rauchmelderPartnerDialogOpen, setRauchmelderPartnerDialogOpen] = useState(false);
+
   // Aktualisiere selectedUnit wenn sich units ändert
   useEffect(() => {
     if (units.length > 0) {
@@ -597,8 +655,27 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     }
   }, [selectedUnit]);
 
+  // Filter + load Zähler und Rauchmelder für selectedUnit
+  const unitZaehler = selectedUnit
+    ? zaehler.filter((z) => z.wohnungId === selectedUnit.id)
+    : [];
+
+  const unitRauchmelder = selectedUnit
+    ? rauchmelder.filter((r) => r.wohnungId === selectedUnit.id)
+    : [];
+
   const filteredUnits = units.filter((unit) =>
     unit.lage.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
+  // Ad card conditions
+  const hasExpiredOrMissingCalibration = unitZaehler.some((z) => {
+    if (!z.geeichtBis) return true;
+    return new Date(z.geeichtBis) < new Date();
+  });
+
+  const hasMaintenanceDueRauchmelder = unitRauchmelder.some(
+    (r) => r.status === "Wartung fällig" || r.status === "Defekt"
   );
 
   // Hilfsfunktion zum Aktualisieren der bearbeiteten Unit
@@ -608,76 +685,6 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
   ) => {
     if (!editedUnit) return;
     setEditedUnit((prev) => (prev ? { ...prev, [field]: value } : null));
-  };
-
-  // Handle status change with archive confirmation
-  const handleStatusChange = (newStatus: "vermietet" | "frei" | "renovierung") => {
-    if (!selectedUnit || !editedUnit) {
-      updateEditedUnit("status", newStatus);
-      return;
-    }
-
-    // Wenn Status zu "frei" oder "renovierung" geändert wird, prüfe auf aktive Mieter
-    if (newStatus === "frei" || newStatus === "renovierung") {
-      const activeMieter = mieter.find(
-        (m) => m.wohnungId === selectedUnit.id && m.isAktiv !== false
-      );
-
-      if (activeMieter) {
-        // Es gibt einen aktiven Mieter - zeige Archive Dialog
-        setArchiveDialogData({
-          activeMieter,
-          newStatus: newStatus as "frei" | "renovierung",
-        });
-        setArchiveDialogOpen(true);
-        return;
-      }
-    }
-
-    // Kein aktiver Mieter oder Status ändert sich zu "vermietet" - ändere direkt
-    updateEditedUnit("status", newStatus);
-  };
-
-  // Archive mieter and update status
-  const handleArchiveMieter = async () => {
-    if (!archiveDialogData?.activeMieter || !selectedUnit || !editedUnit) return;
-
-    setArchiveProcessing(true);
-    try {
-      // Archiviere den Mieter
-      await updateMieter(archiveDialogData.activeMieter.id, {
-        isAktiv: false,
-      });
-
-      updateEditedUnit("status", archiveDialogData.newStatus);
-
-      toast({
-        title: "Mieter archiviert",
-        description: `${archiveDialogData.activeMieter.name} wurde archiviert und die Wohnung auf "${
-          archiveDialogData.newStatus === "frei" ? "Frei" : "Renovierung"
-        }" gesetzt.`,
-      });
-    } catch (error: any) {
-      console.error("Fehler beim Archivieren:", error);
-      toast({
-        title: "Fehler beim Archivieren",
-        description: error?.message ?? "Der Mieter konnte nicht archiviert werden.",
-        variant: "destructive",
-      });
-    } finally {
-      setArchiveProcessing(false);
-      setArchiveDialogOpen(false);
-      setArchiveDialogData(null);
-    }
-  };
-
-  // Skip archive and just update status
-  const handleSkipArchive = () => {
-    if (!archiveDialogData || !editedUnit) return;
-    // Just update status without archiving mieter
-    updateEditedUnit("status", archiveDialogData.newStatus);
-    setArchiveDialogOpen(false);
-    setArchiveDialogData(null);
   };
 
   const [isSaving, setIsSaving] = useState(false);
@@ -693,7 +700,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
           ? "vermietet"
           : editedUnit.status === "frei"
             ? "leer"
-            : "leer"; // renovierung → leer (kein renovierung-Status in DB)
+            : "eigennutzung"; // renovierung → eigennutzung
 
       await updateWohnung(selectedUnit.id, {
         bezeichnung: editedUnit.lage,
@@ -792,6 +799,227 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
       title: "Einheit dupliziert",
       description: `Wohneinheit "${selectedUnit.lage}" wurde kopiert.`,
     });
+  };
+
+  // Handle status change with archive confirmation
+  const handleStatusChange = (newStatus: "vermietet" | "frei" | "renovierung") => {
+    if (!selectedUnit || !editedUnit) {
+      updateEditedUnit("status", newStatus);
+      return;
+    }
+
+    // Check if changing FROM "vermietet" TO "frei" or "renovierung"
+    if (editedUnit.status === "vermietet" && ["frei", "renovierung"].includes(newStatus)) {
+      // Find active mieter for this unit
+      const activeMieter = mieter.find(
+        (m) => m.wohnungId === selectedUnit.id && m.isAktiv !== false
+      );
+
+      if (activeMieter) {
+        // Show confirmation dialog
+        setArchiveDialogData({
+          newStatus: newStatus,
+          activeMieter: { id: activeMieter.id, name: activeMieter.name },
+        });
+        setArchiveDialogOpen(true);
+        return;
+      }
+    }
+
+    // No confirmation needed, just update status
+    updateEditedUnit("status", newStatus);
+  };
+
+  const handleArchiveMieter = async () => {
+    if (!archiveDialogData || !selectedUnit || !editedUnit) return;
+
+    setArchiveProcessing(true);
+    try {
+      const supabase = createClient();
+      if (!supabase) throw new Error("Supabase client not available");
+
+      // Update mieter: set isAktiv=false, archived_at=now(), archive_reason="Auszug"
+      const now = new Date().toISOString();
+      const { error: mieterError } = await supabase
+        .from("mieter")
+        .update({
+          isAktiv: false,
+          archived_at: now,
+          archive_reason: "Auszug",
+        })
+        .eq("id", archiveDialogData.activeMieter?.id);
+
+      if (mieterError) throw mieterError;
+
+      // Update unit status
+      updateEditedUnit("status", archiveDialogData.newStatus);
+
+      toast({
+        title: "Mieter archiviert",
+        description: `${archiveDialogData.activeMieter?.name} wurde archiviert und die Wohnung auf "${
+          archiveDialogData.newStatus === "frei" ? "Frei" : "Renovierung"
+        }" gesetzt.`,
+      });
+
+      setArchiveDialogOpen(false);
+      setArchiveDialogData(null);
+    } catch (error: any) {
+      console.error("Error archiving mieter:", error);
+      toast({
+        title: "Fehler beim Archivieren",
+        description: error?.message ?? "Der Mieter konnte nicht archiviert werden.",
+        variant: "destructive",
+      });
+    } finally {
+      setArchiveProcessing(false);
+    }
+  };
+
+  const handleSkipArchive = () => {
+    if (!archiveDialogData || !editedUnit) return;
+    // Just update status without archiving mieter
+    updateEditedUnit("status", archiveDialogData.newStatus);
+    setArchiveDialogOpen(false);
+    setArchiveDialogData(null);
+  };
+
+  // Zähler handlers
+  const handleZaehlerSave = async () => {
+    if (!selectedUnit) return;
+
+    try {
+      const zaehlerData: Partial<any> = {
+        wohnungId: selectedUnit.id,
+        wohnungNr: selectedUnit.lage,
+        geschoss: selectedUnit.lage,
+        geraeteart: zaehlerForm.geraeteart,
+        montageort: zaehlerForm.montageort,
+        geraetnummer: zaehlerForm.geraetnummer,
+        einbaudatum: zaehlerForm.einbaudatum,
+        geeichtBis: zaehlerForm.geeichtBis,
+        aktuellerStand: zaehlerForm.aktuellerStand || 0,
+        standDatum: zaehlerForm.standDatum,
+      };
+
+      if (zaehlerEditingId) {
+        await updateZaehler(zaehlerEditingId, zaehlerData);
+        toast({ title: "Zähler aktualisiert" });
+      } else {
+        await addZaehler({
+          id: "",
+          ...zaehlerData,
+        } as any);
+        toast({ title: "Zähler hinzugefügt" });
+      }
+
+      setZaehlerFormOpen(false);
+      setZaehlerEditingId(null);
+      setZaehlerForm({
+        geraeteart: "Kaltwasser",
+        montageort: "",
+        geraetnummer: "",
+        einbaudatum: "",
+        geeichtBis: "",
+        aktuellerStand: 0,
+        standDatum: "",
+      });
+    } catch (error: any) {
+      console.error("Error saving zaehler:", error);
+      toast({
+        title: "Fehler beim Speichern",
+        description: error?.message ?? "Die Daten konnten nicht gespeichert werden.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleZaehlerDelete = async (id: string) => {
+    try {
+      await deleteZaehler(id);
+      toast({ title: "Zähler gelöscht" });
+    } catch (error: any) {
+      console.error("Error deleting zaehler:", error);
+      toast({
+        title: "Fehler beim Löschen",
+        description: error?.message ?? "Die Daten konnten nicht gelöscht werden.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Rauchmelder handlers
+  const handleRauchmelderSave = async () => {
+    if (!selectedUnit) return;
+
+    try {
+      const naechsteWartung = rauchmelderForm.einbaudatum
+        ? new Date(new Date(rauchmelderForm.einbaudatum).getTime() + 365 * 24 * 60 * 60 * 1000)
+            .toISOString()
+            .split("T")[0]
+        : null;
+
+      const rauchmelderData: Partial<any> = {
+        wohnungId: selectedUnit.id,
+        wohnungNr: selectedUnit.lage,
+        geschoss: selectedUnit.lage,
+        geraeteart: "Rauchmelder",
+        montageort: rauchmelderForm.montageort,
+        modell: rauchmelderForm.modell,
+        geraetnummer: rauchmelderForm.geraetnummer,
+        lebensdauerBis: rauchmelderForm.lebensdauerBis,
+        einbaudatum: rauchmelderForm.einbaudatum,
+        letztewartung: rauchmelderForm.letztewartung,
+        naechsteWartung: naechsteWartung,
+        batteriGeWechselt: rauchmelderForm.batteriGeWechselt,
+        status: rauchmelderForm.status,
+      };
+
+      if (rauchmelderEditingId) {
+        await updateRauchmelder(rauchmelderEditingId, rauchmelderData);
+        toast({ title: "Rauchmelder aktualisiert" });
+      } else {
+        await addRauchmelder({
+          id: "",
+          ...rauchmelderData,
+        } as any);
+        toast({ title: "Rauchmelder hinzugefügt" });
+      }
+
+      setRauchmelderFormOpen(false);
+      setRauchmelderEditingId(null);
+      setRauchmelderForm({
+        montageort: "",
+        modell: "",
+        geraetnummer: "",
+        einbaudatum: "",
+        lebensdauerBis: "",
+        letztewartung: "",
+        naechsteWartung: "",
+        batteriGeWechselt: "",
+        status: "OK",
+      });
+    } catch (error: any) {
+      console.error("Error saving rauchmelder:", error);
+      toast({
+        title: "Fehler beim Speichern",
+        description: error?.message ?? "Die Daten konnten nicht gespeichert werden.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRauchmelderDelete = async (id: string) => {
+    try {
+      await deleteRauchmelder(id);
+      toast({ title: "Rauchmelder gelöscht" });
+    } catch (error: any) {
+      console.error("Error deleting rauchmelder:", error);
+      toast({
+        title: "Fehler beim Löschen",
+        description: error?.message ?? "Die Daten konnten nicht gelöscht werden.",
+        variant: "destructive",
+      });
+    }
   };
 
   const checkedCount = Object.values(checkedItems).filter(Boolean).length;
@@ -1311,13 +1539,153 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
             {/* Tab: Zähler */}
             <TabsContent value="zaehler" className="space-y-4">
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Zähler</CardTitle>
-                  <CardDescription>
-                    Wasser-, Wärme- und sonstige Zähler für diese Wohneinheit.
-                  </CardDescription>
+                <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base">Zähler</CardTitle>
+                    <CardDescription>
+                      Wasser-, Wärme- und sonstige Zähler für diese Wohneinheit.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => {
+                      setZaehlerEditingId(null);
+                      setZaehlerForm({
+                        geraeteart: "Kaltwasser",
+                        montageort: "",
+                        geraetnummer: "",
+                        einbaudatum: "",
+                        geeichtBis: "",
+                        aktuellerStand: 0,
+                        standDatum: "",
+                      });
+                      setZaehlerFormOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Zähler hinzufügen
+                  </Button>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
+                  {zaehlerFormOpen && (
+                    <div className="border rounded-lg p-4 bg-muted/30 space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>Zählerart</Label>
+                          <Select
+                            value={zaehlerForm.geraeteart}
+                            onValueChange={(value) =>
+                              setZaehlerForm((prev) => ({ ...prev, geraeteart: value as any }))
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Kaltwasser">Kaltwasser</SelectItem>
+                              <SelectItem value="Warmwasser">Warmwasser</SelectItem>
+                              <SelectItem value="Wärme/Heizung">Wärme/Heizung</SelectItem>
+                              <SelectItem value="Gas">Gas</SelectItem>
+                              <SelectItem value="Strom">Strom</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Geschosslage</Label>
+                          <Input
+                            disabled
+                            value={selectedUnit?.lage || ""}
+                            className="bg-muted"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>Montageort</Label>
+                          <Input
+                            placeholder="z.B. Küche"
+                            value={zaehlerForm.montageort}
+                            onChange={(e) =>
+                              setZaehlerForm((prev) => ({ ...prev, montageort: e.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Gerätenummer</Label>
+                          <Input
+                            placeholder="z.B. 123456"
+                            value={zaehlerForm.geraetnummer}
+                            onChange={(e) =>
+                              setZaehlerForm((prev) => ({ ...prev, geraetnummer: e.target.value }))
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>Einbaudatum</Label>
+                          <Input
+                            type="date"
+                            value={zaehlerForm.einbaudatum}
+                            onChange={(e) =>
+                              setZaehlerForm((prev) => ({ ...prev, einbaudatum: e.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Geeicht bis</Label>
+                          <Input
+                            type="date"
+                            value={zaehlerForm.geeichtBis}
+                            onChange={(e) =>
+                              setZaehlerForm((prev) => ({ ...prev, geeichtBis: e.target.value }))
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>Aktueller Stand</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={zaehlerForm.aktuellerStand}
+                            onChange={(e) =>
+                              setZaehlerForm((prev) => ({ ...prev, aktuellerStand: parseFloat(e.target.value) || 0 }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Datum der Ablesung</Label>
+                          <Input
+                            type="date"
+                            value={zaehlerForm.standDatum}
+                            onChange={(e) =>
+                              setZaehlerForm((prev) => ({ ...prev, standDatum: e.target.value }))
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          variant="outline"
+                          onClick={() => setZaehlerFormOpen(false)}
+                        >
+                          Abbrechen
+                        </Button>
+                        <Button
+                          className="bg-success hover:bg-success/90"
+                          onClick={handleZaehlerSave}
+                        >
+                          <Save className="h-4 w-4 mr-2" />
+                          Speichern
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   {(() => {
                     const unitZaehler = zaehler.filter((z) => z.wohnungId === selectedUnit?.id);
                     if (unitZaehler.length === 0) return (
@@ -1329,17 +1697,50 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                           <TableRow>
                             <TableHead>Montageort</TableHead>
                             <TableHead>Geräteart</TableHead>
-                            <TableHead>Gerätenummer</TableHead>
+                            <TableHead className="hidden md:table-cell">Gerätenummer</TableHead>
                             <TableHead>Geeicht bis</TableHead>
+                            <TableHead className="w-[80px]">Aktionen</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {unitZaehler.map((z) => (
                             <TableRow key={z.id}>
                               <TableCell>{z.montageort}</TableCell>
-                              <TableCell>{z.geraeteart}</TableCell>
-                              <TableCell className="font-mono text-xs">{z.geraetnummer}</TableCell>
-                              <TableCell>{z.geeichtBis}</TableCell>
+                              <TableCell className="text-sm">{z.geraeteart}</TableCell>
+                              <TableCell className="hidden md:table-cell font-mono text-xs">{z.geraetnummer}</TableCell>
+                              <TableCell>{formatDateGerman(z.geeichtBis)}</TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => {
+                                      setZaehlerForm({
+                                        geraeteart: (z.geraeteart as any) || "Kaltwasser",
+                                        montageort: z.montageort || "",
+                                        geraetnummer: z.geraetnummer || "",
+                                        einbaudatum: z.einbaudatum || "",
+                                        geeichtBis: z.geeichtBis || "",
+                                        aktuellerStand: z.aktuellerStand || 0,
+                                        standDatum: z.standDatum || "",
+                                      });
+                                      setZaehlerEditingId(z.id);
+                                      setZaehlerFormOpen(true);
+                                    }}
+                                  >
+                                    <Edit className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive hover:text-destructive"
+                                    onClick={() => handleZaehlerDelete(z.id)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -1348,14 +1749,173 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                   })()}
                 </CardContent>
               </Card>
+
+              {/* Ad Card: Eichfrist abgelaufen */}
+              {hasExpiredOrMissingCalibration && (
+                <Card className="border-yellow-200 bg-yellow-50 relative">
+                  <div className="absolute top-3 right-3 text-xs text-muted-foreground font-medium"></div>
+                  <CardContent className="pt-6 pb-4">
+                    <div className="flex gap-4">
+                      <AlertCircle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <h4 className="font-medium text-yellow-900 mb-1">Eichfrist abgelaufen oder unbekannt</h4>
+                        <p className="text-sm text-yellow-800 mb-4">Ihre Wasserzähler müssen regelmäßig geeicht werden. Kontaktieren Sie einen Messdienstleister.</p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-yellow-600 text-yellow-700 hover:bg-yellow-100"
+                          onClick={() => setZaehlerPartnerDialogOpen(true)}
+                        >
+                          Jetzt anfragen →
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Rauchmelder</CardTitle>
-                  <CardDescription>
-                    Rauchmelder in dieser Wohneinheit.
-                  </CardDescription>
+                <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base">Rauchmelder</CardTitle>
+                    <CardDescription>
+                      Rauchmelder in dieser Wohneinheit.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-2"
+                    onClick={() => {
+                      setRauchmelderEditingId(null);
+                      setRauchmelderForm({
+                        montageort: "",
+                        modell: "",
+                        geraetnummer: "",
+                        einbaudatum: "",
+                        lebensdauerBis: "",
+                        letztewartung: "",
+                        naechsteWartung: "",
+                        batteriGeWechselt: "",
+                        status: "OK",
+                      });
+                      setRauchmelderFormOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Rauchmelder hinzufügen
+                  </Button>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
+                  {rauchmelderFormOpen && (
+                    <div className="border rounded-lg p-4 bg-muted/30 space-y-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>Montageort</Label>
+                          <Input
+                            placeholder="z.B. Schlafzimmer"
+                            value={rauchmelderForm.montageort}
+                            onChange={(e) =>
+                              setRauchmelderForm((prev) => ({ ...prev, montageort: e.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Modell/Geräteart</Label>
+                          <Input
+                            placeholder="z.B. Ei Electronics XC-71"
+                            value={rauchmelderForm.modell}
+                            onChange={(e) =>
+                              setRauchmelderForm((prev) => ({ ...prev, modell: e.target.value }))
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>Einbaudatum</Label>
+                          <Input
+                            type="date"
+                            value={rauchmelderForm.einbaudatum}
+                            onChange={(e) => {
+                              const newDate = e.target.value;
+                              setRauchmelderForm((prev) => ({ 
+                                ...prev, 
+                                einbaudatum: newDate,
+                                // Auto-calculate Lebensdauer bis (10 Jahre)
+                                lebensdauerBis: newDate ? new Date(new Date(newDate).getTime() + 10 * 365.25 * 24 * 60 * 60 * 1000).toISOString().split("T")[0] : ""
+                              }))
+                            }}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Lebensdauer bis</Label>
+                          <Input
+                            type="date"
+                            disabled
+                            value={rauchmelderForm.lebensdauerBis}
+                            className="bg-muted"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label>Letzte Wartung</Label>
+                          <Input
+                            type="date"
+                            value={rauchmelderForm.letztewartung}
+                            onChange={(e) =>
+                              setRauchmelderForm((prev) => ({ ...prev, letztewartung: e.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Letzte Batteriewechsel</Label>
+                          <Input
+                            type="date"
+                            value={rauchmelderForm.batteriGeWechselt}
+                            onChange={(e) =>
+                              setRauchmelderForm((prev) => ({ ...prev, batteriGeWechselt: e.target.value }))
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Status</Label>
+                        <Select
+                          value={rauchmelderForm.status}
+                          onValueChange={(value) =>
+                            setRauchmelderForm((prev) => ({ ...prev, status: value as any }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="OK">OK</SelectItem>
+                            <SelectItem value="Wartung fällig">Wartung fällig</SelectItem>
+                            <SelectItem value="Defekt">Defekt</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <Button
+                          variant="outline"
+                          onClick={() => setRauchmelderFormOpen(false)}
+                        >
+                          Abbrechen
+                        </Button>
+                        <Button
+                          className="bg-success hover:bg-success/90"
+                          onClick={handleRauchmelderSave}
+                        >
+                          <Save className="h-4 w-4 mr-2" />
+                          Speichern
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   {(() => {
                     const unitRauchmelder = rauchmelder.filter((r) => r.wohnungId === selectedUnit?.id);
                     if (unitRauchmelder.length === 0) return (
@@ -1367,17 +1927,52 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                           <TableRow>
                             <TableHead>Montageort</TableHead>
                             <TableHead>Geräteart</TableHead>
-                            <TableHead>Gerätenummer</TableHead>
-                            <TableHead>Lebensdauer bis</TableHead>
+                            <TableHead className="hidden md:table-cell">Gerätenummer</TableHead>
+                            <TableHead>Nächste Wartung</TableHead>
+                            <TableHead className="w-[80px]">Aktionen</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {unitRauchmelder.map((r) => (
                             <TableRow key={r.id}>
                               <TableCell>{r.montageort}</TableCell>
-                              <TableCell>{r.geraeteart}</TableCell>
-                              <TableCell className="font-mono text-xs">{r.geraetnummer}</TableCell>
-                              <TableCell>{r.lebensdauerBis}</TableCell>
+                              <TableCell className="text-sm">{r.geraeteart}</TableCell>
+                              <TableCell className="hidden md:table-cell font-mono text-xs">{r.geraetnummer}</TableCell>
+                              <TableCell>{formatDateGerman(r.naechsteWartung) !== "-" ? formatDateGerman(r.naechsteWartung) : formatDateGerman(r.lebensdauerBis)}</TableCell>
+                              <TableCell>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7"
+                                    onClick={() => {
+                                      setRauchmelderForm({
+                                        montageort: r.montageort || "",
+                                        modell: r.modell || "",
+                                        geraetnummer: r.geraetnummer || "",
+                                        einbaudatum: r.einbaudatum || "",
+                                        letztewartung: r.letztewartung || "",
+                                        naechsteWartung: r.naechsteWartung || "",
+                                        batteriGeWechselt: r.batteriGeWechselt || "",
+                                        lebensdauerBis: r.lebensdauerBis || "",
+                                        status: (r.status as any) || "OK",
+                                      });
+                                      setRauchmelderEditingId(r.id);
+                                      setRauchmelderFormOpen(true);
+                                    }}
+                                  >
+                                    <Edit className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 text-destructive hover:text-destructive"
+                                    onClick={() => handleRauchmelderDelete(r.id)}
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -1386,6 +1981,36 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                   })()}
                 </CardContent>
               </Card>
+
+              {/* Ad Card: Wartung fällig für Rauchmelder */}
+              {hasMaintenanceDueRauchmelder && (
+                <Card className={`relative ${rauchmelder.filter((r) => r.wohnungId === selectedUnit?.id).some((r) => r.status === "Defekt") ? "border-red-200 bg-red-50" : "border-yellow-200 bg-yellow-50"}`}>
+                  <div className="absolute top-3 right-3 text-xs text-muted-foreground font-medium">Anzeige</div>
+                  <CardContent className="pt-6 pb-4">
+                    <div className="flex gap-4">
+                      <Wrench className={`h-5 w-5 shrink-0 mt-0.5 ${rauchmelder.filter((r) => r.wohnungId === selectedUnit?.id).some((r) => r.status === "Defekt") ? "text-red-600" : "text-yellow-600"}`} />
+                      <div className="flex-1">
+                        <h4 className={`font-medium mb-1 ${rauchmelder.filter((r) => r.wohnungId === selectedUnit?.id).some((r) => r.status === "Defekt") ? "text-red-900" : "text-yellow-900"}`}>
+                          {rauchmelder.filter((r) => r.wohnungId === selectedUnit?.id).some((r) => r.status === "Defekt") ? "Rauchmelder defekt" : "Wartung fällig"}
+                        </h4>
+                        <p className={`text-sm mb-4 ${rauchmelder.filter((r) => r.wohnungId === selectedUnit?.id).some((r) => r.status === "Defekt") ? "text-red-800" : "text-yellow-800"}`}>
+                          {rauchmelder.filter((r) => r.wohnungId === selectedUnit?.id).some((r) => r.status === "Defekt")
+                            ? "Ihre Rauchmelder benötigen sofortige Reparatur. Kontaktieren Sie einen Wartungsservice."
+                            : "Ihre Rauchmelder sind wartungsfällig. Beauftragen Sie einen Wartungsservice."}
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className={`${rauchmelder.filter((r) => r.wohnungId === selectedUnit?.id).some((r) => r.status === "Defekt") ? "border-red-600 text-red-700 hover:bg-red-100" : "border-yellow-600 text-yellow-700 hover:bg-yellow-100"}`}
+                          onClick={() => setRauchmelderPartnerDialogOpen(true)}
+                        >
+                          {rauchmelder.filter((r) => r.wohnungId === selectedUnit?.id).some((r) => r.status === "Defekt") ? "Reparatur buchen →" : "Wartung buchen →"}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
 
             {/* Tab: Schlüssel (Verteilungsschlüssel) */}
@@ -1779,9 +2404,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>
               • <span className="font-medium">Ja, archivieren:</span> Der Mieter wird archiviert und die
-              Wohnung auf &quot;{archiveDialogData?.newStatus === "frei"
-                ? "Frei"
-                : "Renovierung"}&quot; gesetzt.
+              Wohnung auf &quot;{archiveDialogData?.newStatus === "frei" ? "Frei" : "Renovierung"}&quot; gesetzt.
             </p>
             <p>
               • <span className="font-medium">Nein, nur Status ändern:</span> Die Wohnung wird auf &quot;
@@ -1811,9 +2434,189 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
               onClick={handleArchiveMieter}
               disabled={archiveProcessing}
             >
-              {archiveProcessing ? "Wird archiviert..." : "Ja, archivieren"}
+              {archiveProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Wird archiviert...
+                </>
+              ) : (
+                <>
+                  <Archive className="mr-2 h-4 w-4" />
+                  Ja, archivieren
+                </>
+              )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Zähler Partner Dialog */}
+      <Dialog open={zaehlerPartnerDialogOpen} onOpenChange={setZaehlerPartnerDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Messdienstleister</DialogTitle>
+            <DialogDescription>Professionelle Hilfe bei Zählereichung</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            {[
+              {
+                initials: "TC",
+                name: "Techem",
+                desc: "Messdienstleistungen & Heizkostenabrechnung",
+                rating: 5,
+                tags: ["Bundesweit", "Schnell"],
+              },
+              {
+                initials: "IS",
+                name: "Ista",
+                desc: "Energiedienstleistungen & Messungen",
+                rating: 4,
+                tags: ["Zuverlässig", "Modern"],
+              },
+              {
+                initials: "BR",
+                name: "Brunata",
+                desc: "Wärmezähler & Messgeräte",
+                rating: 4,
+                tags: ["Spezialist", "Kompetent"],
+              },
+              {
+                initials: "MI",
+                name: "Minol",
+                desc: "Erfassungsgeräte & Messdienstleistungen",
+                rating: 4,
+                tags: ["Flexibel", "Günstig"],
+              },
+            ].map((partner) => (
+              <Card key={partner.name} className="relative">
+                <span className="absolute top-2 right-3 text-[10px] text-muted-foreground">Anzeige</span>
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-semibold text-primary">{partner.initials}</span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-sm">{partner.name}</h3>
+                      <p className="text-xs text-muted-foreground mb-2">{partner.desc}</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="flex gap-0.5">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <span
+                              key={i}
+                              className={`text-xs ${i < partner.rating ? "text-yellow-500" : "text-gray-300"}`}
+                            >
+                              ★
+                            </span>
+                          ))}
+                        </div>
+                        <span className="text-xs text-muted-foreground">{partner.rating}.0</span>
+                      </div>
+                      <div className="flex gap-1 flex-wrap">
+                        {partner.tags.map((tag) => (
+                          <Badge key={tag} variant="secondary" className="text-xs h-5">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs flex-shrink-0"
+                    >
+                      Jetzt anfragen
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground mt-4">* Bezahlte Partneranzeigen. Wir erhalten eine Provision bei Vermittlung.</p>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rauchmelder Partner Dialog */}
+      <Dialog open={rauchmelderPartnerDialogOpen} onOpenChange={setRauchmelderPartnerDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Wartungspartner</DialogTitle>
+            <DialogDescription>Professionelle Wartung & Reparatur von Rauchmeldern</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            {[
+              {
+                initials: "TC",
+                name: "Techem",
+                desc: "Messdienstleistungen & Heizkostenabrechnung",
+                rating: 5,
+                tags: ["Bundesweit", "Schnell"],
+              },
+              {
+                initials: "IS",
+                name: "Ista",
+                desc: "Energiedienstleistungen & Messungen",
+                rating: 4,
+                tags: ["Zuverlässig", "Modern"],
+              },
+              {
+                initials: "BR",
+                name: "Brunata",
+                desc: "Wärmezähler & Messgeräte",
+                rating: 4,
+                tags: ["Spezialist", "Kompetent"],
+              },
+              {
+                initials: "MI",
+                name: "Minol",
+                desc: "Erfassungsgeräte & Messdienstleistungen",
+                rating: 4,
+                tags: ["Flexibel", "Günstig"],
+              },
+            ].map((partner) => (
+              <Card key={partner.name} className="relative">
+                <span className="absolute top-2 right-3 text-[10px] text-muted-foreground">Anzeige</span>
+                <CardContent className="pt-4 pb-4">
+                  <div className="flex gap-3">
+                    <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-semibold text-primary">{partner.initials}</span>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-sm">{partner.name}</h3>
+                      <p className="text-xs text-muted-foreground mb-2">{partner.desc}</p>
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="flex gap-0.5">
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <span
+                              key={i}
+                              className={`text-xs ${i < partner.rating ? "text-yellow-500" : "text-gray-300"}`}
+                            >
+                              ★
+                            </span>
+                          ))}
+                        </div>
+                        <span className="text-xs text-muted-foreground">{partner.rating}.0</span>
+                      </div>
+                      <div className="flex gap-1 flex-wrap">
+                        {partner.tags.map((tag) => (
+                          <Badge key={tag} variant="secondary" className="text-xs h-5">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs flex-shrink-0"
+                    >
+                      Jetzt anfragen
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground mt-4">* Bezahlte Partneranzeigen. Wir erhalten eine Provision bei Vermittlung.</p>
         </DialogContent>
       </Dialog>
     </div>

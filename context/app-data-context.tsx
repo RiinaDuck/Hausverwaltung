@@ -155,6 +155,10 @@ export interface Zaehler {
   geeichtBis: string;
   hersteller?: string;
   typ?: string;
+  zaehlerart?: string;
+  einbaudatum?: string;
+  aktuellerStand?: number;
+  standDatum?: string;
 }
 
 export interface Rauchmelder {
@@ -168,6 +172,12 @@ export interface Rauchmelder {
   lebensdauerBis: string;
   hersteller?: string;
   typ?: string;
+  modell?: string;
+  einbaudatum?: string;
+  letztewartung?: string;
+  naechsteWartung?: string;
+  batteriGeWechselt?: string;
+  status?: string;
 }
 
 export interface RechnungsPosition {
@@ -193,6 +203,7 @@ export interface Rechnung {
   betragBrutto?: number;
   mwstProzent?: number;
   notizen?: string;
+  dateiPfad?: string;
   stornoVon?: string;
   createdAt: string;
   updatedAt: string;
@@ -588,6 +599,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     geeichtBis: db.geeicht_bis,
     hersteller: db.hersteller ?? undefined,
     typ: db.typ ?? undefined,
+    zaehlerart: db.zaehlerart,
+    einbaudatum: db.einbaudatum,
+    aktuellerStand: db.aktueller_stand,
+    standDatum: db.stand_datum,
   });
 
   const mapDBToRauchmelder = (db: any): Rauchmelder => ({
@@ -601,6 +616,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     lebensdauerBis: db.lebensdauer_bis,
     hersteller: db.hersteller ?? undefined,
     typ: db.typ ?? undefined,
+    modell: db.modell,
+    einbaudatum: db.einbaudatum,
+    letztewartung: db.letzte_wartung,
+    naechsteWartung: db.naechste_wartung,
+    batteriGeWechselt: db.batterie_gewechselt,
+    status: db.status,
   });
 
   const mapDBToRechnung = (db: any): Rechnung => ({
@@ -1199,14 +1220,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const created = await createZaehlerDB({
         user_id: user.id,
         wohnung_id: z.wohnungId,
-        wohnungnr: z.wohnungNr,
-        geschoss: z.geschoss,
-        montageort: z.montageort,
-        geraeteart: z.geraeteart,
-        geraetnummer: z.geraetnummer,
-        geeicht_bis: z.geeichtBis,
+        wohnungnr: z.wohnungNr || "",
+        geschoss: z.geschoss || "",
+        montageort: z.montageort || "",
+        geraeteart: z.zaehlerart || "",
+        geraetnummer: z.geraetnummer || "",
+        geeicht_bis: z.geeichtBis || "",
         hersteller: z.hersteller ?? null,
         typ: z.typ ?? null,
+        zaehlerart: z.zaehlerart || null,
+        einbaudatum: z.einbaudatum || null,
+        aktueller_stand: z.aktuellerStand || 0,
+        stand_datum: z.standDatum || null,
       });
       setZaehler((prev) => [mapDBToZaehler(created), ...prev]);
     } catch (error) {
@@ -1223,14 +1248,18 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     try {
       const dbUpdates: any = {};
       if (z.wohnungId !== undefined) dbUpdates.wohnung_id = z.wohnungId;
-      if (z.wohnungNr !== undefined) dbUpdates.wohnungnr = z.wohnungNr;
-      if (z.geschoss !== undefined) dbUpdates.geschoss = z.geschoss;
+      if (z.zaehlerart !== undefined) dbUpdates.zaehlerart = z.zaehlerart;
       if (z.montageort !== undefined) dbUpdates.montageort = z.montageort;
-      if (z.geraeteart !== undefined) dbUpdates.geraeteart = z.geraeteart;
       if (z.geraetnummer !== undefined) dbUpdates.geraetnummer = z.geraetnummer;
+      if (z.einbaudatum !== undefined) dbUpdates.einbaudatum = z.einbaudatum;
+      if (z.aktuellerStand !== undefined) dbUpdates.aktueller_stand = z.aktuellerStand;
+      if (z.standDatum !== undefined) dbUpdates.stand_datum = z.standDatum;
       if (z.geeichtBis !== undefined) dbUpdates.geeicht_bis = z.geeichtBis;
+      if (z.geraeteart !== undefined) dbUpdates.geraeteart = z.geraeteart;
       if (z.hersteller !== undefined) dbUpdates.hersteller = z.hersteller;
       if (z.typ !== undefined) dbUpdates.typ = z.typ;
+      if (z.wohnungNr !== undefined) dbUpdates.wohnungnr = z.wohnungNr;
+      if (z.geschoss !== undefined) dbUpdates.geschoss = z.geschoss;
       const updated = await updateZaehlerDB(id, dbUpdates);
       setZaehler((prev) => prev.map((e) => (e.id === id ? mapDBToZaehler(updated) : e)));
     } catch (error) {
@@ -1265,14 +1294,20 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       const created = await createRauchmelderDB({
         user_id: user.id,
         wohnung_id: r.wohnungId,
-        wohnungnr: r.wohnungNr,
-        geschoss: r.geschoss,
-        montageort: r.montageort,
-        geraeteart: r.geraeteart,
-        geraetnummer: r.geraetnummer,
-        lebensdauer_bis: r.lebensdauerBis,
+        wohnungnr: r.wohnungNr || "",
+        geschoss: r.geschoss || "",
+        montageort: r.montageort || "",
+        geraeteart: r.geraeteart || "",
+        geraetnummer: r.geraetnummer || "",
+        lebensdauer_bis: r.lebensdauerBis || "",
         hersteller: r.hersteller ?? null,
         typ: r.typ ?? null,
+        modell: r.modell || null,
+        einbaudatum: r.einbaudatum || null,
+        letzte_wartung: r.letztewartung || null,
+        naechste_wartung: r.naechsteWartung || null,
+        batterie_gewechselt: r.batteriGeWechselt || null,
+        status: r.status || "OK",
       });
       setRauchmelder((prev) => [mapDBToRauchmelder(created), ...prev]);
     } catch (error) {
@@ -1289,14 +1324,20 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     try {
       const dbUpdates: any = {};
       if (r.wohnungId !== undefined) dbUpdates.wohnung_id = r.wohnungId;
-      if (r.wohnungNr !== undefined) dbUpdates.wohnungnr = r.wohnungNr;
-      if (r.geschoss !== undefined) dbUpdates.geschoss = r.geschoss;
+      if (r.modell !== undefined) dbUpdates.modell = r.modell;
       if (r.montageort !== undefined) dbUpdates.montageort = r.montageort;
-      if (r.geraeteart !== undefined) dbUpdates.geraeteart = r.geraeteart;
       if (r.geraetnummer !== undefined) dbUpdates.geraetnummer = r.geraetnummer;
+      if (r.einbaudatum !== undefined) dbUpdates.einbaudatum = r.einbaudatum;
+      if (r.letztewartung !== undefined) dbUpdates.letzte_wartung = r.letztewartung;
+      if (r.naechsteWartung !== undefined) dbUpdates.naechste_wartung = r.naechsteWartung;
+      if (r.batteriGeWechselt !== undefined) dbUpdates.batterie_gewechselt = r.batteriGeWechselt;
+      if (r.status !== undefined) dbUpdates.status = r.status;
       if (r.lebensdauerBis !== undefined) dbUpdates.lebensdauer_bis = r.lebensdauerBis;
+      if (r.geraeteart !== undefined) dbUpdates.geraeteart = r.geraeteart;
       if (r.hersteller !== undefined) dbUpdates.hersteller = r.hersteller;
       if (r.typ !== undefined) dbUpdates.typ = r.typ;
+      if (r.wohnungNr !== undefined) dbUpdates.wohnungnr = r.wohnungNr;
+      if (r.geschoss !== undefined) dbUpdates.geschoss = r.geschoss;
       const updated = await updateRauchmelderDB(id, dbUpdates);
       setRauchmelder((prev) => prev.map((e) => (e.id === id ? mapDBToRauchmelder(updated) : e)));
     } catch (error) {
