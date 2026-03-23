@@ -5,6 +5,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useMemo,
   ReactNode,
 } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -376,28 +377,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAuthenticated = !!user || isDemo;
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const contextValue = useMemo(
+    () => ({
+      isAuthenticated,
+      isDemo,
+      isAdmin,
+      user,
+      profile,
+      needsOnboarding,
+      showProfileBanner,
+      login,
+      signup,
+      startDemo,
+      logout,
+      updateProfile,
+      completeOnboarding,
+      dismissOnboarding,
+      dismissProfileBanner,
+      getInitials,
+      loading,
+    }),
+    // Only state values as deps — functions are intentionally excluded
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      isAuthenticated, isDemo, isAdmin, user, profile,
+      needsOnboarding, showProfileBanner, loading,
+    ],
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        isAuthenticated,
-        isDemo,
-        isAdmin,
-        user,
-        profile,
-        needsOnboarding,
-        showProfileBanner,
-        login,
-        signup,
-        startDemo,
-        logout,
-        updateProfile,
-        completeOnboarding,
-        dismissOnboarding,
-        dismissProfileBanner,
-        getInitials,
-        loading,
-      }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

@@ -12,6 +12,7 @@ import { NebenkostenAbrechnungView } from "@/components/views/nebenkosten-abrech
 import { ZaehlerView } from "@/components/views/zaehler-view";
 import { HausmanagerView } from "@/components/views/hausmanager-view";
 import { RechnungenView } from "@/components/views/rechnungen-view";
+import { EinnahmenAusgabenView } from "@/components/views/einnahmen-ausgaben-view";
 import { StatistikenView } from "@/components/views/statistiken-view";
 import { ArchivView } from "@/components/views/archiv-view";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -22,6 +23,7 @@ export type AppView =
   | "objekte"
   | "wohnungen"
   | "mieter"
+  | "einnahmen-ausgaben"
   | "nebenkosten"
   | "nebenkosten-abrechnung"
   | "rechnungen"
@@ -31,8 +33,9 @@ export type AppView =
   | "archiv";
 
 const validViews: AppView[] = [
-  "dashboard", "objekte", "wohnungen", "mieter", "nebenkosten",
-  "nebenkosten-abrechnung", "rechnungen", "zaehler", "hausmanager", "statistiken", "archiv",
+  "dashboard", "objekte", "wohnungen", "mieter", "einnahmen-ausgaben",
+  "nebenkosten", "nebenkosten-abrechnung", "rechnungen", "zaehler",
+  "hausmanager", "statistiken", "archiv",
 ];
 
 interface AppDashboardProps {
@@ -80,6 +83,8 @@ export function AppDashboard({ onSwitchToLanding }: AppDashboardProps) {
         return <WohnungsdatenView onNavigate={handleNavigate} />;
       case "mieter":
         return <MieterdatenView initialMieterId={navMieterId} />;
+      case "einnahmen-ausgaben":
+        return <EinnahmenAusgabenView />;
       case "nebenkosten":
         return <NebenkostenView />;
       case "nebenkosten-abrechnung":

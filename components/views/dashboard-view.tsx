@@ -54,13 +54,81 @@ interface DashboardViewProps {
   onNavigate: (view: AppView) => void;
 }
 
+// Extracted from IIFE in JSX — allows proper memoization and clear separation
+interface VerzugStatusProps {
+  zahlungen: { status: string; mieterId: string }[];
+  onNavigate: (view: AppView) => void;
+}
+function VerzugStatusCard({ zahlungen, onNavigate }: VerzugStatusProps) {
+  const mieterInVerzug = zahlungen.filter((z) => z.status === "ueberfaellig" && z.mieterId !== "unbekannt");
+  const uniqueMieterIds = [...new Set(mieterInVerzug.map((z) => z.mieterId))];
+  const anzahl = uniqueMieterIds.length;
+
+  if (anzahl === 0) {
+    return (
+      <Card className="border-green-200 bg-green-50">
+        <CardContent className="pt-4 pb-4 h-full flex items-center">
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-3">
+              <div className="rounded-full bg-green-100 p-2">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-green-800">Alle Zahlungen aktuell</p>
+                <p className="text-xs text-green-700">Kein Mieter hat ausstehende Zahlungen</p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-green-300 text-green-700 hover:bg-green-100"
+              onClick={() => onNavigate("mieter")}
+            >
+              Anzeigen
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="border-destructive/50 bg-destructive/5">
+      <CardContent className="pt-4 pb-4 h-full flex items-center">
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-3">
+            <div className="rounded-full bg-destructive/10 p-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">Mieter in Verzug</p>
+              <p className="text-xs text-muted-foreground">
+                {anzahl} {anzahl === 1 ? "Mieter hat" : "Mieter haben"} ausstehende Zahlungen
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-destructive/30 text-destructive hover:bg-destructive/10"
+            onClick={() => onNavigate("mieter")}
+          >
+            Anzeigen
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function DashboardView({ onNavigate }: DashboardViewProps) {
-  const { objekte, wohnungen, mieter, zahlungen, selectedObjektId, setSelectedObjektId } =
+  const { objekte, wohnungen, mieter, zahlungen, setSelectedObjektId } =
     useAppData();
   const { isDemo, profile } = useAuth();
   const { toast } = useToast();
   const [statusContainer, setStatusContainer] = useState<HTMLDivElement | null>(null);
   const [inkassoOpen, setInkassoOpen] = useState(false);
+  const [objektSelectOpen, setObjektSelectOpen] = useState(false);
 
   // Vorname extrahieren
   const firstName = profile.vorname || "User";
@@ -73,19 +141,19 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
     });
   };
 
-  // Berechne reale Dashboard-Statistiken
-  const dashboardStats = useMemo(() => {
-    // Filtere Daten nach ausgewähltem Objekt (oder alle wenn keins ausgewählt)
-    let relevantWohnungen = wohnungen;
-    let relevantMieter = mieter;
+  // Pre-group wohnungen count by objektId to avoid O(n²) in the table render
+  const wohnungenCountByObjektId = useMemo(
+    () => wohnungen.reduce<Record<string, number>>((acc, w) => {
+      acc[w.objektId] = (acc[w.objektId] ?? 0) + 1;
+      return acc;
+    }, {}),
+    [wohnungen],
+  );
 
-    if (selectedObjektId) {
-      relevantWohnungen = wohnungen.filter(
-        (w) => w.objektId === selectedObjektId,
-      );
-      const wohnungIds = relevantWohnungen.map((w) => w.id);
-      relevantMieter = mieter.filter((m) => wohnungIds.includes(m.wohnungId));
-    }
+  // Berechne reale Dashboard-Statistiken (objektübergreifend)
+  const dashboardStats = useMemo(() => {
+    const relevantWohnungen = wohnungen;
+    const relevantMieter = mieter;
 
     // 1. Gesamteinnahmen YTD (Year To Date) berechnen
     const currentYear = new Date().getFullYear();
@@ -151,7 +219,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
       leerstehendeWohnungen: leerstehendeWohnungen.length,
       leerstandsquote,
     };
-  }, [wohnungen, mieter, selectedObjektId]);
+  }, [wohnungen, mieter]);
 
   const handleObjektOpen = (objektId: string) => {
     setSelectedObjektId(objektId);
@@ -207,9 +275,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
             <Button
               variant="outline"
               className="gap-2 bg-transparent justify-start sm:justify-center"
-              onClick={() =>
-                selectedObjektId && handleObjektOpen(selectedObjektId)
-              }
+              onClick={() => setObjektSelectOpen(true)}
             >
               <FolderOpen className="h-4 w-4" />
               Objekt öffnen
@@ -221,65 +287,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
       {/* Status-Banner: In Verzug + Import-Erinnerung nebeneinander */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* In Verzug */}
-        {(() => {
-          // Zähle nur Mieter, die tatsächlich einen "ueberfaellig"-Eintrag in den Zahlungen haben
-          const mieterInVerzug = zahlungen.filter((z) => z.status === "ueberfaellig" && z.mieterId !== "unbekannt");
-          // Dedupliziere nach Mieter-ID (ein Mieter kann mehrere Monate überfällig sein)
-          const uniqueMieterIds = [...new Set(mieterInVerzug.map((z) => z.mieterId))];
-          const anzahl = uniqueMieterIds.length;
-          if (anzahl === 0) return (
-            <Card className="border-green-200 bg-green-50">
-              <CardContent className="pt-4 pb-4 h-full flex items-center">
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-full bg-green-100 p-2">
-                      <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-green-800">Alle Zahlungen aktuell</p>
-                      <p className="text-xs text-green-700">Kein Mieter hat ausstehende Zahlungen</p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-green-300 text-green-700 hover:bg-green-100"
-                    onClick={() => onNavigate("mieter")}
-                  >
-                    Anzeigen
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          );
-          return (
-            <Card className="border-destructive/50 bg-destructive/5">
-              <CardContent className="pt-4 pb-4 h-full flex items-center">
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-full bg-destructive/10 p-2">
-                      <AlertTriangle className="h-5 w-5 text-destructive" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Mieter in Verzug</p>
-                      <p className="text-xs text-muted-foreground">
-                        {anzahl} {anzahl === 1 ? "Mieter hat" : "Mieter haben"} ausstehende Zahlungen
-                      </p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-destructive/30 text-destructive hover:bg-destructive/10"
-                    onClick={() => onNavigate("mieter")}
-                  >
-                    Anzeigen
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })()}
+        <VerzugStatusCard zahlungen={zahlungen} onNavigate={onNavigate} />
 
         {/* Import-Erinnerung Banner */}
         <ImportErinnerungBanner onNavigate={onNavigate} statusContainer={statusContainer} />
@@ -340,7 +348,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                   <TableRow key={objekt.id}>
                     <TableCell className="font-medium">{objekt.name}</TableCell>
                     <TableCell>{objekt.typ}</TableCell>
-                    <TableCell>{wohnungen.filter((w) => w.objektId === objekt.id).length}</TableCell>
+                    <TableCell>{wohnungenCountByObjektId[objekt.id] ?? 0}</TableCell>
                     <TableCell>
                       <Badge
                         variant="secondary"
@@ -438,6 +446,34 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
             <p className="text-[10px] text-muted-foreground leading-tight">
               * Bezahlte Partneranzeigen. Wir erhalten eine Provision bei Vermittlung.
             </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Objekt wählen Dialog */}
+      <Dialog open={objektSelectOpen} onOpenChange={setObjektSelectOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Objekt öffnen</DialogTitle>
+            <DialogDescription>Wählen Sie ein Objekt aus, um es zu öffnen.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-2">
+            {objekte.map((obj) => (
+              <button
+                key={obj.id}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left hover:bg-accent transition-colors border"
+                onClick={() => { setObjektSelectOpen(false); handleObjektOpen(obj.id); }}
+              >
+                <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{obj.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{obj.adresse}</p>
+                </div>
+              </button>
+            ))}
+            {objekte.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">Noch keine Objekte vorhanden.</p>
+            )}
           </div>
         </DialogContent>
       </Dialog>

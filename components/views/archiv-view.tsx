@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,7 +20,9 @@ interface ArchivedItem {
 export function ArchivView() {
   const { profile } = useAuth();
   const { toast } = useToast();
-  const supabase = createClient();
+  // useMemo gives a stable reference without module-scope initialization,
+  // which would run before Next.js layout router mounts and cause an invariant error.
+  const supabase = useMemo(() => createClient(), []);
   
   const [activeTab, setActiveTab] = useState("mieter");
   const [archivedMieter, setArchivedMieter] = useState<ArchivedItem[]>([]);
@@ -36,25 +38,33 @@ export function ArchivView() {
     const loadArchivedEntries = async () => {
       setLoading(true);
       try {
-        // Load archived mieter
+        // All three archive tables loaded in parallel
         if (supabase) {
-          const { data: archivedMieterData, error: mieterError } = await supabase
-            .from("mieter")
-            .select("id, name, archived_at, archive_reason")
-            .not("archived_at", "is", null)
-            .order("archived_at", { ascending: false });
+          const [
+            { data: archivedMieterData, error: mieterError },
+            { data: archivedWohnungenData, error: wohnungenError },
+            { data: archivedObjekteData, error: objekteError },
+          ] = await Promise.all([
+            supabase
+              .from("mieter")
+              .select("id, name, archived_at, archive_reason")
+              .not("archived_at", "is", null)
+              .order("archived_at", { ascending: false }),
+            supabase
+              .from("wohnungen")
+              .select("id, bezeichnung, archived_at, archive_reason")
+              .not("archived_at", "is", null)
+              .order("archived_at", { ascending: false }),
+            supabase
+              .from("objekte")
+              .select("id, adresse, archived_at, archive_reason")
+              .not("archived_at", "is", null)
+              .order("archived_at", { ascending: false }),
+          ]);
 
           if (!mieterError && archivedMieterData) {
             setArchivedMieter(archivedMieterData);
           }
-
-          // Load archived wohnungen
-          const { data: archivedWohnungenData, error: wohnungenError } = await supabase
-            .from("wohnungen")
-            .select("id, bezeichnung, archived_at, archive_reason")
-            .not("archived_at", "is", null)
-            .order("archived_at", { ascending: false });
-
           if (!wohnungenError && archivedWohnungenData) {
             setArchivedWohnungen(
               archivedWohnungenData.map((w: any) => ({
@@ -65,14 +75,6 @@ export function ArchivView() {
               }))
             );
           }
-
-          // Load archived objekte
-          const { data: archivedObjekteData, error: objekteError } = await supabase
-            .from("objekte")
-            .select("id, adresse, archived_at, archive_reason")
-            .not("archived_at", "is", null)
-            .order("archived_at", { ascending: false });
-
           if (!objekteError && archivedObjekteData) {
             setArchivedObjekte(
               archivedObjekteData.map((o: any) => ({
@@ -93,7 +95,7 @@ export function ArchivView() {
     };
 
     loadArchivedEntries();
-  }, [supabase, toast]);
+  }, [toast]);
 
   const handleRestore = async (type: string, id: string) => {
     setRestoreInProgress(true);

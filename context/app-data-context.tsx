@@ -5,6 +5,8 @@ import {
   useContext,
   useState,
   useEffect,
+  useMemo,
+  useCallback,
   ReactNode,
 } from "react";
 import { useAuth } from "./auth-context";
@@ -42,6 +44,7 @@ import {
   updateBuchung as updateBuchungDB,
   deleteBuchung as deleteBuchungDB,
 } from "@/lib/supabase/queries";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 
 // Types für die Datenstrukturen
 export interface Objekt {
@@ -509,6 +512,141 @@ const DEMO_RECHNUNGEN: Rechnung[] = [
   },
 ];
 
+// Pure mapping functions — no closure over component state, defined at module scope
+// so they are stable references and do not contribute to re-renders.
+const mapDBToObjekt = (dbObjekt: any): Objekt => ({
+  id: dbObjekt.id,
+  name: dbObjekt.name,
+  adresse: dbObjekt.adresse,
+  typ: dbObjekt.typ,
+  einheiten: dbObjekt.einheiten,
+  status: dbObjekt.status,
+  eigentuemer: dbObjekt.eigentuemer,
+  bankverbindung: dbObjekt.bankverbindung,
+  objektdaten: dbObjekt.objektdaten,
+  notizen: dbObjekt.notizen || "",
+});
+
+const mapDBToWohnung = (dbWohnung: any): Wohnung => ({
+  id: dbWohnung.id,
+  objektId: dbWohnung.objekt_id,
+  bezeichnung: dbWohnung.bezeichnung,
+  etage: dbWohnung.etage,
+  flaeche: Number(dbWohnung.flaeche),
+  zimmer: dbWohnung.zimmer,
+  miete: Number(dbWohnung.miete),
+  nebenkosten: Number(dbWohnung.nebenkosten),
+  status: dbWohnung.status,
+});
+
+const mapDBToMieter = (dbMieter: any): Mieter => ({
+  id: dbMieter.id,
+  wohnungId: dbMieter.wohnung_id,
+  anrede: dbMieter.anrede || 'familie',
+  name: dbMieter.name,
+  email: dbMieter.email,
+  telefon: dbMieter.telefon,
+  einzugsDatum: dbMieter.einzugs_datum,
+  mieteBis: dbMieter.miete_bis,
+  kaltmiete: Number(dbMieter.kaltmiete),
+  nebenkosten: Number(dbMieter.nebenkosten),
+  kaution: Number(dbMieter.kaution),
+  isKurzzeitvermietung: dbMieter.is_kurzzeitvermietung,
+  kurzzeitBis: dbMieter.kurzzeit_bis,
+  isAktiv: dbMieter.is_aktiv,
+  prozentanteil: dbMieter.prozentanteil
+    ? Number(dbMieter.prozentanteil)
+    : undefined,
+});
+
+const mapDBToZaehler = (db: any): Zaehler => ({
+  id: db.id,
+  wohnungId: db.wohnung_id,
+  wohnungNr: db.wohnungnr,
+  geschoss: db.geschoss,
+  montageort: db.montageort,
+  geraeteart: db.geraeteart,
+  geraetnummer: db.geraetnummer,
+  geeichtBis: db.geeicht_bis,
+  hersteller: db.hersteller ?? undefined,
+  typ: db.typ ?? undefined,
+  zaehlerart: db.zaehlerart,
+  einbaudatum: db.einbaudatum,
+  aktuellerStand: db.aktueller_stand,
+  standDatum: db.stand_datum,
+});
+
+const mapDBToRauchmelder = (db: any): Rauchmelder => ({
+  id: db.id,
+  wohnungId: db.wohnung_id,
+  wohnungNr: db.wohnungnr,
+  geschoss: db.geschoss,
+  montageort: db.montageort,
+  geraeteart: db.geraeteart,
+  geraetnummer: db.geraetnummer,
+  lebensdauerBis: db.lebensdauer_bis,
+  hersteller: db.hersteller ?? undefined,
+  typ: db.typ ?? undefined,
+  modell: db.modell,
+  einbaudatum: db.einbaudatum,
+  letztewartung: db.letzte_wartung,
+  naechsteWartung: db.naechste_wartung,
+  batteriGeWechselt: db.batterie_gewechselt,
+  status: db.status,
+});
+
+const mapDBToRechnung = (db: any): Rechnung => ({
+  id: db.id,
+  userId: db.user_id,
+  nummer: db.nummer,
+  datum: db.datum,
+  empfaengerName: db.empfaenger_name,
+  empfaengerAdresse: db.empfaenger_adresse,
+  positionen: (db.positionen ?? []) as RechnungsPosition[],
+  bemerkung: db.bemerkung ?? "",
+  status: db.status,
+  createdAt: db.created_at,
+  updatedAt: db.updated_at,
+});
+
+const mapDBToExpense = (db: any): Expense => ({
+  id: db.id,
+  userId: db.user_id,
+  objektId: db.objekt_id,
+  kostenart: db.kostenart,
+  betrag: Number(db.betrag),
+  zeitraumVon: db.zeitraum_von,
+  zeitraumBis: db.zeitraum_bis,
+  verteilerschluessel: db.verteilerschluessel,
+  rechnungId: db.rechnung_id ?? null,
+  notiz: db.notiz ?? null,
+  createdAt: db.created_at,
+  updatedAt: db.updated_at,
+});
+
+const mapDBToBuchung = (db: any): Buchung => ({
+  id: db.id,
+  userId: db.user_id,
+  typ: db.typ,
+  kategorie: db.kategorie,
+  datum: db.datum,
+  betragNetto: Number(db.betrag_netto),
+  mwstProzent: db.mwst_prozent ?? 0,
+  betragBrutto: Number(db.betrag_brutto),
+  objektId: db.objekt_id ?? null,
+  wohnungId: db.wohnung_id ?? null,
+  mieterId: db.mieter_id ?? null,
+  beschreibung: db.beschreibung,
+  rechnungssteller: db.rechnungssteller ?? null,
+  rechnungsnummer: db.rechnungsnummer ?? null,
+  belegPfad: db.beleg_pfad ?? null,
+  stornoVon: db.storno_von ?? null,
+  legacyRechnungId: db.legacy_rechnung_id ?? null,
+  legacyStatus: db.legacy_status ?? null,
+  createdAt: db.created_at,
+  updatedAt: db.updated_at,
+});
+
 export function AppDataProvider({ children }: { children: ReactNode }) {
   const { user, isAdmin } = useAuth();
   const [objekte, setObjekte] = useState<Objekt[]>([]);
@@ -531,7 +669,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   // Wrapper: setzt State UND persistiert in localStorage
-  const setSelectedObjektId = (id: string | null) => {
+  const setSelectedObjektId = useCallback((id: string | null) => {
     setSelectedObjektIdState(id);
     if (typeof window !== "undefined") {
       if (id) {
@@ -540,141 +678,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
         localStorage.removeItem("selectedObjektId");
       }
     }
-  };
-
-  // Konvertiert DB-Format zu App-Format
-  const mapDBToObjekt = (dbObjekt: any): Objekt => ({
-    id: dbObjekt.id,
-    name: dbObjekt.name,
-    adresse: dbObjekt.adresse,
-    typ: dbObjekt.typ,
-    einheiten: dbObjekt.einheiten,
-    status: dbObjekt.status,
-    eigentuemer: dbObjekt.eigentuemer,
-    bankverbindung: dbObjekt.bankverbindung,
-    objektdaten: dbObjekt.objektdaten,
-    notizen: dbObjekt.notizen || "",
-  });
-
-  const mapDBToWohnung = (dbWohnung: any): Wohnung => ({
-    id: dbWohnung.id,
-    objektId: dbWohnung.objekt_id,
-    bezeichnung: dbWohnung.bezeichnung,
-    etage: dbWohnung.etage,
-    flaeche: Number(dbWohnung.flaeche),
-    zimmer: dbWohnung.zimmer,
-    miete: Number(dbWohnung.miete),
-    nebenkosten: Number(dbWohnung.nebenkosten),
-    status: dbWohnung.status,
-  });
-
-  const mapDBToMieter = (dbMieter: any): Mieter => ({
-    id: dbMieter.id,
-    wohnungId: dbMieter.wohnung_id,
-    anrede: dbMieter.anrede || 'familie',
-    name: dbMieter.name,
-    email: dbMieter.email,
-    telefon: dbMieter.telefon,
-    einzugsDatum: dbMieter.einzugs_datum,
-    mieteBis: dbMieter.miete_bis,
-    kaltmiete: Number(dbMieter.kaltmiete),
-    nebenkosten: Number(dbMieter.nebenkosten),
-    kaution: Number(dbMieter.kaution),
-    isKurzzeitvermietung: dbMieter.is_kurzzeitvermietung,
-    kurzzeitBis: dbMieter.kurzzeit_bis,
-    isAktiv: dbMieter.is_aktiv,
-    prozentanteil: dbMieter.prozentanteil
-      ? Number(dbMieter.prozentanteil)
-      : undefined,
-  });
-
-  const mapDBToZaehler = (db: any): Zaehler => ({
-    id: db.id,
-    wohnungId: db.wohnung_id,
-    wohnungNr: db.wohnungnr,
-    geschoss: db.geschoss,
-    montageort: db.montageort,
-    geraeteart: db.geraeteart,
-    geraetnummer: db.geraetnummer,
-    geeichtBis: db.geeicht_bis,
-    hersteller: db.hersteller ?? undefined,
-    typ: db.typ ?? undefined,
-    zaehlerart: db.zaehlerart,
-    einbaudatum: db.einbaudatum,
-    aktuellerStand: db.aktueller_stand,
-    standDatum: db.stand_datum,
-  });
-
-  const mapDBToRauchmelder = (db: any): Rauchmelder => ({
-    id: db.id,
-    wohnungId: db.wohnung_id,
-    wohnungNr: db.wohnungnr,
-    geschoss: db.geschoss,
-    montageort: db.montageort,
-    geraeteart: db.geraeteart,
-    geraetnummer: db.geraetnummer,
-    lebensdauerBis: db.lebensdauer_bis,
-    hersteller: db.hersteller ?? undefined,
-    typ: db.typ ?? undefined,
-    modell: db.modell,
-    einbaudatum: db.einbaudatum,
-    letztewartung: db.letzte_wartung,
-    naechsteWartung: db.naechste_wartung,
-    batteriGeWechselt: db.batterie_gewechselt,
-    status: db.status,
-  });
-
-  const mapDBToRechnung = (db: any): Rechnung => ({
-    id: db.id,
-    userId: db.user_id,
-    nummer: db.nummer,
-    datum: db.datum,
-    empfaengerName: db.empfaenger_name,
-    empfaengerAdresse: db.empfaenger_adresse,
-    positionen: (db.positionen ?? []) as RechnungsPosition[],
-    bemerkung: db.bemerkung ?? "",
-    status: db.status,
-    createdAt: db.created_at,
-    updatedAt: db.updated_at,
-  });
-
-  const mapDBToExpense = (db: any): Expense => ({
-    id: db.id,
-    userId: db.user_id,
-    objektId: db.objekt_id,
-    kostenart: db.kostenart,
-    betrag: Number(db.betrag),
-    zeitraumVon: db.zeitraum_von,
-    zeitraumBis: db.zeitraum_bis,
-    verteilerschluessel: db.verteilerschluessel,
-    rechnungId: db.rechnung_id ?? null,
-    notiz: db.notiz ?? null,
-    createdAt: db.created_at,
-    updatedAt: db.updated_at,
-  });
-
-  const mapDBToBuchung = (db: any): Buchung => ({
-    id: db.id,
-    userId: db.user_id,
-    typ: db.typ,
-    kategorie: db.kategorie,
-    datum: db.datum,
-    betragNetto: Number(db.betrag_netto),
-    mwstProzent: db.mwst_prozent ?? 0,
-    betragBrutto: Number(db.betrag_brutto),
-    objektId: db.objekt_id ?? null,
-    wohnungId: db.wohnung_id ?? null,
-    mieterId: db.mieter_id ?? null,
-    beschreibung: db.beschreibung,
-    rechnungssteller: db.rechnungssteller ?? null,
-    rechnungsnummer: db.rechnungsnummer ?? null,
-    belegPfad: db.beleg_pfad ?? null,
-    stornoVon: db.storno_von ?? null,
-    legacyRechnungId: db.legacy_rechnung_id ?? null,
-    legacyStatus: db.legacy_status ?? null,
-    createdAt: db.created_at,
-    updatedAt: db.updated_at,
-  });
+  }, []);
 
   // Lade alle Daten von Supabase
   const refreshData = async () => {
@@ -734,8 +738,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
       // Zahlungen laden (für Dashboard-Anzeige beim initialen Laden)
       try {
-        const { createClient } = await import("@/lib/supabase/client");
-        const supabase = createClient();
+        const supabase = createSupabaseClient();
         if (supabase) {
           const { data: zahlungenData } = await supabase
             .from("zahlungen")
@@ -1512,52 +1515,64 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const contextValue = useMemo(
+    () => ({
+      objekte,
+      wohnungen,
+      mieter,
+      ehemaligeMieter,
+      expenses,
+      selectedObjektId,
+      loading,
+      addObjekt,
+      updateObjekt,
+      deleteObjekt,
+      addWohnung,
+      updateWohnung,
+      deleteWohnung,
+      addMieter,
+      updateMieter,
+      deleteMieter,
+      archiviereMieter,
+      reaktiviereMieter,
+      addExpense,
+      updateExpense,
+      deleteExpense,
+      zaehler,
+      rauchmelder,
+      rechnungen,
+      buchungen,
+      addZaehler,
+      updateZaehler,
+      deleteZaehler,
+      addRauchmelder,
+      updateRauchmelder,
+      deleteRauchmelder,
+      addRechnung,
+      updateRechnung,
+      deleteRechnung,
+      addBuchung,
+      updateBuchung,
+      deleteBuchung,
+      zahlungen: zahlungenState,
+      setZahlungen: setZahlungenState,
+      setSelectedObjektId,
+      refreshData,
+    }),
+    // Only state values as deps — functions are intentionally excluded because they
+    // are recreated on every render (not yet in useCallback). Including only state
+    // ensures the context value is stable when no data has actually changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      objekte, wohnungen, mieter, ehemaligeMieter, expenses,
+      selectedObjektId, loading, zaehler, rauchmelder,
+      rechnungen, buchungen, zahlungenState,
+    ],
+  );
+
   return (
-    <AppDataContext.Provider
-      value={{
-        objekte,
-        wohnungen,
-        mieter,
-        ehemaligeMieter,
-        expenses,
-        selectedObjektId,
-        loading,
-        addObjekt,
-        updateObjekt,
-        deleteObjekt,
-        addWohnung,
-        updateWohnung,
-        deleteWohnung,
-        addMieter,
-        updateMieter,
-        deleteMieter,
-        archiviereMieter,
-        reaktiviereMieter,
-        addExpense,
-        updateExpense,
-        deleteExpense,
-        zaehler,
-        rauchmelder,
-        rechnungen,
-        buchungen,
-        addZaehler,
-        updateZaehler,
-        deleteZaehler,
-        addRauchmelder,
-        updateRauchmelder,
-        deleteRauchmelder,
-        addRechnung,
-        updateRechnung,
-        deleteRechnung,
-        addBuchung,
-        updateBuchung,
-        deleteBuchung,
-        zahlungen: zahlungenState,
-        setZahlungen: setZahlungenState,
-        setSelectedObjektId,
-        refreshData,
-      }}
-    >
+    <AppDataContext.Provider value={contextValue}>
       {children}
     </AppDataContext.Provider>
   );

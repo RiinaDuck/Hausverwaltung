@@ -30,6 +30,11 @@
 | PDF | jsPDF | `lib/pdf-generator.tsx` |
 | DATEV Import | Custom CSV parser | `lib/parseDatev.ts` |
 
+## Dependency Management
+- NEVER update Next.js, @supabase/ssr, or other core 
+  dependencies without explicit user request.
+- Current working versions are locked — do not upgrade.
+
 ## Known Environment Variables
 
 ```

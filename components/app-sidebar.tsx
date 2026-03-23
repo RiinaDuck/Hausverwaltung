@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -15,16 +15,18 @@ import {
   Building2,
   DoorOpen,
   Users,
-  Receipt,
   Gauge,
   Landmark,
   LogOut,
-  FileText,
   BarChart3,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Archive,
   X,
+  Wallet,
+  TrendingUp,
+  Receipt,
 } from "lucide-react";
 import type { AppView } from "@/components/app-dashboard";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -38,18 +40,21 @@ interface AppSidebarProps {
   onClose?: () => void;
 }
 
-const navItems = [
+const navItemsBefore = [
   { id: "dashboard" as const, label: "Dashboard", icon: Home },
   { id: "objekte" as const, label: "Objekte", icon: Building2 },
   { id: "wohnungen" as const, label: "Wohnungen", icon: DoorOpen },
   { id: "mieter" as const, label: "Mieter", icon: Users },
-  { id: "nebenkosten" as const, label: "Nebenkosten", icon: Receipt },
-  { id: "rechnungen" as const, label: "Rechnungen", icon: FileText },
+];
+
+const navItemsAfter = [
   { id: "zaehler" as const, label: "Zähler", icon: Gauge },
   { id: "statistiken" as const, label: "Statistiken", icon: BarChart3 },
   { id: "hausmanager" as const, label: "Hausmanager", icon: Landmark },
   { id: "archiv" as const, label: "Archiv", icon: Archive, dividerBefore: true },
 ];
+
+const FINANZEN_VIEWS = ["einnahmen-ausgaben", "nebenkosten"] as const;
 
 
 export function AppSidebar({
@@ -60,24 +65,27 @@ export function AppSidebar({
   onClose,
 }: AppSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [finanzenOpen, setFinanzenOpen] = useState(
+    FINANZEN_VIEWS.includes(currentView as (typeof FINANZEN_VIEWS)[number]),
+  );
   const isMobile = useIsMobile();
   const { profile, getInitials, logout } = useAuth();
 
   // Handle navigation on mobile - close sidebar after selection
-  const handleNavigate = (view: AppView) => {
+  const handleNavigate = useCallback((view: AppView) => {
     onNavigate(view);
     if (isMobile && onClose) {
       onClose();
     }
-  };
+  }, [onNavigate, isMobile, onClose]);
 
   // Handle logout and switch to landing
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout();
     if (onSwitchToLanding) {
       onSwitchToLanding();
     }
-  };
+  }, [logout, onSwitchToLanding]);
 
   // Prevent body scroll when mobile sidebar is open
   useEffect(() => {
@@ -181,7 +189,8 @@ export function AppSidebar({
             !isMobile && isCollapsed && "px-2",
           )}
         >
-          {navItems.map((item) => {
+          {/* Items before Finanzen group */}
+          {navItemsBefore.map((item) => {
             const button = (
               <Button
                 key={item.id}
@@ -209,8 +218,7 @@ export function AppSidebar({
                 </span>
               </Button>
             );
-
-            const itemContent = !isMobile && isCollapsed ? (
+            return !isMobile && isCollapsed ? (
               <Tooltip key={item.id}>
                 <TooltipTrigger asChild>{button}</TooltipTrigger>
                 <TooltipContent side="right" className="font-medium">
@@ -218,20 +226,137 @@ export function AppSidebar({
                 </TooltipContent>
               </Tooltip>
             ) : (
-              button
+              <div key={item.id}>{button}</div>
             );
+          })}
 
+          {/* Finanzen expandable group */}
+          {!isMobile && isCollapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full h-10 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-300 justify-center px-0",
+                    FINANZEN_VIEWS.includes(
+                      currentView as (typeof FINANZEN_VIEWS)[number],
+                    ) && "bg-sidebar-accent text-sidebar-foreground",
+                  )}
+                  onClick={() => handleNavigate("einnahmen-ausgaben")}
+                >
+                  <Wallet className="h-4 w-4 shrink-0" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="font-medium">
+                Finanzen
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <div>
+              {/* Group header */}
+              <Button
+                variant="ghost"
+                className={cn(
+                  "w-full h-10 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-300 justify-start gap-3",
+                  FINANZEN_VIEWS.includes(
+                    currentView as (typeof FINANZEN_VIEWS)[number],
+                  ) && "text-sidebar-foreground",
+                )}
+                onClick={() => setFinanzenOpen((o) => !o)}
+              >
+                <Wallet className="h-4 w-4 shrink-0" />
+                <span className="text-sm flex-1 text-left whitespace-nowrap">
+                  Finanzen
+                </span>
+                <ChevronDown
+                  className={cn(
+                    "h-3 w-3 transition-transform",
+                    finanzenOpen && "rotate-180",
+                  )}
+                />
+              </Button>
+              {/* Sub-items */}
+              {finanzenOpen && (
+                <div className="ml-4 mt-0.5 space-y-0.5 border-l border-sidebar-border pl-2">
+                  <Button
+                    variant="ghost"
+                    className={cn(
+                      "w-full h-9 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-300 justify-start gap-3",
+                      currentView === "einnahmen-ausgaben" &&
+                        "bg-sidebar-accent text-sidebar-foreground",
+                    )}
+                    onClick={() => handleNavigate("einnahmen-ausgaben")}
+                  >
+                    <TrendingUp className="h-4 w-4 shrink-0" />
+                    <span className="text-sm whitespace-nowrap">
+                      Einnahmen/Ausgaben
+                    </span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className={cn(
+                      "w-full h-9 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-300 justify-start gap-3",
+                      currentView === "nebenkosten" &&
+                        "bg-sidebar-accent text-sidebar-foreground",
+                    )}
+                    onClick={() => handleNavigate("nebenkosten")}
+                  >
+                    <Receipt className="h-4 w-4 shrink-0" />
+                    <span className="text-sm whitespace-nowrap">Nebenkosten</span>
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Items after Finanzen group */}
+          {navItemsAfter.map((item) => {
+            const button = (
+              <Button
+                key={item.id}
+                variant="ghost"
+                className={cn(
+                  "w-full h-10 text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-all duration-300",
+                  currentView === item.id &&
+                    "bg-sidebar-accent text-sidebar-foreground",
+                  !isMobile && isCollapsed
+                    ? "justify-center px-0"
+                    : "justify-start gap-3",
+                )}
+                onClick={() => handleNavigate(item.id)}
+              >
+                <item.icon className="h-4 w-4 shrink-0" />
+                <span
+                  className={cn(
+                    "text-sm transition-all duration-300 overflow-hidden whitespace-nowrap",
+                    !isMobile && isCollapsed
+                      ? "w-0 opacity-0"
+                      : "w-auto opacity-100",
+                  )}
+                >
+                  {item.label}
+                </span>
+              </Button>
+            );
+            const content = !isMobile && isCollapsed ? (
+              <Tooltip key={item.id}>
+                <TooltipTrigger asChild>{button}</TooltipTrigger>
+                <TooltipContent side="right" className="font-medium">
+                  {item.label}
+                </TooltipContent>
+              </Tooltip>
+            ) : (
+              <div key={item.id}>{button}</div>
+            );
             return (
               <div key={item.id}>
                 {(item as any).dividerBefore && (
                   <div className="my-2 border-t border-sidebar-border" />
                 )}
-                {itemContent}
+                {content}
               </div>
             );
           })}
-
-
         </nav>
 
         {/* User Profile */}
