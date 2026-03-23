@@ -45,6 +45,7 @@ import {
   Save,
   ChevronDown,
   Check,
+  TrendingUp,
 } from "lucide-react";
 import type { AppView } from "@/components/app-dashboard";
 import { useAppData } from "@/context/app-data-context";
@@ -297,6 +298,38 @@ const helpSections: HelpSection[] = [
         name: "PDF-Export",
         description:
           "Erstellt für jede Einheit eine individuelle, druckfertige Nebenkostenabrechnung als PDF.",
+      },
+    ],
+  },
+  {
+    id: "einnahmen-ausgaben",
+    title: "Finanzen – Einnahmen & Ausgaben",
+    icon: <TrendingUp className="h-4 w-4" />,
+    description:
+      "Verwalten Sie alle Einnahmen und Ausgaben Ihrer Objekte. Buchen Sie Mieteinnahmen auf Knopfdruck oder erfassen Sie einzelne Buchungen manuell.",
+    fields: [
+      {
+        name: "Typ",
+        description: "Einnahme (z.B. Mieteinnahme) oder Ausgabe (z.B. Reparatur).",
+      },
+      {
+        name: "Kategorie",
+        description:
+          "Einnahmen: Mieteinnahmen, Kaution, NK-Vorauszahlung, Sonstige. Ausgaben: Betriebskosten, Versicherung, Reparaturen u.v.m.",
+      },
+      {
+        name: "Rechnungssteller",
+        description: "Für Ausgaben: Name der ausstellenden Firma oder Person.",
+      },
+      {
+        name: "Mieten buchen",
+        description:
+          "Öffnet einen Dialog mit allen aktiven Mietern – mit einem Klick werden Mieteinnahmen für den gewählten Monat gebucht.",
+      },
+      {
+        name: "Storno",
+        description:
+          "Erstellt eine Gegenbuchung mit negativem Betrag (nur für Ausgaben). Die ursprüngliche Buchung wird als 'storniert' markiert.",
       },
     ],
   },
@@ -564,13 +597,11 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
           <Menu className="h-5 w-5" />
         </Button>
         <h1 className="text-base md:text-xl font-semibold truncate">
-          {currentView === "dashboard" && currentObjekt
-            ? `Dashboard – ${currentObjekt.name}`
-            : viewTitles[currentView]}
+          {viewTitles[currentView]}
         </h1>
       </div>
       <div className="flex items-center gap-2 md:gap-4">
-        {objekte.length > 0 && (
+        {objekte.length > 0 && currentView !== "dashboard" && (
           <div className="hidden sm:flex items-center">
             <Popover open={objektPopoverOpen} onOpenChange={setObjektPopoverOpen}>
               <PopoverTrigger asChild>

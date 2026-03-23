@@ -8,11 +8,11 @@ const withBundleAnalyzer = bundleAnalyzer({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ["nodemailer", "resend", "svix", "postal-mime"],
+  serverExternalPackages: ["resend", "svix", "postal-mime"],
   turbopack: {
-    // pnpm virtual store uses lowercase "hausverwaltung" path; going up one level
+    // pnpm virtual store uses lowercase "hausverwaltung" path; the project root
     // ensures Turbopack's case-sensitive root check passes for the symlink targets
-    root: resolve(fileURLToPath(import.meta.url), "..", ".."),
+    root: resolve(fileURLToPath(import.meta.url), ".."),
   },
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "",

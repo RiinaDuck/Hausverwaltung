@@ -61,6 +61,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useAppData, type Rechnung, type RechnungsPosition, type Objekt, type Wohnung, type Mieter } from "@/context/app-data-context";
 import { useIsMobile } from "@/hooks/use-mobile";
 
+// Pure calculation helpers — module scope for stable references, no closure over state
+function calculatePositionTotal(pos: RechnungsPosition): number {
+  return pos.menge * pos.einzelpreis;
+}
+function calculateNetto(positionen: RechnungsPosition[]): number {
+  return positionen.reduce((sum, p) => sum + p.menge * p.einzelpreis, 0);
+}
+function calculateMwst(netto: number): number { return netto * 0.19; }
+function calculateBrutto(netto: number): number { return netto * 1.19; }
+
 const KOSTENART_OPTIONS = [
   "Miete",
   "Nebenkosten",
@@ -131,21 +141,6 @@ export function RechnungenView() {
     mwstProzent: 19,
   });
 
-  // Memoized calculation functions
-  const calculatePositionTotal = useMemo(
-    () => (pos: RechnungsPosition) => pos.menge * pos.einzelpreis,
-    [],
-  );
-
-  const calculateNetto = useMemo(
-    () => (positionen: RechnungsPosition[]) =>
-      positionen.reduce((sum, p) => sum + p.menge * p.einzelpreis, 0),
-    [],
-  );
-
-  const calculateMwst = useMemo(() => (netto: number) => netto * 0.19, []);
-  const calculateBrutto = useMemo(() => (netto: number) => netto * 1.19, []);
-
   // Count active filters
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -205,7 +200,7 @@ export function RechnungenView() {
 
       return true;
     });
-  }, [rechnungen, filter, calculateNetto, calculateBrutto]);
+  }, [rechnungen, filter]);
 
   // Reset filters
   const handleResetFilters = () => {
@@ -239,7 +234,7 @@ export function RechnungenView() {
         return sum + calculateBrutto(netto);
       }, 0);
     return { gesamt, offen, bezahlt, count: filteredRechnungen.length };
-  }, [filteredRechnungen, calculateNetto, calculateBrutto]);
+  }, [filteredRechnungen]);
 
   const handleExportPDF = (rechnung: Rechnung) => {
     try {

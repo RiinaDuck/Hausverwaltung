@@ -395,47 +395,8 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
     }
   }, [selectedMieter]);
 
-  // Zahlungen beim Start aus Supabase laden (nur wenn NICHT Demo-Modus und NICHT Admin)
-  useEffect(() => {
-    if (!selectedObjektId || isDemo || isAdmin) return;
-    const loadZahlungen = async () => {
-      try {
-        const supabase = createClient();
-        if (!supabase) {
-          toast({ title: "Supabase nicht konfiguriert", description: "Zahlungen konnten nicht geladen werden.", variant: "destructive" });
-          return;
-        }
-        const { data, error } = await supabase
-          .from("zahlungen")
-          .select("*")
-          .order("buchungsdatum", { ascending: false });
-        if (error) {
-          toast({ title: "Laden fehlgeschlagen", description: `Zahlungen: ${error.message}`, variant: "destructive" });
-          return;
-        }
-      if (!data || data.length === 0) return;
-      const loaded: ZahlungEintrag[] = data.map((row: any) => ({
-        id: row.id,
-        mieterId: row.mieter_id ?? "unbekannt",
-        monat: row.monat ?? "",
-        faelligkeitsdatum: row.monat ? `${row.monat}-01` : "",
-        sollBetrag: row.soll_betrag ?? 0,
-        istBetrag: row.betrag ?? 0,
-        buchungsdatum: row.buchungsdatum ?? "",
-        wertstellungsdatum: row.wertstellungsdatum ?? "",
-        verwendungszweck: row.verwendungszweck ?? "",
-        ibanAbsender: row.auftraggeber_iban ?? "",
-        auftraggeber: row.auftraggeber_name ?? "",
-        referenz: row.zahlungsreferenz ?? "",
-        status: (row.status as ZahlungEintrag["status"]) ?? "ausstehend",
-      }));
-      setZahlungen(loaded);
-      } catch (err) {
-        toast({ title: "Laden fehlgeschlagen", description: err instanceof Error ? err.message : "Unbekannter Fehler", variant: "destructive" });
-      }
-    };
-    loadZahlungen();
-  }, [selectedObjektId, isDemo, isAdmin]);
+  // Zahlungen are already loaded by AppDataContext.refreshData and exposed via the
+  // `zahlungen` context value — no duplicate fetch needed here.
 
   // Events für den aktuellen Mieter laden wenn Historie-Tab geöffnet wird
   useEffect(() => {

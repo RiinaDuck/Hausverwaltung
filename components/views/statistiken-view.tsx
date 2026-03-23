@@ -62,9 +62,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAppData } from "@/context/app-data-context";
-import * as XLSX from "xlsx";
-import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
+// xlsx, jsPDF, html2canvas are loaded lazily inside their export handlers (see handleExport / handlePDFExport)
 import {
   BarChart,
   Bar,
@@ -609,6 +607,8 @@ export function StatistikenView() {
   };
 
   const handleExport = async () => {
+    // xlsx loaded lazily to avoid adding ~600 KB to the initial bundle
+    const XLSX = await import("xlsx");
     // Erstelle Excel Workbook
     const wb = XLSX.utils.book_new();
 
@@ -776,6 +776,9 @@ export function StatistikenView() {
 
   const handlePDFExport = async () => {
     try {
+      // jsPDF and html2canvas loaded lazily to avoid ~400 KB on the initial bundle
+      const { default: jsPDF } = await import("jspdf");
+      const { default: html2canvas } = await import("html2canvas");
       const pdf = new jsPDF("p", "mm", "a4");
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
