@@ -433,6 +433,7 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
       return;
     }
     const loadVertraegeData = async () => {
+      if (selectedMieter.id.startsWith("demo-")) { setVertraege([]); setVertraegeLoading(false); return; }
       const supabase = createClient();
       if (!supabase) return;
       setVertraegeLoading(true);

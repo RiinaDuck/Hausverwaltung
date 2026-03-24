@@ -455,6 +455,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const loadFotos = useCallback(async (wohnungId: string) => {
+    if (wohnungId.startsWith("demo-")) { setFotos([]); return; }
     const supabase = createClient();
     if (!supabase) return;
     setFotosLoading(true);
