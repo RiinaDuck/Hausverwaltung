@@ -384,7 +384,6 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     addWohnung,
     updateWohnung,
     deleteWohnung,
-    addMieter,
     addZaehler,
     updateZaehler,
     deleteZaehler,
@@ -592,19 +591,6 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
   };
   const [newUnit, setNewUnit] = useState(initialNewUnit);
 
-  // "Mieter zuordnen" section state for the new unit dialog
-  const [newUnitMieterOption, setNewUnitMieterOption] = useState<"jetzt" | "spaeter">("jetzt");
-  const initialNewUnitMieter = {
-    anrede: "herr" as string,
-    name: "",
-    einzugsDatum: new Date().toISOString().split("T")[0],
-    kaution: 0,
-  };
-  const [newUnitMieter, setNewUnitMieter] = useState(initialNewUnitMieter);
-
-  // Track wohnungs that were created as "vermietet" but without a mieter
-  const [unlinkedVermietetIds, setUnlinkedVermietetIds] = useState<Set<string>>(new Set());
-
   // Archive dialog state
   const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
   const [archiveDialogData, setArchiveDialogData] = useState<{
@@ -766,18 +752,6 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
       return;
     }
 
-    // Validate mieter fields when "jetzt anlegen" is chosen
-    if (newUnit.status === "vermietet" && newUnitMieterOption === "jetzt") {
-      if (!newUnitMieter.name.trim()) {
-        toast({
-          title: "Pflichtfeld fehlt",
-          description: "Bitte geben Sie den Namen des Mieters ein.",
-          variant: "destructive",
-        });
-        return;
-      }
-    }
-
     const dbStatus: "leer" | "vermietet" | "eigennutzung" =
       newUnit.status === "frei"
         ? "leer"
@@ -797,44 +771,8 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
         status: dbStatus,
       });
 
-      // If status is "vermietet" and user chose "jetzt anlegen", create mieter
-      if (newUnit.status === "vermietet" && newUnitMieterOption === "jetzt") {
-        // Find the newly created wohnung (last added with matching bezeichnung)
-        const newWohnungInList = wohnungen
-          .filter((w) => w.objektId === selectedObjektId && w.bezeichnung === (newUnit.lage || "Neue Einheit"))
-          .sort((a, b) => b.id.localeCompare(a.id))[0];
-
-        if (newWohnungInList) {
-          await addMieter({
-            wohnungId: newWohnungInList.id,
-            anrede: newUnitMieter.anrede,
-            name: newUnitMieter.name,
-            email: "",
-            telefon: "",
-            einzugsDatum: newUnitMieter.einzugsDatum || new Date().toISOString().split("T")[0],
-            mieteBis: null,
-            kaltmiete: newUnit.miete || 0,
-            nebenkosten: 150,
-            kaution: newUnitMieter.kaution || 0,
-            isKurzzeitvermietung: false,
-            isAktiv: true,
-            prozentanteil: 0,
-          });
-        }
-      } else if (newUnit.status === "vermietet" && newUnitMieterOption === "spaeter") {
-        // Mark as needing mieter assignment — find newly added wohnung
-        const newWohnungInList = wohnungen
-          .filter((w) => w.objektId === selectedObjektId && w.bezeichnung === (newUnit.lage || "Neue Einheit"))
-          .sort((a, b) => b.id.localeCompare(a.id))[0];
-        if (newWohnungInList) {
-          setUnlinkedVermietetIds((prev) => new Set(prev).add(newWohnungInList.id));
-        }
-      }
-
       setIsNewUnitOpen(false);
       setNewUnit(initialNewUnit);
-      setNewUnitMieter(initialNewUnitMieter);
-      setNewUnitMieterOption("jetzt");
       toast({
         title: "Einheit erstellt",
         description: `Wohneinheit "${
@@ -1108,7 +1046,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
       <div className="flex items-center justify-center h-[calc(100vh-12rem)]">
         <Card className="p-8 text-center">
           <Home className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-lg font-semibold mb-2">Kein Objekt ausgewählt</h2>
+          <h2 className="text-[15px] font-medium mb-2">Kein Objekt ausgewählt</h2>
           <p className="text-muted-foreground">
             Bitte wählen Sie oben ein Objekt aus, um die Wohnungen anzuzeigen.
           </p>
@@ -1122,7 +1060,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     <div className="flex items-center justify-center h-[calc(100vh-12rem)]">
       <Card className="p-8 text-center">
         <Home className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h2 className="text-lg font-semibold mb-2">Keine Wohnungen</h2>
+        <h2 className="text-[15px] font-medium mb-2">Keine Wohnungen</h2>
         <p className="text-muted-foreground mb-4">
           Für &quot;{currentObjekt?.name}&quot; sind noch keine Wohnungen
           angelegt.
@@ -1231,7 +1169,6 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       ...prev,
                       status: value as "frei" | "vermietet" | "renovierung",
                     }));
-                    if (value !== "vermietet") setNewUnitMieterOption("jetzt");
                   }}
                 >
                   <SelectTrigger id="new-status-empty">
@@ -1246,100 +1183,6 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
               </div>
             </div>
 
-            {/* Mieter zuordnen – nur bei Status "Vermietet" */}
-            {newUnit.status === "vermietet" && (
-              <div className="rounded-lg border bg-muted/40 p-3 space-y-3">
-                <p className="text-sm font-medium">Mieter zuordnen</p>
-                <div className="flex flex-col gap-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="mieterOption-empty"
-                      value="jetzt"
-                      checked={newUnitMieterOption === "jetzt"}
-                      onChange={() => setNewUnitMieterOption("jetzt")}
-                      className="accent-primary"
-                    />
-                    <span className="text-sm">Jetzt Mieter anlegen</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="mieterOption-empty"
-                      value="spaeter"
-                      checked={newUnitMieterOption === "spaeter"}
-                      onChange={() => setNewUnitMieterOption("spaeter")}
-                      className="accent-primary"
-                    />
-                    <span className="text-sm">Später zuordnen</span>
-                  </label>
-                </div>
-
-                {newUnitMieterOption === "jetzt" && (
-                  <div className="grid gap-2 pt-1">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <Label htmlFor="nm-anrede-empty" className="text-xs">Anrede</Label>
-                        <Select
-                          value={newUnitMieter.anrede}
-                          onValueChange={(v) => setNewUnitMieter((p) => ({ ...p, anrede: v }))}
-                        >
-                          <SelectTrigger id="nm-anrede-empty" className="h-8 text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="herr">Herr</SelectItem>
-                            <SelectItem value="frau">Frau</SelectItem>
-                            <SelectItem value="divers">Divers</SelectItem>
-                            <SelectItem value="familie">Familie</SelectItem>
-                            <SelectItem value="firma">Firma</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="nm-name-empty" className="text-xs">Name *</Label>
-                        <Input
-                          id="nm-name-empty"
-                          className="h-8 text-sm"
-                          placeholder="Mustermann"
-                          value={newUnitMieter.name}
-                          onChange={(e) => setNewUnitMieter((p) => ({ ...p, name: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <Label htmlFor="nm-einzug-empty" className="text-xs">Einzugsdatum</Label>
-                        <Input
-                          id="nm-einzug-empty"
-                          type="date"
-                          className="h-8 text-sm"
-                          value={newUnitMieter.einzugsDatum}
-                          onChange={(e) => setNewUnitMieter((p) => ({ ...p, einzugsDatum: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="nm-kaution-empty" className="text-xs">Kaution (€)</Label>
-                        <Input
-                          id="nm-kaution-empty"
-                          type="number"
-                          className="h-8 text-sm"
-                          value={newUnitMieter.kaution}
-                          onChange={(e) => setNewUnitMieter((p) => ({ ...p, kaution: Number.parseFloat(e.target.value) || 0 }))}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {newUnitMieterOption === "spaeter" && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3 shrink-0" />
-                    Die Einheit wird als vermietet markiert. In der Liste erscheint ein Hinweis, dass noch kein Mieter zugeordnet ist.
-                  </p>
-                )}
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsNewUnitOpen(false)}>
@@ -1424,7 +1267,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                           {statusConfig[unit.status].label}
                         </Badge>
                       )}
-                      {unlinkedVermietetIds.has(unit.id) && (
+                      {unit.status === "vermietet" && !mieter.some((m) => m.wohnungId === unit.id && m.isAktiv !== false) && (
                         <Badge
                           variant="outline"
                           className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/20 flex items-center gap-1"
@@ -1634,14 +1477,30 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                 const unitMieter = mieter.filter(
                   (m) => m.wohnungId === selectedUnit.id && m.isAktiv !== false
                 );
-                if (unitMieter.length === 0) return (
-                  <Card className="border-dashed">
-                    <CardContent className="py-4 flex items-center gap-3 text-muted-foreground">
-                      <Users className="h-5 w-5" />
-                      <span className="text-sm">Kein Mieter zugeordnet</span>
-                    </CardContent>
-                  </Card>
-                );
+                if (unitMieter.length === 0) {
+                  if (selectedUnit.status !== "vermietet") return null;
+                  return (
+                    <Card className="border-amber-200 bg-amber-50">
+                      <CardContent className="pt-5 pb-4">
+                        <div className="flex gap-4">
+                          <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+                          <div className="flex-1">
+                            <h4 className="font-medium text-amber-900 mb-1">Kein Mieter zugeordnet</h4>
+                            <p className="text-sm text-amber-800 mb-3">Wohnung ist als vermietet markiert, aber es wurde noch kein Mieter hinterlegt.</p>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="border-amber-500 text-amber-700 hover:bg-amber-100"
+                              onClick={() => onNavigate?.("mieter")}
+                            >
+                              Mieter anlegen →
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                }
                 return unitMieter.map((m) => (
                   <Card
                     key={m.id}
@@ -1891,7 +1750,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             <TableRow key={z.id}>
                               <TableCell>{z.montageort}</TableCell>
                               <TableCell className="text-sm">{z.geraeteart}</TableCell>
-                              <TableCell className="hidden md:table-cell font-mono text-xs">{z.geraetnummer}</TableCell>
+                              <TableCell className="hidden md:table-cell font-mono text-sm">{z.geraetnummer}</TableCell>
                               <TableCell>{formatDateGerman(z.geeichtBis)}</TableCell>
                               <TableCell>
                                 <div className="flex gap-1">
@@ -2121,7 +1980,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             <TableRow key={r.id}>
                               <TableCell>{r.montageort}</TableCell>
                               <TableCell className="text-sm">{r.geraeteart}</TableCell>
-                              <TableCell className="hidden md:table-cell font-mono text-xs">{r.geraetnummer}</TableCell>
+                              <TableCell className="hidden md:table-cell font-mono text-sm">{r.geraetnummer}</TableCell>
                               <TableCell>{formatDateGerman(r.naechsteWartung) !== "-" ? formatDateGerman(r.naechsteWartung) : formatDateGerman(r.lebensdauerBis)}</TableCell>
                               <TableCell>
                                 <div className="flex gap-1">
@@ -2547,7 +2406,6 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       ...prev,
                       status: value as "frei" | "vermietet" | "renovierung",
                     }));
-                    if (value !== "vermietet") setNewUnitMieterOption("jetzt");
                   }}
                 >
                   <SelectTrigger id="new-status">
@@ -2562,100 +2420,6 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
               </div>
             </div>
 
-            {/* Mieter zuordnen – nur bei Status "Vermietet" */}
-            {newUnit.status === "vermietet" && (
-              <div className="rounded-lg border bg-muted/40 p-3 space-y-3">
-                <p className="text-sm font-medium">Mieter zuordnen</p>
-                <div className="flex flex-col gap-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="mieterOption"
-                      value="jetzt"
-                      checked={newUnitMieterOption === "jetzt"}
-                      onChange={() => setNewUnitMieterOption("jetzt")}
-                      className="accent-primary"
-                    />
-                    <span className="text-sm">Jetzt Mieter anlegen</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="mieterOption"
-                      value="spaeter"
-                      checked={newUnitMieterOption === "spaeter"}
-                      onChange={() => setNewUnitMieterOption("spaeter")}
-                      className="accent-primary"
-                    />
-                    <span className="text-sm">Später zuordnen</span>
-                  </label>
-                </div>
-
-                {newUnitMieterOption === "jetzt" && (
-                  <div className="grid gap-2 pt-1">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <Label htmlFor="nm-anrede" className="text-xs">Anrede</Label>
-                        <Select
-                          value={newUnitMieter.anrede}
-                          onValueChange={(v) => setNewUnitMieter((p) => ({ ...p, anrede: v }))}
-                        >
-                          <SelectTrigger id="nm-anrede" className="h-8 text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="herr">Herr</SelectItem>
-                            <SelectItem value="frau">Frau</SelectItem>
-                            <SelectItem value="divers">Divers</SelectItem>
-                            <SelectItem value="familie">Familie</SelectItem>
-                            <SelectItem value="firma">Firma</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="nm-name" className="text-xs">Name *</Label>
-                        <Input
-                          id="nm-name"
-                          className="h-8 text-sm"
-                          placeholder="Mustermann"
-                          value={newUnitMieter.name}
-                          onChange={(e) => setNewUnitMieter((p) => ({ ...p, name: e.target.value }))}
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <Label htmlFor="nm-einzug" className="text-xs">Einzugsdatum</Label>
-                        <Input
-                          id="nm-einzug"
-                          type="date"
-                          className="h-8 text-sm"
-                          value={newUnitMieter.einzugsDatum}
-                          onChange={(e) => setNewUnitMieter((p) => ({ ...p, einzugsDatum: e.target.value }))}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label htmlFor="nm-kaution" className="text-xs">Kaution (€)</Label>
-                        <Input
-                          id="nm-kaution"
-                          type="number"
-                          className="h-8 text-sm"
-                          value={newUnitMieter.kaution}
-                          onChange={(e) => setNewUnitMieter((p) => ({ ...p, kaution: Number.parseFloat(e.target.value) || 0 }))}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {newUnitMieterOption === "spaeter" && (
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <AlertCircle className="h-3 w-3 shrink-0" />
-                    Die Einheit wird als vermietet markiert. In der Liste erscheint ein Hinweis, dass noch kein Mieter zugeordnet ist.
-                  </p>
-                )}
-              </div>
-            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsNewUnitOpen(false)}>
@@ -2678,7 +2442,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
             <DialogTitle>Mieter archivieren?</DialogTitle>
             <DialogDescription>
               Diese Wohnung ist aktuell von{" "}
-              <span className="font-semibold">{archiveDialogData?.activeMieter?.name}</span>{" "}
+              <span className="font-medium">{archiveDialogData?.activeMieter?.name}</span>{" "}
               bewohnt. Was soll mit dem Mietverhältnis passieren?
             </DialogDescription>
           </DialogHeader>
@@ -2774,7 +2538,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                 <CardContent className="pt-4 pb-4">
                   <div className="flex gap-3">
                     <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs font-semibold text-primary">{partner.initials}</span>
+                      <span className="text-xs font-medium text-primary">{partner.initials}</span>
                     </div>
                     <div className="flex-1">
                       <h3 className="font-medium text-sm">{partner.name}</h3>
@@ -2859,7 +2623,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                 <CardContent className="pt-4 pb-4">
                   <div className="flex gap-3">
                     <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs font-semibold text-primary">{partner.initials}</span>
+                      <span className="text-xs font-medium text-primary">{partner.initials}</span>
                     </div>
                     <div className="flex-1">
                       <h3 className="font-medium text-sm">{partner.name}</h3>

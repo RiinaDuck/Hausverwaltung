@@ -1296,7 +1296,7 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
           <DialogHeader>
             <DialogTitle>Objekt archivieren?</DialogTitle>
             <DialogDescription>
-              Möchten Sie das Objekt <span className="font-semibold">"{objektToArchive?.name}"</span> wirklich archivieren?
+              Möchten Sie das Objekt <span className="font-medium">"{objektToArchive?.name}"</span> wirklich archivieren?
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 text-sm text-muted-foreground">

@@ -1450,7 +1450,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
       <div className="flex items-center justify-center h-[calc(100vh-12rem)]">
         <Card className="p-8 text-center">
           <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-lg font-semibold mb-2">Kein Objekt ausgewählt</h2>
+          <h2 className="text-[15px] font-medium mb-2">Kein Objekt ausgewählt</h2>
           <p className="text-muted-foreground">
             Bitte wählen Sie oben ein Objekt aus, um die Mieter anzuzeigen.
           </p>
@@ -1465,7 +1465,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
       <div className="flex items-center justify-center h-[calc(100vh-12rem)]">
         <Card className="p-8 text-center">
           <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-lg font-semibold mb-2">Keine Mieter</h2>
+          <h2 className="text-[15px] font-medium mb-2">Keine Mieter</h2>
           <p className="text-muted-foreground mb-4">
             Für &quot;{currentObjekt?.name}&quot; sind noch keine Mieter
             angelegt.
@@ -1795,7 +1795,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
               {/* Sektion: Stammdaten */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  <CardTitle className="text-[13px] font-medium text-text-secondary uppercase tracking-wide">
                     Stammdaten
                   </CardTitle>
                 </CardHeader>
@@ -1861,7 +1861,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
               {/* Sektion: Mietverhältnis */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  <CardTitle className="text-[13px] font-medium text-text-secondary uppercase tracking-wide">
                     Mietverhältnis
                   </CardTitle>
                 </CardHeader>
@@ -1964,7 +1964,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
               {/* Sektion: Mietkosten */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  <CardTitle className="text-[13px] font-medium text-text-secondary uppercase tracking-wide">
                     Mietkosten
                   </CardTitle>
                 </CardHeader>
@@ -2032,7 +2032,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
               {/* Header + Filter – fixed */}
               <div className="shrink-0 pb-4 space-y-4">
                 <div>
-                  <h3 className="text-base font-semibold">Ereignis-Protokoll</h3>
+                  <h3 className="text-[15px] font-medium">Ereignis-Protokoll</h3>
                   <p className="text-sm text-muted-foreground">
                     Zahlungen, Mahnungen und Mitteilungen für{" "}
                     {selectedMieter?.name}
@@ -3658,7 +3658,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                   <span className="absolute top-2 right-3 text-[10px] text-muted-foreground">Anzeige</span>
                   <CardContent className="pt-4 pb-4">
                     <div className="flex gap-3">
-                      <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">
+                      <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center text-sm font-medium text-text-secondary shrink-0">
                         {partner.initials}
                       </div>
                       <div className="flex-1 min-w-0 space-y-1.5">

@@ -551,7 +551,7 @@ export function EinnahmenAusgabenView() {
   const FilterSidebar = () => (
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-2">
-        <h2 className="text-lg font-semibold">
+        <h2 className="text-[15px] font-medium">
           Filter {activeFilterCount > 0 && `(${activeFilterCount})`}
         </h2>
         <Button
@@ -981,7 +981,7 @@ export function EinnahmenAusgabenView() {
               <p className="text-xs text-muted-foreground uppercase tracking-wide">
                 Gesamteinnahmen
               </p>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-2xl font-medium text-green-600">
                 {summary.einnahmen.toFixed(2)} €
               </p>
             </CardContent>
@@ -991,7 +991,7 @@ export function EinnahmenAusgabenView() {
               <p className="text-xs text-muted-foreground uppercase tracking-wide">
                 Gesamtausgaben
               </p>
-              <p className="text-2xl font-bold text-red-600">
+              <p className="text-2xl font-medium text-red-600">
                 {summary.ausgaben.toFixed(2)} €
               </p>
             </CardContent>
@@ -1002,7 +1002,7 @@ export function EinnahmenAusgabenView() {
                 Überschuss
               </p>
               <p
-                className={`text-2xl font-bold ${
+                className={`text-2xl font-medium ${
                   summary.ueberschuss >= 0 ? "text-green-600" : "text-red-600"
                 }`}
               >
@@ -1015,7 +1015,7 @@ export function EinnahmenAusgabenView() {
               <p className="text-xs text-muted-foreground uppercase tracking-wide">
                 Anzahl Buchungen
               </p>
-              <p className="text-2xl font-bold">{summary.count}</p>
+              <p className="text-2xl font-medium">{summary.count}</p>
             </CardContent>
           </Card>
         </div>

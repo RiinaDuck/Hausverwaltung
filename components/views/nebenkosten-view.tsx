@@ -294,7 +294,7 @@ export function NebenkostenView() {
               Betriebskosten{selectedObjektId ? ` (${filteredExpenses.length} Positionen)` : ""}
             </CardTitle>
             {selectedObjektId && (
-              <span className="text-sm font-semibold text-foreground">
+              <span className="text-sm font-medium text-text-primary">
                 Gesamt: {formatEuro(gesamtbetrag)}
               </span>
             )}

@@ -256,17 +256,17 @@ export function ZaehlerView() {
             </Button>
           </CardHeader>
           <CardContent className="overflow-x-auto">
-            <Table className="min-w-[700px]">
+            <Table className="min-w-[700px] table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Wohnung</TableHead>
-                  <TableHead>Montageort</TableHead>
-                  <TableHead>Geräteart</TableHead>
-                  <TableHead className="hidden md:table-cell">
+                  <TableHead style={{ width: "15%" }}>Wohnung</TableHead>
+                  <TableHead style={{ width: "20%" }}>Montageort</TableHead>
+                  <TableHead style={{ width: "20%" }}>Geräteart</TableHead>
+                  <TableHead className="hidden md:table-cell" style={{ width: "20%" }}>
                     Gerätenummer
                   </TableHead>
-                  <TableHead>Gültig bis</TableHead>
-                  <TableHead className="w-[80px]">Aktionen</TableHead>
+                  <TableHead style={{ width: "15%" }}>Gültig bis</TableHead>
+                  <TableHead style={{ width: "10%" }} className="w-[80px]">Aktionen</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -274,7 +274,7 @@ export function ZaehlerView() {
                   const wohnung = wohnungen.find((w) => w.id === zaehler.wohnungId);
                   return (
                   <TableRow key={zaehler.id}>
-                    <TableCell className="text-xs">{wohnung?.bezeichnung || wohnungLabel(zaehler.wohnungId)}</TableCell>
+                    <TableCell className="text-sm">{wohnung?.bezeichnung || wohnungLabel(zaehler.wohnungId)}</TableCell>
                     <TableCell>{zaehler.montageort}</TableCell>
                     <TableCell>{zaehler.geraeteart}</TableCell>
                     <TableCell className="hidden md:table-cell font-mono text-sm">
@@ -326,17 +326,17 @@ export function ZaehlerView() {
             </Button>
           </CardHeader>
           <CardContent className="overflow-x-auto">
-            <Table className="min-w-[700px]">
+            <Table className="min-w-[700px] table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead>Wohnung</TableHead>
-                  <TableHead>Montageort</TableHead>
-                  <TableHead>Geräteart</TableHead>
-                  <TableHead className="hidden md:table-cell">
+                  <TableHead style={{ width: "15%" }}>Wohnung</TableHead>
+                  <TableHead style={{ width: "20%" }}>Montageort</TableHead>
+                  <TableHead style={{ width: "20%" }}>Geräteart</TableHead>
+                  <TableHead className="hidden md:table-cell" style={{ width: "20%" }}>
                     Gerätenummer
                   </TableHead>
-                  <TableHead>Gültig bis</TableHead>
-                  <TableHead className="w-[80px]">Aktionen</TableHead>
+                  <TableHead style={{ width: "15%" }}>Gültig bis</TableHead>
+                  <TableHead style={{ width: "10%" }} className="w-[80px]">Aktionen</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -344,7 +344,7 @@ export function ZaehlerView() {
                   const wohnung = wohnungen.find((w) => w.id === rm.wohnungId);
                   return (
                   <TableRow key={rm.id}>
-                    <TableCell className="text-xs">{wohnung?.bezeichnung || wohnungLabel(rm.wohnungId)}</TableCell>
+                    <TableCell className="text-sm">{wohnung?.bezeichnung || wohnungLabel(rm.wohnungId)}</TableCell>
                     <TableCell>{rm.montageort}</TableCell>
                     <TableCell>{rm.geraeteart}</TableCell>
                     <TableCell className="hidden md:table-cell font-mono text-sm">

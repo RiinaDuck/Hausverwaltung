@@ -695,7 +695,7 @@ export function HausmanagerView() {
             <div className="flex md:flex-col gap-2 md:gap-6 overflow-x-auto md:overflow-x-visible pb-2 md:pb-0">
               {navSections.map((section) => (
                 <div key={section.title} className="min-w-fit md:min-w-0">
-                  <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 hidden md:block">
+                  <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wider mb-2 hidden md:block">
                     {section.title}
                   </h3>
                   <div className="flex md:flex-col gap-1">
@@ -1171,7 +1171,7 @@ function GenericMasterDetail<T extends BaseItem>({
       {/* List */}
       <div className="w-full lg:w-80 shrink-0 border-b lg:border-b-0 lg:border-r flex flex-col max-h-[250px] lg:max-h-full">
         <div className="p-3 border-b flex items-center justify-between">
-          <span className="font-semibold text-sm">{title}</span>
+          <span className="font-medium text-sm">{title}</span>
           <Button
             size="sm"
             variant="outline"
@@ -1188,12 +1188,12 @@ function GenericMasterDetail<T extends BaseItem>({
               <TableHeader>
                 <TableRow>
                   {columns.slice(0, 2).map((col) => (
-                    <TableHead key={col.key} className="text-xs">
+                    <TableHead key={col.key}>
                       {col.label}
                     </TableHead>
                   ))}
                   {columns.length > 2 && (
-                    <TableHead className="text-xs hidden sm:table-cell">
+                    <TableHead className="hidden sm:table-cell">
                       {columns[2].label}
                     </TableHead>
                   )}
@@ -1209,12 +1209,12 @@ function GenericMasterDetail<T extends BaseItem>({
                     onClick={() => setSelected(item)}
                   >
                     {columns.slice(0, 2).map((col) => (
-                      <TableCell key={col.key} className="text-xs py-2">
+                      <TableCell key={col.key} className="text-sm py-2">
                         {(item as any)[col.key]}
                       </TableCell>
                     ))}
                     {columns.length > 2 && (
-                      <TableCell className="text-xs py-2 hidden sm:table-cell">
+                      <TableCell className="text-sm py-2 hidden sm:table-cell">
                         {(item as any)[columns[2].key]}
                       </TableCell>
                     )}
@@ -1229,7 +1229,7 @@ function GenericMasterDetail<T extends BaseItem>({
       {/* Detail Form */}
       <div className="flex-1 flex flex-col min-h-0">
         <div className="p-3 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-muted/30">
-          <span className="font-semibold text-sm sm:text-base truncate">
+          <span className="font-medium text-sm sm:text-base truncate">
             {selected.name}
           </span>
           <div className="flex gap-2 flex-wrap">
@@ -1294,7 +1294,7 @@ function FinanzamtForm({
               <Input
                 value={item.steuernummer}
                 onChange={(e) => updateItem({ steuernummer: e.target.value })}
-                className="font-mono text-lg font-semibold"
+                className="font-mono text-lg font-medium"
               />
             </div>
             <div className="space-y-1">

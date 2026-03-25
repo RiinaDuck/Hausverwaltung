@@ -405,7 +405,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                   <span className="absolute top-2 right-3 text-[10px] text-muted-foreground">Anzeige</span>
                   <CardContent className="pt-4 pb-4">
                     <div className="flex gap-3">
-                      <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">
+                      <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center text-sm font-medium text-text-secondary shrink-0">
                         {partner.initials}
                       </div>
                       <div className="flex-1 min-w-0 space-y-1.5">

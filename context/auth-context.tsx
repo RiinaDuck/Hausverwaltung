@@ -79,7 +79,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDemo, setIsDemo] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [profile, setProfile] = useState<UserProfile>(defaultProfile);
   const [needsOnboarding, setNeedsOnboarding] = useState(false);
   const [showProfileBanner, setShowProfileBanner] = useState(false);
@@ -173,31 +172,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     password: string,
   ): Promise<{ success: boolean; error?: string }> => {
-    // Hardcoded Admin-Account
-    if (email === "admin" && password === "admin") {
-      const adminUser = {
-        id: "admin-user",
-        email: "admin@hausverwaltung-boss.de",
-        user_metadata: {
-          vorname: "Admin",
-          nachname: "istrator",
-          anschrift: "Admin-Straße 1, 00000 Admin",
-        },
-      } as unknown as User;
-
-      setUser(adminUser);
-      setIsDemo(false);
-      setIsAdmin(true);
-      setProfile({
-        vorname: "Admin",
-        nachname: "istrator",
-        email: "admin@hausverwaltung-boss.de",
-        telefon: "",
-        anschrift: "Admin-Straße 1, 00000 Admin",
-      });
-      return { success: true };
-    }
-
     // Skip if no supabase client
     if (!supabase) {
       return { success: false, error: "Supabase ist nicht konfiguriert" };
@@ -217,7 +191,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.user) {
         setUser(data.user);
         setIsDemo(false);
-        setIsAdmin(false);
         return { success: true };
       }
 
@@ -301,7 +274,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setUser(null);
     setIsDemo(false);
-    setIsAdmin(false);
     setProfile(defaultProfile);
   };
 
@@ -376,6 +348,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isAuthenticated = !!user || isDemo;
+  // Derived from JWT app_metadata — set via Supabase Auth service role
+  const isAdmin = user?.app_metadata?.role === 'admin';
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const contextValue = useMemo(
