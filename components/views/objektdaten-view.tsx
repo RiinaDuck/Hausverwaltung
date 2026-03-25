@@ -915,6 +915,93 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
 
           {/* TAB 3: Steuern & Abgaben */}
           <TabsContent value="steuern" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Finanzamt</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="fa-name">Finanzamt Name</Label>
+                    <Input
+                      id="fa-name"
+                      value={selectedObjekt.steuern?.finanzamtName || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          steuern: {
+                            ...selectedObjekt.steuern,
+                            finanzamtName: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fa-steuernummer">Steuernummer</Label>
+                    <Input
+                      id="fa-steuernummer"
+                      value={selectedObjekt.steuern?.finanzamtSteuernummer || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          steuern: {
+                            ...selectedObjekt.steuern,
+                            finanzamtSteuernummer: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="fa-ansprechpartner">Ansprechpartner</Label>
+                    <Input
+                      id="fa-ansprechpartner"
+                      value={selectedObjekt.steuern?.finanzamtAnsprechpartner || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          steuern: {
+                            ...selectedObjekt.steuern,
+                            finanzamtAnsprechpartner: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fa-telefon">Telefon</Label>
+                    <Input
+                      id="fa-telefon"
+                      value={selectedObjekt.steuern?.finanzamtTelefon || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          steuern: {
+                            ...selectedObjekt.steuern,
+                            finanzamtTelefon: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fa-email">E-Mail</Label>
+                    <Input
+                      id="fa-email"
+                      type="email"
+                      value={selectedObjekt.steuern?.finanzamtEmail || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          steuern: {
+                            ...selectedObjekt.steuern,
+                            finanzamtEmail: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
             <div className="flex flex-col md:flex-row gap-4">
               <Card className="flex-1">
                 <CardHeader className="pb-3">

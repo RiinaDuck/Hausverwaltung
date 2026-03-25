@@ -107,6 +107,11 @@ export interface Objekt {
   };
   notizen: string;
   steuern?: {
+    finanzamtName?: string;
+    finanzamtSteuernummer?: string;
+    finanzamtAnsprechpartner?: string;
+    finanzamtTelefon?: string;
+    finanzamtEmail?: string;
     steuerberaterName?: string;
     steuerberaterTelefon?: string;
     steuerberaterEmail?: string;
