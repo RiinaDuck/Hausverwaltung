@@ -458,8 +458,8 @@ const helpSections: HelpSection[] = [
     ],
   },
   {
-    id: "hausmanager",
-    title: "Hausmanager",
+    id: "kontakte",
+    title: "Kontakte",
     icon: <Briefcase className="h-4 w-4" />,
     description:
       "Zentrale Verwaltung aller externen Kontakte, Dienstleister, Versicherungen und Behörden rund um Ihre Immobilien.",
@@ -530,7 +530,7 @@ const viewTitles: Record<AppView, string> = {
   nebenkosten: "Nebenkosten",
   "nebenkosten-abrechnung": "Nebenkosten – Abrechnung erstellen",
   zaehler: "Zähler & Rauchmelder",
-  hausmanager: "Hausmanager / Finanzamt",
+  kontakte: "Kontakte",
   rechnungen: "Rechnungen",
   statistiken: "Statistiken",
   archiv: "Archiv",
