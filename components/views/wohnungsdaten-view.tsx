@@ -1480,23 +1480,27 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                 if (unitMieter.length === 0) {
                   if (selectedUnit.status !== "vermietet") return null;
                   return (
-                    <Card className="border-amber-200 bg-amber-50">
-                      <CardContent className="pt-5 pb-4">
-                        <div className="flex gap-4">
-                          <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-                          <div className="flex-1">
-                            <h4 className="font-medium text-amber-900 mb-1">Kein Mieter zugeordnet</h4>
-                            <p className="text-sm text-amber-800 mb-3">Wohnung ist als vermietet markiert, aber es wurde noch kein Mieter hinterlegt.</p>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="border-amber-500 text-amber-700 hover:bg-amber-100"
-                              onClick={() => onNavigate?.("mieter")}
-                            >
-                              Mieter anlegen →
-                            </Button>
+                    <Card className="border-amber-200 bg-amber-50 rounded-lg">
+                      <CardContent className="p-5 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
+                            <AlertCircle className="h-4 w-4 text-amber-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-amber-900">Kein Mieter zugeordnet</p>
+                            <p className="text-xs text-amber-700">Wohnung ist als vermietet markiert</p>
                           </div>
                         </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-amber-500 text-amber-700 hover:bg-amber-100 shrink-0"
+                          onClick={() => onNavigate?.("mieter")}
+                        >
+                          {mieter.some((m) => units.some((u) => u.id === m.wohnungId))
+                            ? "Mieter zuordnen →"
+                            : "Mieter anlegen →"}
+                        </Button>
                       </CardContent>
                     </Card>
                   );
@@ -1504,10 +1508,10 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                 return unitMieter.map((m) => (
                   <Card
                     key={m.id}
-                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    className="cursor-pointer hover:bg-accent/50 transition-colors rounded-lg"
                     onClick={() => onNavigate?.("mieter", { mieterId: m.id })}
                   >
-                    <CardContent className="py-4 flex items-center justify-between">
+                    <CardContent className="p-5 flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                           <Users className="h-4 w-4 text-primary" />

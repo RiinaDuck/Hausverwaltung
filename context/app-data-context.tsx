@@ -106,6 +106,16 @@ export interface Objekt {
     ustIdNr?: string;
   };
   notizen: string;
+  steuern?: {
+    steuerberaterName?: string;
+    steuerberaterTelefon?: string;
+    steuerberaterEmail?: string;
+    steuerberaterBriefanrede?: string;
+    grundsteuernummer?: string;
+    grundsteuerwert?: string;
+    einheitswert?: string;
+    aktenzeichen?: string;
+  };
 }
 
 export interface Wohnung {
@@ -376,6 +386,7 @@ const DEMO_OBJEKTE: Objekt[] = [
     },
     notizen:
       "Hausmeisterservice: Firma Schmidt, Tel. 030 9876543\nSchlüssel: 3x Haupteingang, 1x Keller\nNächste Wartung Heizung: März 2026",
+    steuern: {},
   },
 ];
 
@@ -525,6 +536,7 @@ const mapDBToObjekt = (dbObjekt: any): Objekt => ({
   bankverbindung: dbObjekt.bankverbindung,
   objektdaten: dbObjekt.objektdaten,
   notizen: dbObjekt.notizen || "",
+  steuern: dbObjekt.steuern || {},
 });
 
 const mapDBToWohnung = (dbWohnung: any): Wohnung => ({

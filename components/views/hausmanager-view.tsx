@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,8 +47,6 @@ import {
   Trash2,
   Mail,
   Building2,
-  Landmark,
-  Receipt,
   Zap,
   Gauge,
   PiggyBank,
@@ -64,39 +62,6 @@ import { generateBriefPDF, downloadPDF } from "@/lib/pdf-generator";
 interface BaseItem {
   id: string;
   name: string;
-}
-
-interface Finanzamt extends BaseItem {
-  steuernummer: string;
-  ansprechpartner: string;
-  anrede: string;
-  strasse: string;
-  plz: string;
-  ort: string;
-  briefanrede: string;
-  telefon: string;
-  fax: string;
-  email: string;
-  bank: string;
-  blzBic: string;
-  ktoIban: string;
-  einzugsermaechtigung: boolean;
-  besonderheiten: string;
-}
-
-interface Steuerberater extends BaseItem {
-  ansprechpartner: string;
-  telefon: string;
-  email: string;
-  strasse: string;
-  plz: string;
-  ort: string;
-}
-
-interface Grundbesitzabgabe extends BaseItem {
-  gemeinde: string;
-  aktenzeichen: string;
-  betrag: string;
 }
 
 interface Energielieferant extends BaseItem {
@@ -209,52 +174,6 @@ interface Rechtsberatung extends BaseItem {
 }
 
 // Initial Data
-const initialFinanzaemter: Finanzamt[] = [
-  {
-    id: "1",
-    name: "Finanzamt Berlin Mitte",
-    steuernummer: "30/123/45678",
-    ansprechpartner: "Herr Schulz",
-    anrede: "Herr",
-    strasse: "Neue Jakobstraße 6",
-    plz: "10179",
-    ort: "Berlin",
-    briefanrede: "Sehr geehrter Herr Schulz",
-    telefon: "030 9024-0",
-    fax: "030 9024-1234",
-    email: "poststelle@fa-mitte.berlin.de",
-    bank: "Landeshauptkasse Berlin",
-    blzBic: "MARKDEF1100",
-    ktoIban: "DE12 1000 0000 0000 0000 12",
-    einzugsermaechtigung: true,
-    besonderheiten:
-      "Zuständig für Einkünfte aus Vermietung und Verpachtung im Bezirk Mitte.",
-  },
-];
-
-const initialSteuerberater: Steuerberater[] = [
-  {
-    id: "1",
-    name: "Kanzlei Müller & Partner",
-    ansprechpartner: "Dr. Hans Müller",
-    telefon: "030 1234567",
-    email: "mueller@steuerberater.de",
-    strasse: "Friedrichstraße 100",
-    plz: "10117",
-    ort: "Berlin",
-  },
-];
-
-const initialGrundbesitzabgaben: Grundbesitzabgabe[] = [
-  {
-    id: "1",
-    name: "Grundsteuer Berlin Mitte",
-    gemeinde: "Berlin Mitte",
-    aktenzeichen: "GB-2024-001",
-    betrag: "1.250,00",
-  },
-];
-
 const initialEnergielieferanten: Energielieferant[] = [
   {
     id: "1",
@@ -265,7 +184,7 @@ const initialEnergielieferanten: Energielieferant[] = [
     zaehlernummer: "1ESM123456789",
     anrede: "Herr",
     ansprechpartner: "Max Schmidt",
-    strasse: "Chausseestraße 23",
+    strasse: "ChausseestraÃŸe 23",
     plz: "10115",
     ort: "Berlin",
     telefon: "030 267-0",
@@ -274,14 +193,14 @@ const initialEnergielieferanten: Energielieferant[] = [
     briefanrede: "Sehr geehrter Herr Schmidt",
     woMontiert: "Keller Raum 1.01",
     tankgroesse: "",
-    ablesetermin: "31.12. jährlich",
+    ablesetermin: "31.12. jÃ¤hrlich",
     bank: "Deutsche Bank",
     blzBic: "DEUTDEDB",
     ktoIban: "DE89 3704 0044 0532 0130 00",
     betrag: "185,00",
     zahltermin: "15. jeden Monats",
     einzugsermaechtigung: true,
-    besonderheiten: "Ökostrom-Tarif seit 01.01.2023",
+    besonderheiten: "Ã–kostrom-Tarif seit 01.01.2023",
   },
 ];
 
@@ -302,7 +221,7 @@ const initialFinanzierungspartner: Finanzierungspartner[] = [
     name: "Deutsche Bank AG",
     ansprechpartner: "Dr. Thomas Richter",
     darlehensnummer: "DAR-2020-123456",
-    summe: "450.000,00 €",
+    summe: "450.000,00 â‚¬",
     laufzeit: "31.12.2040",
     anrede: "Herr",
     strasse: "Taunusanlage 12",
@@ -312,7 +231,7 @@ const initialFinanzierungspartner: Finanzierungspartner[] = [
     fax: "069 910-34225",
     email: "immobilien@deutsche-bank.de",
     briefanrede: "Sehr geehrter Herr Dr. Richter",
-    darlehensart: "Annuitätendarlehen",
+    darlehensart: "AnnuitÃ¤tendarlehen",
     darlehenssumme: "450.000,00",
     zinssatz: "2,85",
     tilgung: "2,00",
@@ -320,22 +239,22 @@ const initialFinanzierungspartner: Finanzierungspartner[] = [
     zahltermin: "1. jeden Monats",
     zahlungsweise: "Lastschrift",
     grundbucheintrag: true,
-    besonderheiten: "Sondertilgung 5% p.a. möglich",
+    besonderheiten: "Sondertilgung 5% p.a. mÃ¶glich",
   },
 ];
 
 const initialVersicherungen: Versicherung[] = [
   {
     id: "1",
-    name: "Allianz - Gebäudeversicherung",
-    versicherungsart: "Gebäudeversicherung",
+    name: "Allianz - GebÃ¤udeversicherung",
+    versicherungsart: "GebÃ¤udeversicherung",
     versicherung: "Allianz Versicherungs-AG",
     versicherungsNr: "VS-2020-4711-0815",
     ansprechpartner: "Herr Bauer",
     anrede: "Herr",
-    strasse: "Königinstraße 28",
+    strasse: "KÃ¶niginstraÃŸe 28",
     plz: "80802",
-    ort: "München",
+    ort: "MÃ¼nchen",
     briefanrede: "Sehr geehrter Herr Bauer",
     telefon: "089 3800-0",
     fax: "089 3800-1234",
@@ -345,7 +264,7 @@ const initialVersicherungen: Versicherung[] = [
     blzBic: "ALLIDEM1",
     ktoIban: "DE89 5021 1000 0000 0000 00",
     zahlungsweise: "Lastschrift",
-    zahltermin: "01.01. jährlich",
+    zahltermin: "01.01. jÃ¤hrlich",
     wert1914: "125.000",
     laufzeitBis: "31.12.2030",
     kuendigungsfrist: "3 Monate zum Jahresende",
@@ -353,21 +272,21 @@ const initialVersicherungen: Versicherung[] = [
     bruttomietwert: "48.000,00",
     brennstofftankinhalt: "",
     glasflaeche: "45",
-    besonderheiten: "Elementarschäden eingeschlossen",
+    besonderheiten: "ElementarschÃ¤den eingeschlossen",
   },
 ];
 
 const initialDienstleister: Dienstleister[] = [
   {
     id: "1",
-    name: "Sanitär Schulze GmbH",
+    name: "SanitÃ¤r Schulze GmbH",
     kategorie: "Handwerker",
-    firma: "Sanitär Schulze GmbH",
+    firma: "SanitÃ¤r Schulze GmbH",
     ansprechpartner: "Peter Schulze",
     telefon: "030 5551234",
     email: "info@sanitaer-schulze.de",
-    gewerk: "Sanitär/Heizung",
-    strasse: "Handwerkerstraße 15",
+    gewerk: "SanitÃ¤r/Heizung",
+    strasse: "HandwerkerstraÃŸe 15",
     plz: "10115",
     ort: "Berlin",
   },
@@ -377,12 +296,12 @@ const initialRechtsberatung: Rechtsberatung[] = [
   {
     id: "1",
     name: "RA Dr. Michael Schmidt",
-    kanzlei: "Rechtsanwälte Schmidt & Partner",
+    kanzlei: "RechtsanwÃ¤lte Schmidt & Partner",
     anwalt: "RA Dr. Michael Schmidt",
     fachgebiet: "Mietrecht",
     telefon: "030 2345678",
     email: "schmidt@mietrecht-berlin.de",
-    strasse: "Kurfürstendamm 100",
+    strasse: "KurfÃ¼rstendamm 100",
     plz: "10709",
     ort: "Berlin",
   },
@@ -391,22 +310,10 @@ const initialRechtsberatung: Rechtsberatung[] = [
 // Sub-navigation items
 const navSections = [
   {
-    title: "Steuern & Abgaben",
-    items: [
-      { id: "finanzamt", label: "Finanzamt", icon: Landmark },
-      { id: "steuerberater", label: "Steuerberater", icon: Receipt },
-      {
-        id: "grundbesitzabgaben",
-        label: "Grundbesitzabgaben",
-        icon: Building2,
-      },
-    ],
-  },
-  {
     title: "Energie & Versorgung",
     items: [
       { id: "energielieferanten", label: "Energielieferanten", icon: Zap },
-      { id: "messdienst", label: "Meßdienst", icon: Gauge },
+      { id: "messdienst", label: "MeÃŸdienst", icon: Gauge },
     ],
   },
   {
@@ -430,15 +337,12 @@ const navSections = [
 ];
 
 export function HausmanagerView() {
-  const [activeView, setActiveView] = useState("finanzamt");
+  const [activeView, setActiveView] = useState("energielieferanten");
   const [searchQuery, setSearchQuery] = useState("");
   const { toast } = useToast();
 
   // LocalStorage Keys
   const STORAGE_KEYS = {
-    finanzaemter: "hausverwaltung_finanzaemter",
-    steuerberater: "hausverwaltung_steuerberater",
-    grundbesitzabgaben: "hausverwaltung_grundbesitzabgaben",
     energielieferanten: "hausverwaltung_energielieferanten",
     messdienst: "hausverwaltung_messdienst",
     finanzierungspartner: "hausverwaltung_finanzierungspartner",
@@ -460,17 +364,6 @@ export function HausmanagerView() {
   };
 
   // State for all data - with localStorage persistence
-  const [finanzaemter, setFinanzaemter] = useState<Finanzamt[]>(() =>
-    loadFromStorage(STORAGE_KEYS.finanzaemter, initialFinanzaemter),
-  );
-  const [steuerberater, setSteuerberater] = useState<Steuerberater[]>(() =>
-    loadFromStorage(STORAGE_KEYS.steuerberater, initialSteuerberater),
-  );
-  const [grundbesitzabgaben, setGrundbesitzabgaben] = useState<
-    Grundbesitzabgabe[]
-  >(() =>
-    loadFromStorage(STORAGE_KEYS.grundbesitzabgaben, initialGrundbesitzabgaben),
-  );
   const [energielieferanten, setEnergielieferanten] = useState<
     Energielieferant[]
   >(() =>
@@ -498,30 +391,6 @@ export function HausmanagerView() {
   );
 
   // Auto-save to localStorage whenever data changes
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(
-      STORAGE_KEYS.finanzaemter,
-      JSON.stringify(finanzaemter),
-    );
-  }, [finanzaemter]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(
-      STORAGE_KEYS.steuerberater,
-      JSON.stringify(steuerberater),
-    );
-  }, [steuerberater]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem(
-      STORAGE_KEYS.grundbesitzabgaben,
-      JSON.stringify(grundbesitzabgaben),
-    );
-  }, [grundbesitzabgaben]);
-
   useEffect(() => {
     if (typeof window === "undefined") return;
     localStorage.setItem(
@@ -583,7 +452,7 @@ export function HausmanagerView() {
     setBriefEmpfaenger(empfaenger);
     setBriefBetreff("");
     setBriefText(
-      "Sehr geehrte Damen und Herren,\n\n\n\nMit freundlichen Grüßen\nIhre Hausverwaltung Boss",
+      "Sehr geehrte Damen und Herren,\n\n\n\nMit freundlichen GrÃ¼ÃŸen\nIhre Hausverwaltung Boss",
     );
     setBriefModalOpen(true);
   };
@@ -621,37 +490,15 @@ export function HausmanagerView() {
   };
 
   const handleSave = (item: BaseItem) => {
-    // Die Daten werden automatisch über useEffect in localStorage gespeichert
+    // Die Daten werden automatisch Ã¼ber useEffect in localStorage gespeichert
     toast({
-      title: "✓ Speicherung erfolgreich",
+      title: "âœ“ Speicherung erfolgreich",
       description: `"${item.name}" wurde erfolgreich gespeichert und bleibt auch nach einem Neustart erhalten.`,
       duration: 3000,
     });
   };
 
   // Memoized filtered lists based on search query
-  const filteredFinanzaemter = useMemo(
-    () =>
-      finanzaemter.filter(
-        (item) =>
-          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.steuernummer.toLowerCase().includes(searchQuery.toLowerCase()),
-      ),
-    [finanzaemter, searchQuery],
-  );
-
-  const filteredSteuerberater = useMemo(
-    () =>
-      steuerberater.filter(
-        (item) =>
-          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.ansprechpartner
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase()),
-      ),
-    [steuerberater, searchQuery],
-  );
-
   const filteredDienstleister = useMemo(
     () =>
       dienstleister.filter(
@@ -726,95 +573,6 @@ export function HausmanagerView() {
 
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto">
-        {activeView === "finanzamt" && (
-          <GenericMasterDetail
-            title="Finanzämter"
-            items={filteredFinanzaemter}
-            setItems={setFinanzaemter}
-            columns={[
-              { key: "name", label: "Finanzamt" },
-              { key: "steuernummer", label: "Steuernummer" },
-              { key: "ansprechpartner", label: "Ansprechpartner" },
-            ]}
-            createNew={() => ({
-              id: String(Date.now()),
-              name: "Neues Finanzamt",
-              steuernummer: "",
-              ansprechpartner: "",
-              anrede: "Herr",
-              strasse: "",
-              plz: "",
-              ort: "",
-              briefanrede: "",
-              telefon: "",
-              fax: "",
-              email: "",
-              bank: "",
-              blzBic: "",
-              ktoIban: "",
-              einzugsermaechtigung: false,
-              besonderheiten: "",
-            })}
-            renderForm={(item, updateItem) => (
-              <FinanzamtForm item={item} updateItem={updateItem} />
-            )}
-            onBrief={openBriefModal}
-            onDelete={confirmDelete}
-            onSave={handleSave}
-          />
-        )}
-        {activeView === "steuerberater" && (
-          <GenericMasterDetail
-            title="Steuerberater"
-            items={filteredSteuerberater}
-            setItems={setSteuerberater}
-            columns={[
-              { key: "name", label: "Kanzlei" },
-              { key: "ansprechpartner", label: "Ansprechpartner" },
-              { key: "telefon", label: "Telefon" },
-            ]}
-            createNew={() => ({
-              id: String(Date.now()),
-              name: "Neue Kanzlei",
-              ansprechpartner: "",
-              telefon: "",
-              email: "",
-              strasse: "",
-              plz: "",
-              ort: "",
-            })}
-            renderForm={(item, updateItem) => (
-              <SteuerberaterForm item={item} updateItem={updateItem} />
-            )}
-            onBrief={openBriefModal}
-            onDelete={confirmDelete}
-            onSave={handleSave}
-          />
-        )}
-        {activeView === "grundbesitzabgaben" && (
-          <GenericMasterDetail
-            title="Grundbesitzabgaben"
-            items={grundbesitzabgaben}
-            setItems={setGrundbesitzabgaben}
-            columns={[
-              { key: "gemeinde", label: "Gemeinde" },
-              { key: "aktenzeichen", label: "Aktenzeichen" },
-              { key: "betrag", label: "Betrag" },
-            ]}
-            createNew={() => ({
-              id: String(Date.now()),
-              name: "Neue Abgabe",
-              gemeinde: "",
-              aktenzeichen: "",
-              betrag: "",
-            })}
-            renderForm={(item, updateItem) => (
-              <GrundbesitzabgabenForm item={item} updateItem={updateItem} />
-            )}
-            onDelete={confirmDelete}
-            onSave={handleSave}
-          />
-        )}
         {activeView === "energielieferanten" && (
           <GenericMasterDetail
             title="Energielieferanten"
@@ -862,7 +620,7 @@ export function HausmanagerView() {
         )}
         {activeView === "messdienst" && (
           <GenericMasterDetail
-            title="Meßdienst"
+            title="MeÃŸdienst"
             items={messdienst}
             setItems={setMessdienst}
             columns={[
@@ -872,7 +630,7 @@ export function HausmanagerView() {
             ]}
             createNew={() => ({
               id: String(Date.now()),
-              name: "Neuer Meßdienst",
+              name: "Neuer MeÃŸdienst",
               kundennummer: "",
               ansprechpartner: "",
               telefon: "",
@@ -911,7 +669,7 @@ export function HausmanagerView() {
               fax: "",
               email: "",
               briefanrede: "",
-              darlehensart: "Annuitätendarlehen",
+              darlehensart: "AnnuitÃ¤tendarlehen",
               darlehenssumme: "",
               zinssatz: "",
               tilgung: "",
@@ -937,12 +695,12 @@ export function HausmanagerView() {
             columns={[
               { key: "versicherungsart", label: "Art" },
               { key: "versicherung", label: "Versicherung" },
-              { key: "jahrespraemie", label: "Prämie" },
+              { key: "jahrespraemie", label: "PrÃ¤mie" },
             ]}
             createNew={() => ({
               id: String(Date.now()),
               name: "Neue Versicherung",
-              versicherungsart: "Gebäudeversicherung",
+              versicherungsart: "GebÃ¤udeversicherung",
               versicherung: "",
               versicherungsNr: "",
               ansprechpartner: "",
@@ -1089,8 +847,8 @@ export function HausmanagerView() {
           <AlertDialogHeader>
             <AlertDialogTitle>Sind Sie sicher?</AlertDialogTitle>
             <AlertDialogDescription>
-              Diese Aktion kann nicht rückgängig gemacht werden. Der Eintrag
-              wird dauerhaft gelöscht.
+              Diese Aktion kann nicht rÃ¼ckgÃ¤ngig gemacht werden. Der Eintrag
+              wird dauerhaft gelÃ¶scht.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1099,7 +857,7 @@ export function HausmanagerView() {
               onClick={handleConfirmDelete}
               className="bg-destructive text-destructive-foreground"
             >
-              Löschen
+              LÃ¶schen
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1253,7 +1011,7 @@ function GenericMasterDetail<T extends BaseItem>({
               disabled={items.length <= 1}
             >
               <Trash2 className="h-3 w-3" />
-              <span className="hidden sm:inline">Löschen</span>
+              <span className="hidden sm:inline">LÃ¶schen</span>
             </Button>
             <Button
               size="sm"
@@ -1274,318 +1032,6 @@ function GenericMasterDetail<T extends BaseItem>({
 }
 
 // Form Components
-function FinanzamtForm({
-  item,
-  updateItem,
-}: {
-  item: Finanzamt;
-  updateItem: (u: Partial<Finanzamt>) => void;
-}) {
-  return (
-    <div className="space-y-4 max-w-4xl">
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm">Steuerangaben</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Steuernummer</Label>
-              <Input
-                value={item.steuernummer}
-                onChange={(e) => updateItem({ steuernummer: e.target.value })}
-                className="font-mono text-lg font-medium"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Finanzamt Name</Label>
-              <Input
-                value={item.name}
-                onChange={(e) => updateItem({ name: e.target.value })}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm">Ansprechpartner & Anschrift</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
-          <div className="grid grid-cols-4 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Anrede</Label>
-              <Select
-                value={item.anrede}
-                onValueChange={(v) => updateItem({ anrede: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Herr">Herr</SelectItem>
-                  <SelectItem value="Frau">Frau</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="col-span-3 space-y-1">
-              <Label className="text-xs">Ansprechpartner</Label>
-              <Input
-                value={item.ansprechpartner}
-                onChange={(e) =>
-                  updateItem({ ansprechpartner: e.target.value })
-                }
-              />
-            </div>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Straße</Label>
-            <Input
-              value={item.strasse}
-              onChange={(e) => updateItem({ strasse: e.target.value })}
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">PLZ</Label>
-              <Input
-                value={item.plz}
-                onChange={(e) => updateItem({ plz: e.target.value })}
-              />
-            </div>
-            <div className="col-span-2 space-y-1">
-              <Label className="text-xs">Ort</Label>
-              <Input
-                value={item.ort}
-                onChange={(e) => updateItem({ ort: e.target.value })}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm">Kommunikation</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
-          <div className="space-y-1">
-            <Label className="text-xs">Briefanrede</Label>
-            <Input
-              value={item.briefanrede}
-              onChange={(e) => updateItem({ briefanrede: e.target.value })}
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Telefon</Label>
-              <Input
-                value={item.telefon}
-                onChange={(e) => updateItem({ telefon: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Fax</Label>
-              <Input
-                value={item.fax}
-                onChange={(e) => updateItem({ fax: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">E-Mail</Label>
-              <Input
-                value={item.email}
-                onChange={(e) => updateItem({ email: e.target.value })}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm">Bankverbindung</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
-          <div className="space-y-1">
-            <Label className="text-xs">Bank</Label>
-            <Input
-              value={item.bank}
-              onChange={(e) => updateItem({ bank: e.target.value })}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">BLZ/BIC</Label>
-              <Input
-                value={item.blzBic}
-                onChange={(e) => updateItem({ blzBic: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Kto/IBAN</Label>
-              <Input
-                value={item.ktoIban}
-                onChange={(e) => updateItem({ ktoIban: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="einzug"
-              checked={item.einzugsermaechtigung}
-              onCheckedChange={(c) =>
-                updateItem({ einzugsermaechtigung: c === true })
-              }
-            />
-            <label htmlFor="einzug" className="text-sm">
-              Einzugsermächtigung erteilt
-            </label>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm">Besonderheiten</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Textarea
-            rows={4}
-            value={item.besonderheiten}
-            onChange={(e) => updateItem({ besonderheiten: e.target.value })}
-            placeholder="Notizen und Besonderheiten..."
-          />
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function SteuerberaterForm({
-  item,
-  updateItem,
-}: {
-  item: Steuerberater;
-  updateItem: (u: Partial<Steuerberater>) => void;
-}) {
-  return (
-    <div className="space-y-4 max-w-4xl">
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm">Kanzlei-Daten</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
-          <div className="space-y-1">
-            <Label className="text-xs">Kanzlei Name</Label>
-            <Input
-              value={item.name}
-              onChange={(e) => updateItem({ name: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Ansprechpartner</Label>
-            <Input
-              value={item.ansprechpartner}
-              onChange={(e) => updateItem({ ansprechpartner: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Straße</Label>
-            <Input
-              value={item.strasse}
-              onChange={(e) => updateItem({ strasse: e.target.value })}
-            />
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">PLZ</Label>
-              <Input
-                value={item.plz}
-                onChange={(e) => updateItem({ plz: e.target.value })}
-              />
-            </div>
-            <div className="col-span-2 space-y-1">
-              <Label className="text-xs">Ort</Label>
-              <Input
-                value={item.ort}
-                onChange={(e) => updateItem({ ort: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Telefon</Label>
-              <Input
-                value={item.telefon}
-                onChange={(e) => updateItem({ telefon: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">E-Mail</Label>
-              <Input
-                value={item.email}
-                onChange={(e) => updateItem({ email: e.target.value })}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function GrundbesitzabgabenForm({
-  item,
-  updateItem,
-}: {
-  item: Grundbesitzabgabe;
-  updateItem: (u: Partial<Grundbesitzabgabe>) => void;
-}) {
-  return (
-    <div className="space-y-4 max-w-4xl">
-      <Card>
-        <CardHeader className="py-3">
-          <CardTitle className="text-sm">Abgaben-Daten</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
-          <div className="space-y-1">
-            <Label className="text-xs">Bezeichnung</Label>
-            <Input
-              value={item.name}
-              onChange={(e) => updateItem({ name: e.target.value })}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Gemeinde</Label>
-            <Input
-              value={item.gemeinde}
-              onChange={(e) => updateItem({ gemeinde: e.target.value })}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs">Aktenzeichen</Label>
-              <Input
-                value={item.aktenzeichen}
-                onChange={(e) => updateItem({ aktenzeichen: e.target.value })}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Betrag (€)</Label>
-              <Input
-                value={item.betrag}
-                onChange={(e) => updateItem({ betrag: e.target.value })}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
 function EnergielieferantForm({
   item,
   updateItem,
@@ -1613,8 +1059,8 @@ function EnergielieferantForm({
                 <SelectContent>
                   <SelectItem value="Strom">Strom</SelectItem>
                   <SelectItem value="Gas">Gas</SelectItem>
-                  <SelectItem value="Öl">Öl</SelectItem>
-                  <SelectItem value="Fernwärme">Fernwärme</SelectItem>
+                  <SelectItem value="Ã–l">Ã–l</SelectItem>
+                  <SelectItem value="FernwÃ¤rme">FernwÃ¤rme</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1640,7 +1086,7 @@ function EnergielieferantForm({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Zählernummer</Label>
+              <Label className="text-xs">ZÃ¤hlernummer</Label>
               <Input
                 value={item.zaehlernummer}
                 onChange={(e) => updateItem({ zaehlernummer: e.target.value })}
@@ -1682,7 +1128,7 @@ function EnergielieferantForm({
             </div>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Straße</Label>
+            <Label className="text-xs">StraÃŸe</Label>
             <Input
               value={item.strasse}
               onChange={(e) => updateItem({ strasse: e.target.value })}
@@ -1744,7 +1190,7 @@ function EnergielieferantForm({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Tankgröße (Liter)</Label>
+              <Label className="text-xs">TankgrÃ¶ÃŸe (Liter)</Label>
               <Input
                 value={item.tankgroesse}
                 onChange={(e) => updateItem({ tankgroesse: e.target.value })}
@@ -1791,7 +1237,7 @@ function EnergielieferantForm({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs">Monatlicher Betrag (€)</Label>
+              <Label className="text-xs">Monatlicher Betrag (â‚¬)</Label>
               <Input
                 value={item.betrag}
                 onChange={(e) => updateItem({ betrag: e.target.value })}
@@ -1814,7 +1260,7 @@ function EnergielieferantForm({
               }
             />
             <label htmlFor="einzug-energie" className="text-sm">
-              Einzugsermächtigung erteilt
+              EinzugsermÃ¤chtigung erteilt
             </label>
           </div>
         </CardContent>
@@ -1847,7 +1293,7 @@ function MessdienstForm({
     <div className="space-y-4 max-w-4xl">
       <Card>
         <CardHeader className="py-3">
-          <CardTitle className="text-sm">Meßdienst-Daten</CardTitle>
+          <CardTitle className="text-sm">MeÃŸdienst-Daten</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 max-h-[600px] overflow-y-auto">
           <div className="space-y-1">
@@ -1934,17 +1380,17 @@ function FinanzierungspartnerForm({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Annuitätendarlehen">
-                    Annuitätendarlehen
+                  <SelectItem value="AnnuitÃ¤tendarlehen">
+                    AnnuitÃ¤tendarlehen
                   </SelectItem>
                   <SelectItem value="Tilgungsdarlehen">
                     Tilgungsdarlehen
                   </SelectItem>
-                  <SelectItem value="Endfälliges Darlehen">
-                    Endfälliges Darlehen
+                  <SelectItem value="EndfÃ¤lliges Darlehen">
+                    EndfÃ¤lliges Darlehen
                   </SelectItem>
-                  <SelectItem value="KfW-Förderkredit">
-                    KfW-Förderkredit
+                  <SelectItem value="KfW-FÃ¶rderkredit">
+                    KfW-FÃ¶rderkredit
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -1952,7 +1398,7 @@ function FinanzierungspartnerForm({
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs">Darlehenssumme (€)</Label>
+              <Label className="text-xs">Darlehenssumme (â‚¬)</Label>
               <Input
                 value={item.darlehenssumme}
                 onChange={(e) => updateItem({ darlehenssumme: e.target.value })}
@@ -1975,7 +1421,7 @@ function FinanzierungspartnerForm({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs">Rate (€)</Label>
+              <Label className="text-xs">Rate (â‚¬)</Label>
               <Input
                 value={item.rate}
                 onChange={(e) => updateItem({ rate: e.target.value })}
@@ -2017,7 +1463,7 @@ function FinanzierungspartnerForm({
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Straße</Label>
+            <Label className="text-xs">StraÃŸe</Label>
             <Input
               value={item.strasse}
               onChange={(e) => updateItem({ strasse: e.target.value })}
@@ -2106,14 +1552,14 @@ function VersicherungForm({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Gebäudeversicherung">
-                    Gebäudeversicherung
+                  <SelectItem value="GebÃ¤udeversicherung">
+                    GebÃ¤udeversicherung
                   </SelectItem>
                   <SelectItem value="Haus- und Grundbesitzerhaftpflicht">
                     Haus- und Grundbesitzerhaftpflicht
                   </SelectItem>
-                  <SelectItem value="Gewässerschadenhaftpflicht">
-                    Gewässerschadenhaftpflicht
+                  <SelectItem value="GewÃ¤sserschadenhaftpflicht">
+                    GewÃ¤sserschadenhaftpflicht
                   </SelectItem>
                   <SelectItem value="Glasversicherung">
                     Glasversicherung
@@ -2143,7 +1589,7 @@ function VersicherungForm({
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs">Jahresprämie (€)</Label>
+              <Label className="text-xs">JahresprÃ¤mie (â‚¬)</Label>
               <Input
                 value={item.jahrespraemie}
                 onChange={(e) => updateItem({ jahrespraemie: e.target.value })}
@@ -2157,7 +1603,7 @@ function VersicherungForm({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Kündigungsfrist</Label>
+              <Label className="text-xs">KÃ¼ndigungsfrist</Label>
               <Input
                 value={item.kuendigungsfrist}
                 onChange={(e) =>
@@ -2175,7 +1621,7 @@ function VersicherungForm({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Glasfläche (m²)</Label>
+              <Label className="text-xs">GlasflÃ¤che (mÂ²)</Label>
               <Input
                 value={item.glasflaeche}
                 onChange={(e) => updateItem({ glasflaeche: e.target.value })}
@@ -2207,7 +1653,7 @@ function VersicherungForm({
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Straße</Label>
+            <Label className="text-xs">StraÃŸe</Label>
             <Input
               value={item.strasse}
               onChange={(e) => updateItem({ strasse: e.target.value })}
@@ -2328,7 +1774,7 @@ function DienstleisterForm({
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Straße</Label>
+            <Label className="text-xs">StraÃŸe</Label>
             <Input
               value={item.strasse}
               onChange={(e) => updateItem({ strasse: e.target.value })}
@@ -2412,7 +1858,7 @@ function RechtsberatungForm({
             </div>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Straße</Label>
+            <Label className="text-xs">StraÃŸe</Label>
             <Input
               value={item.strasse}
               onChange={(e) => updateItem({ strasse: e.target.value })}

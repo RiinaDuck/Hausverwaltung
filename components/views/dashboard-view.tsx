@@ -150,6 +150,19 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
     [wohnungen],
   );
 
+  // Count vermietet units without an active tenant, per objekt
+  const unitsOhneMieterByObjektId = useMemo(() => {
+    const wohnungenMitMieter = new Set(
+      mieter.filter((m) => m.isAktiv !== false).map((m) => m.wohnungId),
+    );
+    return wohnungen.reduce<Record<string, number>>((acc, w) => {
+      if (w.status === "vermietet" && !wohnungenMitMieter.has(w.id)) {
+        acc[w.objektId] = (acc[w.objektId] ?? 0) + 1;
+      }
+      return acc;
+    }, {});
+  }, [wohnungen, mieter]);
+
   // Berechne reale Dashboard-Statistiken (objektübergreifend)
   const dashboardStats = useMemo(() => {
     const relevantWohnungen = wohnungen;
@@ -350,12 +363,26 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                     <TableCell>{objekt.typ}</TableCell>
                     <TableCell>{wohnungenCountByObjektId[objekt.id] ?? 0}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant="secondary"
-                        className="bg-success/10 text-success"
-                      >
-                        {objekt.status}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Badge
+                          variant="secondary"
+                          className="bg-success/10 text-success"
+                        >
+                          {objekt.status}
+                        </Badge>
+                        {(unitsOhneMieterByObjektId[objekt.id] ?? 0) > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/20"
+                          >
+                            ⚠ {unitsOhneMieterByObjektId[objekt.id]}{" "}
+                            {unitsOhneMieterByObjektId[objekt.id] === 1
+                              ? "Einheit"
+                              : "Einheiten"}{" "}
+                            ohne Mieter
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button

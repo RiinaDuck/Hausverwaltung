@@ -136,3 +136,12 @@ CREATE POLICY "Users can insert their own categories"
 -- ============================================
 -- This would be created via Supabase dashboard
 -- Storage path: storage/objects/public/belege/{user_id}/{buchung_id}/{filename}
+
+-- ============================================
+-- TABLE: objekte - add steuern JSONB column
+-- Stores per-object tax/advisor data:
+--   steuerberaterName, steuerberaterTelefon, steuerberaterEmail,
+--   steuerberaterBriefanrede, grundsteuernummer, grundsteuerwert,
+--   einheitswert, aktenzeichen
+-- ============================================
+ALTER TABLE objekte ADD COLUMN IF NOT EXISTS steuern JSONB NOT NULL DEFAULT '{}'::jsonb;
