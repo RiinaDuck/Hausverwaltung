@@ -1750,7 +1750,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             <TableRow key={z.id}>
                               <TableCell>{z.montageort}</TableCell>
                               <TableCell className="text-sm">{z.geraeteart}</TableCell>
-                              <TableCell className="hidden md:table-cell font-mono text-sm">{z.geraetnummer}</TableCell>
+                              <TableCell className="hidden md:table-cell text-sm">{z.geraetnummer}</TableCell>
                               <TableCell>{formatDateGerman(z.geeichtBis)}</TableCell>
                               <TableCell>
                                 <div className="flex gap-1">
@@ -1980,7 +1980,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             <TableRow key={r.id}>
                               <TableCell>{r.montageort}</TableCell>
                               <TableCell className="text-sm">{r.geraeteart}</TableCell>
-                              <TableCell className="hidden md:table-cell font-mono text-sm">{r.geraetnummer}</TableCell>
+                              <TableCell className="hidden md:table-cell text-sm">{r.geraetnummer}</TableCell>
                               <TableCell>{formatDateGerman(r.naechsteWartung) !== "-" ? formatDateGerman(r.naechsteWartung) : formatDateGerman(r.lebensdauerBis)}</TableCell>
                               <TableCell>
                                 <div className="flex gap-1">

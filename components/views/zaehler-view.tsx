@@ -277,7 +277,7 @@ export function ZaehlerView() {
                     <TableCell className="text-sm">{wohnung?.bezeichnung || wohnungLabel(zaehler.wohnungId)}</TableCell>
                     <TableCell>{zaehler.montageort}</TableCell>
                     <TableCell>{zaehler.geraeteart}</TableCell>
-                    <TableCell className="hidden md:table-cell font-mono text-sm">
+                    <TableCell className="hidden md:table-cell text-sm">
                       {zaehler.geraetnummer}
                     </TableCell>
                     <TableCell>{formatDateGerman(zaehler.geeichtBis)}</TableCell>
@@ -347,7 +347,7 @@ export function ZaehlerView() {
                     <TableCell className="text-sm">{wohnung?.bezeichnung || wohnungLabel(rm.wohnungId)}</TableCell>
                     <TableCell>{rm.montageort}</TableCell>
                     <TableCell>{rm.geraeteart}</TableCell>
-                    <TableCell className="hidden md:table-cell font-mono text-sm">
+                    <TableCell className="hidden md:table-cell text-sm">
                       {rm.geraetnummer}
                     </TableCell>
                     <TableCell>{formatDateGerman(rm.lebensdauerBis)}</TableCell>

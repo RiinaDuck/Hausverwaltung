@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,7 +46,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Plus,
@@ -57,6 +56,7 @@ import {
   Filter,
   X,
   ChevronDown,
+  ChevronUp,
   TrendingUp,
   RotateCcw,
   Download,
@@ -145,6 +145,34 @@ function recalcBrutto(netto: number, mwst: number): number {
   return netto * (1 + mwst / 100);
 }
 
+function loadHausmanagerNames(): string[] {
+  if (typeof window === "undefined") return [];
+  const keys = [
+    "hausverwaltung_finanzaemter",
+    "hausverwaltung_steuerberater",
+    "hausverwaltung_energielieferanten",
+    "hausverwaltung_finanzierungspartner",
+    "hausverwaltung_versicherungen",
+    "hausverwaltung_dienstleister",
+    "hausverwaltung_rechtsberatung",
+  ];
+  const names: string[] = [];
+  for (const key of keys) {
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored) {
+        const items = JSON.parse(stored) as Array<{ name?: string }>;
+        for (const item of items) {
+          if (item.name) names.push(item.name);
+        }
+      }
+    } catch {
+      // ignore parse errors
+    }
+  }
+  return [...new Set(names)];
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -186,6 +214,12 @@ export function EinnahmenAusgabenView() {
   // ------ confirm dialogs ------
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [stornoId, setStornoId] = useState<string | null>(null);
+
+  // ------ inline form extras ------
+  const [showMwst, setShowMwst] = useState(false);
+  const [rsSuggestions, setRsSuggestions] = useState<string[]>([]);
+  const [showRsSuggestions, setShowRsSuggestions] = useState(false);
+  const [allRsNames] = useState<string[]>(() => loadHausmanagerNames());
 
   // ------ mieten buchen ------
   const [mietenOpen, setMietenOpen] = useState(false);
@@ -264,6 +298,7 @@ export function EinnahmenAusgabenView() {
     setFormMwstProzent(19);
     setFormBetragBrutto(0);
     setFormBeschreibung("");
+    setShowMwst(false);
     setIsFormOpen(true);
   };
 
@@ -281,6 +316,7 @@ export function EinnahmenAusgabenView() {
     setFormMwstProzent(b.mwstProzent);
     setFormBetragBrutto(Math.abs(b.betragBrutto));
     setFormBeschreibung(b.beschreibung);
+    setShowMwst(b.mwstProzent > 0);
     setIsFormOpen(true);
   };
 
@@ -301,7 +337,7 @@ export function EinnahmenAusgabenView() {
       toast({ title: "Kategorie erforderlich", variant: "destructive" });
       return;
     }
-    if (formBetragNetto <= 0) {
+    if (formBetragBrutto <= 0) {
       toast({
         title: "Betrag erforderlich",
         description: "Bitte geben Sie einen gültigen Betrag ein.",
@@ -314,8 +350,9 @@ export function EinnahmenAusgabenView() {
       return;
     }
 
-    const mwst = formTyp === "ausgabe" ? formMwstProzent : 0;
-    const brutto = recalcBrutto(formBetragNetto, mwst);
+    const mwst = showMwst && formTyp === "ausgabe" ? formMwstProzent : 0;
+    const netto = showMwst && formTyp === "ausgabe" ? formBetragNetto : formBetragBrutto;
+    const brutto = formBetragBrutto;
 
     try {
       if (editingBuchung) {
@@ -323,15 +360,15 @@ export function EinnahmenAusgabenView() {
           typ: formTyp,
           kategorie: formKategorie,
           datum: formDatum,
-          betragNetto: formBetragNetto,
+          betragNetto: netto,
           mwstProzent: mwst,
           betragBrutto: brutto,
           objektId: formObjektId || null,
           wohnungId: formWohnungId || null,
           mieterId: formMieterId || null,
           beschreibung: formBeschreibung,
-          rechnungssteller: formTyp === "ausgabe" ? (formRechnungssteller || null) : null,
-          rechnungsnummer: formTyp === "ausgabe" ? (formRechnungsnummer || null) : null,
+          rechnungssteller: formRechnungssteller || null,
+          rechnungsnummer: formRechnungsnummer || null,
         });
         toast({ title: "Buchung aktualisiert" });
       } else {
@@ -339,15 +376,15 @@ export function EinnahmenAusgabenView() {
           typ: formTyp,
           kategorie: formKategorie,
           datum: formDatum,
-          betragNetto: formBetragNetto,
+          betragNetto: netto,
           mwstProzent: mwst,
           betragBrutto: brutto,
           objektId: formObjektId || null,
           wohnungId: formWohnungId || null,
           mieterId: formMieterId || null,
           beschreibung: formBeschreibung,
-          rechnungssteller: formTyp === "ausgabe" ? (formRechnungssteller || null) : null,
-          rechnungsnummer: formTyp === "ausgabe" ? (formRechnungsnummer || null) : null,
+          rechnungssteller: formRechnungssteller || null,
+          rechnungsnummer: formRechnungsnummer || null,
           belegPfad: null,
           stornoVon: null,
         });
@@ -701,42 +738,154 @@ export function EinnahmenAusgabenView() {
     </div>
   );
 
-  const BookingForm = () => (
-    <div className="space-y-4 mt-2">
-      {/* Typ toggle */}
-      <div className="space-y-2">
-        <Label>Typ</Label>
-        <ToggleGroup
-          type="single"
-          value={formTyp}
-          onValueChange={(v) => {
-            if (v) {
-              setFormTyp(v as "einnahme" | "ausgabe");
-              setFormKategorie("");
-            }
-          }}
-          className="w-full"
-        >
-          <ToggleGroupItem value="einnahme" className="flex-1">
-            Einnahme
-          </ToggleGroupItem>
-          <ToggleGroupItem value="ausgabe" className="flex-1">
-            Ausgabe
-          </ToggleGroupItem>
-        </ToggleGroup>
-      </div>
+  const BookingForm = () => {
+    const handleRsInputChange = (val: string) => {
+      setFormRechnungssteller(val);
+      const filtered = allRsNames.filter((n) =>
+        n.toLowerCase().includes(val.toLowerCase()),
+      );
+      setRsSuggestions(filtered);
+      setShowRsSuggestions(filtered.length > 0);
+    };
 
-      {/* Datum + Kategorie */}
-      <div className="grid grid-cols-2 gap-4">
+    const handleRsFocus = () => {
+      const filtered = allRsNames.filter((n) =>
+        n.toLowerCase().includes(formRechnungssteller.toLowerCase()),
+      );
+      setRsSuggestions(filtered);
+      setShowRsSuggestions(filtered.length > 0);
+    };
+
+    const handleRsBlur = () => {
+      setTimeout(() => setShowRsSuggestions(false), 150);
+    };
+
+    const selectRsSuggestion = (name: string) => {
+      setFormRechnungssteller(name);
+      setShowRsSuggestions(false);
+    };
+
+    return (
+      <div className="space-y-4">
+        {/* 1 — Typ */}
         <div className="space-y-2">
-          <Label htmlFor="form-datum">Datum *</Label>
-          <Input
-            id="form-datum"
-            type="date"
-            value={formDatum}
-            onChange={(e) => setFormDatum(e.target.value)}
-          />
+          <Label>Typ</Label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => { setFormTyp("einnahme"); setFormKategorie(""); setShowMwst(false); }}
+              className={[
+                "flex-1 py-2 px-4 rounded-md text-sm font-medium border transition-colors",
+                formTyp === "einnahme"
+                  ? "bg-success text-success-foreground border-transparent"
+                  : "border-success/50 text-success hover:bg-success/10",
+              ].join(" ")}
+            >
+              Einnahme
+            </button>
+            <button
+              type="button"
+              onClick={() => { setFormTyp("ausgabe"); setFormKategorie(""); }}
+              className={[
+                "flex-1 py-2 px-4 rounded-md text-sm font-medium border transition-colors",
+                formTyp === "ausgabe"
+                  ? "bg-destructive text-destructive-foreground border-transparent"
+                  : "border-destructive/50 text-destructive hover:bg-destructive/10",
+              ].join(" ")}
+            >
+              Ausgabe
+            </button>
+          </div>
         </div>
+
+        {/* 2 — Datum + Betrag */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="form-datum">Datum *</Label>
+            <Input
+              id="form-datum"
+              type="date"
+              value={formDatum}
+              onChange={(e) => setFormDatum(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="form-brutto">Betrag brutto (€) *</Label>
+            <Input
+              id="form-brutto"
+              type="number"
+              step="0.01"
+              min="0"
+              value={formBetragBrutto || ""}
+              onChange={(e) => {
+                const v = parseFloat(e.target.value) || 0;
+                setFormBetragBrutto(v);
+                if (!showMwst) setFormBetragNetto(v);
+              }}
+            />
+            {formTyp === "ausgabe" && (
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !showMwst;
+                  setShowMwst(next);
+                  if (!next) {
+                    setFormBetragNetto(formBetragBrutto);
+                    setFormMwstProzent(19);
+                  }
+                }}
+                className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground transition-colors mt-0.5"
+              >
+                {showMwst ? "MwSt. ausblenden" : "MwSt. aufschlüsseln"}
+              </button>
+            )}
+            {showMwst && formTyp === "ausgabe" && (
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="space-y-1">
+                  <Label htmlFor="form-netto" className="text-[12px] text-muted-foreground">
+                    Betrag netto (€)
+                  </Label>
+                  <Input
+                    id="form-netto"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formBetragNetto || ""}
+                    onChange={(e) => {
+                      const n = parseFloat(e.target.value) || 0;
+                      setFormBetragNetto(n);
+                      setFormBetragBrutto(recalcBrutto(n, formMwstProzent));
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="form-mwst" className="text-[12px] text-muted-foreground">
+                    MwSt. (%)
+                  </Label>
+                  <Select
+                    value={String(formMwstProzent)}
+                    onValueChange={(v) => {
+                      const m = parseInt(v);
+                      setFormMwstProzent(m);
+                      setFormBetragBrutto(recalcBrutto(formBetragNetto, m));
+                    }}
+                  >
+                    <SelectTrigger id="form-mwst">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">0%</SelectItem>
+                      <SelectItem value="7">7%</SelectItem>
+                      <SelectItem value="19">19%</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 3 — Kategorie */}
         <div className="space-y-2">
           <Label htmlFor="form-kategorie">Kategorie *</Label>
           <Select value={formKategorie} onValueChange={setFormKategorie}>
@@ -754,19 +903,86 @@ export function EinnahmenAusgabenView() {
             </SelectContent>
           </Select>
         </div>
-      </div>
 
-      {/* Rechnungssteller + Rechnungsnummer (Ausgabe only) */}
-      {formTyp === "ausgabe" && (
-        <div className="grid grid-cols-2 gap-4">
+        {/* 4 — Objekt + Wohnung */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
+            <Label htmlFor="form-objekt">Objekt *</Label>
+            <Select
+              value={formObjektId || "_none"}
+              onValueChange={(v) => {
+                setFormObjektId(v === "_none" ? "" : v);
+                setFormWohnungId("");
+                setFormMieterId("");
+              }}
+            >
+              <SelectTrigger id="form-objekt">
+                <SelectValue placeholder="Objekt wählen" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none">— Objekt wählen —</SelectItem>
+                {objekte.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>
+                    {o.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="form-wohnung">Wohnung</Label>
+            <Select
+              value={formWohnungId || "_none"}
+              onValueChange={(v) => {
+                setFormWohnungId(v === "_none" ? "" : v);
+                setFormMieterId("");
+              }}
+            >
+              <SelectTrigger id="form-wohnung">
+                <SelectValue placeholder="Wohnung wählen" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="_none">Keine</SelectItem>
+                {wohnungen
+                  .filter((w) => !formObjektId || w.objektId === formObjektId)
+                  .map((w) => (
+                    <SelectItem key={w.id} value={w.id}>
+                      {w.bezeichnung}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* 5 — Rechnungssteller + Rechnungsnummer */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2 relative">
             <Label htmlFor="form-rechnungssteller">Rechnungssteller</Label>
             <Input
               id="form-rechnungssteller"
               value={formRechnungssteller}
-              onChange={(e) => setFormRechnungssteller(e.target.value)}
+              onChange={(e) => handleRsInputChange(e.target.value)}
+              onFocus={handleRsFocus}
+              onBlur={handleRsBlur}
               placeholder="Firma / Name"
+              autoComplete="off"
             />
+            {showRsSuggestions && rsSuggestions.length > 0 && (
+              <div className="absolute z-50 left-0 right-0 top-full mt-1 bg-popover border rounded-md shadow-md max-h-48 overflow-y-auto">
+                {rsSuggestions.map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent transition-colors"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => selectRsSuggestion(name)}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="form-rechnungsnummer">Rechnungsnummer</Label>
@@ -778,163 +994,34 @@ export function EinnahmenAusgabenView() {
             />
           </div>
         </div>
-      )}
 
-      {/* Objekt + Wohnung */}
-      <div className="grid grid-cols-2 gap-4">
+        {/* 6 — Beschreibung */}
         <div className="space-y-2">
-          <Label htmlFor="form-objekt">Objekt *</Label>
-          <Select
-            value={formObjektId || "_none"}
-            onValueChange={(v) => {
-              setFormObjektId(v === "_none" ? "" : v);
-              setFormWohnungId("");
-              setFormMieterId("");
-            }}
-          >
-            <SelectTrigger id="form-objekt">
-              <SelectValue placeholder="Objekt wählen" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="_none">— Objekt wählen —</SelectItem>
-              {objekte.map((o) => (
-                <SelectItem key={o.id} value={o.id}>
-                  {o.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="form-wohnung">Wohnung</Label>
-          <Select
-            value={formWohnungId || "_none"}
-            onValueChange={(v) => {
-              setFormWohnungId(v === "_none" ? "" : v);
-              setFormMieterId("");
-            }}
-          >
-            <SelectTrigger id="form-wohnung">
-              <SelectValue placeholder="Wohnung wählen" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="_none">Keine</SelectItem>
-              {wohnungen
-                .filter((w) => !formObjektId || w.objektId === formObjektId)
-                .map((w) => (
-                  <SelectItem key={w.id} value={w.id}>
-                    {w.bezeichnung}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Mieter (only when a wohnung is selected) */}
-      {formWohnungId && (
-        <div className="space-y-2">
-          <Label htmlFor="form-mieter">Mieter (optional)</Label>
-          <Select
-            value={formMieterId || "_none"}
-            onValueChange={(v) => setFormMieterId(v === "_none" ? "" : v)}
-          >
-            <SelectTrigger id="form-mieter">
-              <SelectValue placeholder="Mieter wählen" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="_none">Kein Mieter</SelectItem>
-              {mieter
-                .filter((m) => m.wohnungId === formWohnungId)
-                .map((m) => (
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.name}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      {/* Betrag netto + MwSt (Ausgabe only) + Brutto */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="form-netto">Betrag netto (€) *</Label>
-          <Input
-            id="form-netto"
-            type="number"
-            step="0.01"
-            min="0"
-            value={formBetragNetto || ""}
-            onChange={(e) => {
-              const n = parseFloat(e.target.value) || 0;
-              setFormBetragNetto(n);
-              setFormBetragBrutto(
-                recalcBrutto(n, formTyp === "ausgabe" ? formMwstProzent : 0),
-              );
-            }}
+          <Label htmlFor="form-beschreibung">Beschreibung</Label>
+          <Textarea
+            id="form-beschreibung"
+            value={formBeschreibung}
+            onChange={(e) => setFormBeschreibung(e.target.value)}
+            placeholder="Optionale Beschreibung"
+            rows={2}
           />
         </div>
-        {formTyp === "ausgabe" && (
-          <div className="space-y-2">
-            <Label htmlFor="form-mwst">MwSt. (%)</Label>
-            <Select
-              value={String(formMwstProzent)}
-              onValueChange={(v) => {
-                const m = parseInt(v);
-                setFormMwstProzent(m);
-                setFormBetragBrutto(recalcBrutto(formBetragNetto, m));
-              }}
-            >
-              <SelectTrigger id="form-mwst">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="0">0%</SelectItem>
-                <SelectItem value="7">7%</SelectItem>
-                <SelectItem value="19">19%</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-        <div className="space-y-2">
-          <Label htmlFor="form-brutto">Betrag brutto (€)</Label>
-          <Input
-            id="form-brutto"
-            type="number"
-            readOnly
-            className="bg-muted"
-            value={formBetragBrutto.toFixed(2)}
-          />
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button variant="outline" onClick={() => setIsFormOpen(false)}>
+            Abbrechen
+          </Button>
+          <Button
+            onClick={handleSave}
+            className="bg-success hover:bg-success/90 text-success-foreground"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Speichern
+          </Button>
         </div>
       </div>
-
-      {/* Beschreibung */}
-      <div className="space-y-2">
-        <Label htmlFor="form-beschreibung">Beschreibung</Label>
-        <Textarea
-          id="form-beschreibung"
-          value={formBeschreibung}
-          onChange={(e) => setFormBeschreibung(e.target.value)}
-          placeholder="Optionale Beschreibung"
-          rows={2}
-        />
-      </div>
-
-      <div className="flex justify-end gap-2 pt-2">
-        <Button variant="outline" onClick={() => setIsFormOpen(false)}>
-          Abbrechen
-        </Button>
-        <Button
-          onClick={handleSave}
-          className="bg-success hover:bg-success/90 text-success-foreground"
-        >
-          <Save className="h-4 w-4 mr-2" />
-          Speichern
-        </Button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   // ---------------------------------------------------------------------------
   // Render
@@ -1035,10 +1122,27 @@ export function EinnahmenAusgabenView() {
             <span className="sm:hidden">Mieten</span>
           </Button>
 
-          <Button size="sm" className="gap-2" onClick={openCreate}>
-            <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">Neue Buchung</span>
-            <span className="sm:hidden">Neu</span>
+          <Button
+            size="sm"
+            variant={isFormOpen && !editingBuchung ? "outline" : "default"}
+            className="gap-2"
+            onClick={() =>
+              isFormOpen && !editingBuchung
+                ? setIsFormOpen(false)
+                : openCreate()
+            }
+          >
+            {isFormOpen && !editingBuchung ? (
+              <X className="h-4 w-4" />
+            ) : (
+              <Plus className="h-4 w-4" />
+            )}
+            <span className="hidden sm:inline">
+              {isFormOpen && !editingBuchung ? "Schließen" : "Neue Buchung"}
+            </span>
+            <span className="sm:hidden">
+              {isFormOpen && !editingBuchung ? "Schließen" : "Neu"}
+            </span>
           </Button>
 
           <DropdownMenu>
@@ -1065,6 +1169,28 @@ export function EinnahmenAusgabenView() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {/* Inline Booking Form */}
+        {isFormOpen && (
+          <Card className="border-primary/20">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardTitle className="text-base">
+                {editingBuchung ? "Buchung bearbeiten" : "Neue Buchung"}
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setIsFormOpen(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </CardHeader>
+            <CardContent>
+              <BookingForm />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Table */}
         <Card>
@@ -1198,23 +1324,6 @@ export function EinnahmenAusgabenView() {
           </CardContent>
         </Card>
       </div>
-
-      {/* New / Edit Buchung Dialog */}
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {editingBuchung ? "Buchung bearbeiten" : "Neue Buchung"}
-            </DialogTitle>
-            <DialogDescription>
-              {editingBuchung
-                ? "Bearbeiten Sie die Buchungsdetails."
-                : "Erstellen Sie eine neue Einnahme oder Ausgabe."}
-            </DialogDescription>
-          </DialogHeader>
-          <BookingForm />
-        </DialogContent>
-      </Dialog>
 
       {/* Mieten buchen Dialog */}
       <Dialog open={mietenOpen} onOpenChange={setMietenOpen}>
