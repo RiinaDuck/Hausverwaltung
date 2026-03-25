@@ -601,7 +601,7 @@ export function AppHeader({ currentView, onMenuClick }: AppHeaderProps) {
         </h1>
       </div>
       <div className="flex items-center gap-2 md:gap-4">
-        {objekte.length > 0 && currentView !== "dashboard" && (
+        {objekte.length > 0 && currentView !== "dashboard" && currentView !== "kontakte" && (
           <div className="hidden sm:flex items-center">
             <Popover open={objektPopoverOpen} onOpenChange={setObjektPopoverOpen}>
               <PopoverTrigger asChild>

@@ -2,6 +2,14 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,7 +22,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -39,6 +46,7 @@ import {
   Plus,
   Trash2,
   Mail,
+  Search,
   Zap,
   Gauge,
   PiggyBank,
@@ -47,6 +55,11 @@ import {
   Scale,
   Users,
   X,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { generateBriefPDF, downloadPDF } from "@/lib/pdf-generator";
@@ -127,6 +140,10 @@ export interface Kontakt {
   notizen?: string;
   // Shared
   besonderheiten?: string;
+  // Metadata
+  _createdAt?: number;
+  _updatedAt?: number;
+  _usageCount?: number;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -311,7 +328,7 @@ function loadKontakte(): Kontakt[] {
       const old = localStorage.getItem(key);
       if (old) {
         const items = JSON.parse(old) as Array<Record<string, unknown>>;
-        migrated.push(...items.map((item) => ({ ...item, typ } as Kontakt)));
+        migrated.push(...items.map((item, i) => ({ ...item, id: item.id ?? `${typ}-${i}`, typ } as Kontakt)));
       }
     }
     return migrated.length > 0 ? migrated : INITIAL_KONTAKTE;
@@ -386,12 +403,41 @@ function createNewKontakt(typ: KontaktTyp): Kontakt {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
+type SortCol = "name" | "kategorie" | "details" | "telefon" | "email";
+type SortDir = "asc" | "desc";
+
+function sortKontakte(items: Kontakt[], col: SortCol, dir: SortDir): Kontakt[] {
+  return [...items].sort((a, b) => {
+    let va = "";
+    let vb = "";
+    switch (col) {
+      case "name":     va = a.name; vb = b.name; break;
+      case "kategorie": va = TYP_LABELS[a.typ]; vb = TYP_LABELS[b.typ]; break;
+      case "details":  va = getSubInfo(a); vb = getSubInfo(b); break;
+      case "telefon":  va = a.telefon ?? ""; vb = b.telefon ?? ""; break;
+      case "email":    va = a.email ?? ""; vb = b.email ?? ""; break;
+    }
+    const cmp = va.localeCompare(vb, "de");
+    return dir === "asc" ? cmp : -cmp;
+  });
+}
+
 export function KontakteView() {
   const [kontakte, setKontakte] = useState<Kontakt[]>(() => loadKontakte());
   const [filterTyp, setFilterTyp] = useState<KontaktTyp | "alle">("alle");
-  const [selectedId, setSelectedId] = useState<string | null>(
-    () => loadKontakte()[0]?.id ?? null,
-  );
+  const [sortCol, setSortCol] = useState<SortCol>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [search, setSearch] = useState("");
+
+  const handleHeaderClick = (col: SortCol) => {
+    if (col === sortCol) {
+      setSortDir((d) => d === "asc" ? "desc" : "asc");
+    } else {
+      setSortCol(col);
+      setSortDir("asc");
+    }
+  };
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [newKontakt, setNewKontakt] = useState<Kontakt | null>(null);
   const { toast } = useToast();
@@ -412,21 +458,16 @@ export function KontakteView() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(kontakte));
   }, [kontakte]);
 
-  const filteredKontakte = useMemo(
-    () => filterTyp === "alle" ? kontakte : kontakte.filter((k) => k.typ === filterTyp),
-    [kontakte, filterTyp],
-  );
-
-  const selectedKontakt = useMemo(
-    () => kontakte.find((k) => k.id === selectedId) ?? null,
-    [kontakte, selectedId],
+  const visibleTypen = useMemo(
+    () => (filterTyp === "alle" ? ALL_TYPEN : [filterTyp as KontaktTyp]),
+    [filterTyp],
   );
 
   // ─── Actions ────────────────────────────────────────────────────────────────
 
   const handleStartNew = () => {
     setIsAddingNew(true);
-    setSelectedId(null);
+    setDetailId(null);
     setNewKontakt(
       createNewKontakt(filterTyp === "alle" ? "energielieferanten" : filterTyp),
     );
@@ -434,14 +475,14 @@ export function KontakteView() {
 
   const handleAddFirstOfType = (typ: KontaktTyp) => {
     setIsAddingNew(true);
-    setSelectedId(null);
+    setDetailId(null);
     setNewKontakt(createNewKontakt(typ));
   };
 
   const handleSaveNew = () => {
     if (!newKontakt) return;
-    setKontakte((prev) => [...prev, newKontakt]);
-    setSelectedId(newKontakt.id);
+    const now = Date.now();
+    setKontakte((prev) => [...prev, { ...newKontakt, _createdAt: now, _updatedAt: now }]);
     setIsAddingNew(false);
     setNewKontakt(null);
     toast({ title: "Kontakt angelegt", description: `"${newKontakt.name}" wurde gespeichert.`, duration: 3000 });
@@ -450,24 +491,21 @@ export function KontakteView() {
   const handleCancelNew = () => {
     setIsAddingNew(false);
     setNewKontakt(null);
-    setSelectedId(kontakte[0]?.id ?? null);
   };
 
-  const handleUpdateSelected = (updates: Partial<Kontakt>) => {
-    setKontakte((prev) => prev.map((k) => k.id === selectedId ? { ...k, ...updates } : k));
+  const handleUpdate = (id: string, updates: Partial<Kontakt>) => {
+    setKontakte((prev) => prev.map((k) => k.id === id ? { ...k, ...updates } : k));
   };
 
-  const handleSaveSelected = () => {
-    if (!selectedKontakt) return;
-    toast({ title: "✓ Speicherung erfolgreich", description: `"${selectedKontakt.name}" wurde gespeichert.`, duration: 3000 });
+  const handleSave = (k: Kontakt) => {
+    setKontakte((prev) => prev.map((c) => c.id === k.id ? { ...c, _updatedAt: Date.now() } : c));
+    toast({ title: "✓ Gespeichert", description: `"${k.name}" wurde gespeichert.`, duration: 3000 });
   };
 
-  const handleDeleteSelected = () => {
-    if (!selectedKontakt) return;
+  const handleDeleteRequest = (k: Kontakt) => {
     setDeleteCallback(() => () => {
-      const remaining = kontakte.filter((k) => k.id !== selectedId);
-      setKontakte(remaining);
-      setSelectedId(remaining[0]?.id ?? null);
+      setKontakte((prev) => prev.filter((c) => c.id !== k.id));
+      if (detailId === k.id) setDetailId(null);
     });
     setDeleteDialogOpen(true);
   };
@@ -478,8 +516,10 @@ export function KontakteView() {
     setDeleteCallback(null);
   };
 
-  const openBriefModal = (empfaenger: string) => {
-    setBriefEmpfaenger(empfaenger);
+  const openBriefModal = (k: Kontakt) => {
+    // increment usage count
+    setKontakte((prev) => prev.map((c) => c.id === k.id ? { ...c, _usageCount: (c._usageCount ?? 0) + 1 } : c));
+    setBriefEmpfaenger(k.name);
     setBriefBetreff("");
     setBriefText(
       "Sehr geehrte Damen und Herren,\n\n\n\nMit freundlichen Grüßen\nIhre Hausverwaltung Boss",
@@ -494,232 +534,221 @@ export function KontakteView() {
     toast({ title: "PDF exportiert", description: `Brief an "${briefEmpfaenger}" wurde als PDF gespeichert.` });
   };
 
-  // ─── Render helpers ─────────────────────────────────────────────────────────
-
-  const renderListItem = (k: Kontakt) => (
-    <button
-      key={k.id}
-      className={`w-full text-left px-3 py-2.5 rounded-md transition-colors ${
-        selectedId === k.id && !isAddingNew
-          ? "bg-accent text-accent-foreground"
-          : "hover:bg-muted"
-      }`}
-      onClick={() => { setSelectedId(k.id); setIsAddingNew(false); setNewKontakt(null); }}
-    >
-      <p className="text-sm font-medium truncate">{k.name}</p>
-      <p className="text-xs text-muted-foreground truncate">{getSubInfo(k)}</p>
-    </button>
-  );
-
-  const renderList = () => {
-    if (filterTyp !== "alle") {
-      return (
-        <div className="p-2 space-y-0.5">
-          {filteredKontakte.length === 0 ? (
-            <div className="py-8 text-center space-y-3">
-              <p className="text-sm text-muted-foreground">Noch keine Einträge</p>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1"
-                onClick={() => handleAddFirstOfType(filterTyp as KontaktTyp)}
-              >
-                <Plus className="h-3 w-3" />
-                Ersten Kontakt anlegen
-              </Button>
-            </div>
-          ) : (
-            filteredKontakte.map(renderListItem)
-          )}
-        </div>
-      );
-    }
-
-    // Grouped "Alle" view
-    return (
-      <div className="p-2 space-y-4">
-        {ALL_TYPEN.map((typ) => {
-          const items = kontakte.filter((k) => k.typ === typ);
-          const Icon = TYP_ICONS[typ];
-          return (
-            <div key={typ}>
-              <div className="flex items-center gap-1.5 px-2 py-1 mb-1">
-                <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  {TYP_LABELS[typ]}
-                </span>
-                <Badge variant="secondary" className="ml-auto text-xs h-4 px-1.5">
-                  {items.length}
-                </Badge>
-              </div>
-              {items.length === 0 ? (
-                <div className="px-2 py-2 text-center">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 text-xs gap-1 text-muted-foreground"
-                    onClick={() => handleAddFirstOfType(typ)}
-                  >
-                    <Plus className="h-3 w-3" />
-                    Ersten anlegen
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-0.5">{items.map(renderListItem)}</div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  const renderDetail = () => {
-    // New contact form
-    if (isAddingNew && newKontakt) {
-      return (
-        <div className="flex flex-col h-full">
-          <div className="p-4 border-b bg-muted/30 flex items-center justify-between gap-2 shrink-0">
-            <span className="font-semibold text-base">Neuen Kontakt anlegen</span>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="gap-1 bg-transparent" onClick={handleCancelNew}>
-                <X className="h-3 w-3" />
-                Abbrechen
-              </Button>
-              <Button size="sm" className="gap-1 bg-emerald-600 hover:bg-emerald-700" onClick={handleSaveNew}>
-                <Save className="h-3 w-3" />
-                Anlegen
-              </Button>
-            </div>
-          </div>
-          <ScrollArea className="flex-1">
-            <div className="p-4 max-w-2xl space-y-4">
-              <div className="space-y-1">
-                <Label className="text-xs">Kontakttyp</Label>
-                <Select
-                  value={newKontakt.typ}
-                  onValueChange={(v: KontaktTyp) => {
-                    const fresh = createNewKontakt(v);
-                    // preserve the current id to avoid flicker
-                    setNewKontakt({ ...fresh, id: newKontakt.id });
-                  }}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ALL_TYPEN.map((t) => (
-                      <SelectItem key={t} value={t}>{TYP_LABELS[t]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <KontaktFormFields
-                kontakt={newKontakt}
-                onChange={(u) => setNewKontakt((prev) => prev ? { ...prev, ...u } : prev)}
-              />
-            </div>
-          </ScrollArea>
-        </div>
-      );
-    }
-
-    // Empty state
-    if (!selectedKontakt) {
-      return (
-        <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground p-8">
-          <Users className="h-12 w-12 opacity-20" />
-          <p className="text-sm text-center">Wählen Sie einen Kontakt aus oder legen Sie einen neuen an.</p>
-        </div>
-      );
-    }
-
-    // Edit / detail view
-    return (
-      <div className="flex flex-col h-full">
-        <div className="p-4 border-b bg-muted/30 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shrink-0">
-          <div className="min-w-0">
-            <p className="font-semibold text-base truncate">{selectedKontakt.name}</p>
-            <p className="text-xs text-muted-foreground">{TYP_LABELS[selectedKontakt.typ]}</p>
-          </div>
-          <div className="flex flex-wrap gap-2 shrink-0">
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1 bg-transparent"
-              onClick={() => openBriefModal(selectedKontakt.name)}
-            >
-              <Mail className="h-3 w-3" />
-              <span className="hidden sm:inline">Brief schreiben</span>
-              <span className="sm:hidden">Brief</span>
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1 bg-transparent text-destructive hover:text-destructive"
-              onClick={handleDeleteSelected}
-            >
-              <Trash2 className="h-3 w-3" />
-              <span className="hidden sm:inline">Löschen</span>
-            </Button>
-            <Button
-              size="sm"
-              className="gap-1 bg-emerald-600 hover:bg-emerald-700"
-              onClick={handleSaveSelected}
-            >
-              <Save className="h-3 w-3" />
-              <span className="hidden sm:inline">Speichern</span>
-            </Button>
-          </div>
-        </div>
-        <ScrollArea className="flex-1">
-          <div className="p-4 max-w-2xl">
-            <KontaktFormFields kontakt={selectedKontakt} onChange={handleUpdateSelected} />
-          </div>
-        </ScrollArea>
-      </div>
-    );
-  };
-
   // ─── Layout ─────────────────────────────────────────────────────────────────
 
+  const detailKontakt = detailId != null ? (kontakte.find((c) => c.id === detailId) ?? null) : null;
+  const allItems = useMemo(() => {
+    const base = visibleTypen.flatMap((typ) => kontakte.filter((k) => k.typ === typ));
+    const q = search.trim().toLowerCase();
+    const filtered = q
+      ? base.filter((k) =>
+          k.name.toLowerCase().includes(q) ||
+          TYP_LABELS[k.typ].toLowerCase().includes(q) ||
+          getSubInfo(k).toLowerCase().includes(q)
+        )
+      : base;
+    return sortKontakte(filtered, sortCol, sortDir);
+  }, [visibleTypen, kontakte, sortCol, sortDir, search]);
+
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)]">
-      {/* Top bar */}
-      <div className="border-b px-4 py-3 flex items-center gap-3 shrink-0">
-        <Select value={filterTyp} onValueChange={(v) => setFilterTyp(v as KontaktTyp | "alle")}>
-          <SelectTrigger className="h-9 w-56">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="alle">Alle Kontakte</SelectItem>
-            {ALL_TYPEN.map((t) => (
-              <SelectItem key={t} value={t}>{TYP_LABELS[t]}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="flex-1" />
-        <Button size="sm" className="gap-1.5" onClick={handleStartNew}>
-          <Plus className="h-4 w-4" />
-          <span className="hidden sm:inline">Neuen Kontakt anlegen</span>
-          <span className="sm:hidden">Neu</span>
-        </Button>
-      </div>
+    <div className="space-y-4 sm:space-y-6">
+      {detailKontakt ? (
+        /* ── Detail view ──────────────────────────────────────────────────────── */
+        <>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
+              <Button variant="ghost" size="sm" className="gap-1 -ml-1 shrink-0" onClick={() => setDetailId(null)}>
+                <ChevronLeft className="h-4 w-4" />
+                Zurück
+              </Button>
+              <div className="flex items-baseline gap-2 min-w-0">
+                <h2 className="font-semibold truncate">{detailKontakt.name}</h2>
+                <span className="text-sm text-muted-foreground shrink-0">{TYP_LABELS[detailKontakt.typ]}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" className="gap-1.5" onClick={() => openBriefModal(detailKontakt)}>
+                <Mail className="h-3.5 w-3.5" />
+                Brief schreiben
+              </Button>
+              <Button
+                variant="outline" size="sm"
+                className="gap-1.5 text-destructive hover:text-destructive border-destructive/40"
+                onClick={() => handleDeleteRequest(detailKontakt)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Löschen
+              </Button>
+              <Button
+                size="sm" className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                onClick={() => handleSave(detailKontakt)}
+              >
+                <Save className="h-3.5 w-3.5" />
+                Speichern
+              </Button>
+            </div>
+          </div>
+          <KontaktFormFields
+            kontakt={detailKontakt}
+            onChange={(u) => handleUpdate(detailKontakt.id, u)}
+          />
+        </>
+      ) : (
+        /* ── List view ────────────────────────────────────────────────────────── */
+        <>
+          {/* Top action bar */}
+          <div className="flex items-center gap-2">
+            <Select value={filterTyp} onValueChange={(v) => setFilterTyp(v as KontaktTyp | "alle")}>
+              <SelectTrigger className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="alle">Alle Kontakte</SelectItem>
+                {ALL_TYPEN.map((t) => (
+                  <SelectItem key={t} value={t}>{TYP_LABELS[t]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Suchen…"
+                className="pl-8 h-9 text-sm"
+              />
+            </div>
+            <div className="flex-1" />
+            <Button size="sm" className="gap-2" onClick={handleStartNew}>
+              <Plus className="h-4 w-4" />
+              Neuen Kontakt anlegen
+            </Button>
+          </div>
 
-      {/* 2-panel layout */}
-      <div className="flex-1 flex min-h-0">
-        {/* Left list panel */}
-        <div className="w-64 md:w-72 shrink-0 border-r flex flex-col min-h-0">
-          <ScrollArea className="flex-1">
-            {renderList()}
-          </ScrollArea>
-        </div>
+          {/* Inline new-contact form */}
+          {isAddingNew && newKontakt && (
+            <Card>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="text-base">Neuen Kontakt anlegen</CardTitle>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" className="gap-1" onClick={handleCancelNew}>
+                      <X className="h-3 w-3" />
+                      Abbrechen
+                    </Button>
+                    <Button size="sm" className="gap-1 bg-emerald-600 hover:bg-emerald-700" onClick={handleSaveNew}>
+                      <Save className="h-3 w-3" />
+                      Anlegen
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-1">
+                  <Label className="text-xs">Kontakttyp</Label>
+                  <Select
+                    value={newKontakt.typ}
+                    onValueChange={(v: KontaktTyp) => {
+                      const fresh = createNewKontakt(v);
+                      setNewKontakt({ ...fresh, id: newKontakt.id });
+                    }}
+                  >
+                    <SelectTrigger className="w-52">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ALL_TYPEN.map((t) => (
+                        <SelectItem key={t} value={t}>{TYP_LABELS[t]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <KontaktFormFields
+                  kontakt={newKontakt}
+                  onChange={(u) => setNewKontakt((prev) => prev ? { ...prev, ...u } : prev)}
+                />
+              </CardContent>
+            </Card>
+          )}
 
-        {/* Right detail panel */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {renderDetail()}
-        </div>
-      </div>
+          {/* All contacts — flat table, type as column */}
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-auto" style={{ maxHeight: "calc(100vh - 220px)" }}>
+              <Table>
+                <TableHeader className="sticky top-0 z-10 bg-card">
+                  <TableRow>
+                    {([
+                      ["name",      "Name"],
+                      ["kategorie", "Kategorie"],
+                      ["details",   "Details"],
+                      ["telefon",   "Telefon"],
+                      ["email",     "E-Mail"],
+                    ] as [SortCol, string][]).map(([col, label]) => (
+                      <TableHead
+                        key={col}
+                        className="cursor-pointer select-none whitespace-nowrap"
+                        onClick={() => handleHeaderClick(col)}
+                      >
+                        <div className="flex items-center gap-1">
+                          {label}
+                          {sortCol === col
+                            ? sortDir === "asc"
+                              ? <ArrowUp className="h-3.5 w-3.5 text-foreground" />
+                              : <ArrowDown className="h-3.5 w-3.5 text-foreground" />
+                            : <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground/50" />}
+                        </div>
+                      </TableHead>
+                    ))}
+                    <TableHead className="w-[40px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {allItems.length === 0 ? (
+                    <TableRow className="hover:bg-transparent">
+                      <TableCell colSpan={6} className="py-12 text-center text-muted-foreground text-sm">
+                        Keine Kontakte vorhanden
+                      </TableCell>
+                    </TableRow>
+                  ) : allItems.map((k) => {
+                    const Icon = TYP_ICONS[k.typ];
+                    return (
+                      <TableRow
+                        key={`${k.typ}-${k.id}`}
+                        className="cursor-pointer"
+                        onClick={() => setDetailId(k.id)}
+                      >
+                        <TableCell>
+                          <span className="font-medium text-sm">{k.name}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5 text-sm text-muted-foreground whitespace-nowrap">
+                            <Icon className="h-3.5 w-3.5 shrink-0" />
+                            {TYP_LABELS[k.typ]}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {getSubInfo(k)}
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {k.telefon ?? ""}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {k.email ?? ""}
+                        </TableCell>
+                        <TableCell>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      )}
 
       {/* Brief Modal */}
       <Dialog open={briefModalOpen} onOpenChange={setBriefModalOpen}>
