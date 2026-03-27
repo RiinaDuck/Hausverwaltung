@@ -60,6 +60,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  Archive,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { generateBriefPDF, downloadPDF } from "@/lib/pdf-generator";
@@ -144,6 +146,8 @@ export interface Kontakt {
   _createdAt?: number;
   _updatedAt?: number;
   _usageCount?: number;
+  archived_at?: string;
+  archive_reason?: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -452,6 +456,12 @@ export function KontakteView() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteCallback, setDeleteCallback] = useState<(() => void) | null>(null);
 
+  // Archive
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const [archiveReason, setArchiveReason] = useState("");
+  const [archiveProcessing, setArchiveProcessing] = useState(false);
+  const [kontaktToArchive, setKontaktToArchive] = useState<Kontakt | null>(null);
+
   // Persist
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -510,6 +520,30 @@ export function KontakteView() {
     setDeleteDialogOpen(true);
   };
 
+  const handleArchiveRequest = (k: Kontakt) => {
+    setKontaktToArchive(k);
+    setArchiveReason("");
+    setArchiveOpen(true);
+  };
+
+  const handleConfirmArchive = async () => {
+    if (!kontaktToArchive) return;
+    setArchiveProcessing(true);
+    try {
+      setKontakte((prev) => prev.map((c) =>
+        c.id === kontaktToArchive.id
+          ? { ...c, archived_at: new Date().toISOString(), archive_reason: archiveReason || undefined }
+          : c
+      ));
+      toast({ title: "Archiviert", description: `"${kontaktToArchive.name}" wurde archiviert.` });
+      setArchiveOpen(false);
+      setKontaktToArchive(null);
+      if (detailId === kontaktToArchive.id) setDetailId(null);
+    } finally {
+      setArchiveProcessing(false);
+    }
+  };
+
   const handleConfirmDelete = () => {
     deleteCallback?.();
     setDeleteDialogOpen(false);
@@ -538,7 +572,7 @@ export function KontakteView() {
 
   const detailKontakt = detailId != null ? (kontakte.find((c) => c.id === detailId) ?? null) : null;
   const allItems = useMemo(() => {
-    const base = visibleTypen.flatMap((typ) => kontakte.filter((k) => k.typ === typ));
+    const base = visibleTypen.flatMap((typ) => kontakte.filter((k) => k.typ === typ && !k.archived_at));
     const q = search.trim().toLowerCase();
     const filtered = q
       ? base.filter((k) =>
@@ -570,6 +604,14 @@ export function KontakteView() {
               <Button variant="outline" size="sm" className="gap-1.5" onClick={() => openBriefModal(detailKontakt)}>
                 <Mail className="h-3.5 w-3.5" />
                 Brief schreiben
+              </Button>
+              <Button
+                variant="outline" size="sm"
+                className="gap-1.5 text-amber-600 hover:text-amber-600 border-amber-600/40"
+                onClick={() => handleArchiveRequest(detailKontakt)}
+              >
+                <Archive className="h-3.5 w-3.5" />
+                Archivieren
               </Button>
               <Button
                 variant="outline" size="sm"
@@ -811,6 +853,49 @@ export function KontakteView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Archive Confirmation Dialog */}
+      <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Kontakt archivieren?</DialogTitle>
+            <DialogDescription>
+              Dieser Kontakt wird archiviert und aus der aktiven Ansicht entfernt. Er kann im Archiv wiederhergestellt werden.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="archive-kontakt-reason">Grund (optional)</Label>
+            <Input
+              id="archive-kontakt-reason"
+              placeholder="z.B. Vertrag beendet"
+              value={archiveReason}
+              onChange={(e) => setArchiveReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setArchiveOpen(false)} disabled={archiveProcessing}>
+              Abbrechen
+            </Button>
+            <Button
+              onClick={handleConfirmArchive}
+              disabled={archiveProcessing}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {archiveProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Wird archiviert...
+                </>
+              ) : (
+                <>
+                  <Archive className="mr-2 h-4 w-4" />
+                  Archivieren
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1003,7 +1088,7 @@ function MessdienstFields({ k, onChange }: FProps) {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader className="py-3"><CardTitle className="text-sm">Meßdienst-Daten</CardTitle></CardHeader>
+        <CardHeader className="py-3"><CardTitle className="text-sm">Stammdaten</CardTitle></CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-1">
             <Label className="text-xs">Firma</Label>

@@ -9,6 +9,9 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Trash2, RotateCcw } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import type { Kontakt } from "@/components/views/kontakte-view";
+
+const KONTAKTE_STORAGE_KEY = "hausverwaltung_kontakte";
 
 interface ArchivedItem {
   id: string;
@@ -28,6 +31,7 @@ export function ArchivView() {
   const [archivedMieter, setArchivedMieter] = useState<ArchivedItem[]>([]);
   const [archivedWohnungen, setArchivedWohnungen] = useState<ArchivedItem[]>([]);
   const [archivedObjekte, setArchivedObjekte] = useState<ArchivedItem[]>([]);
+  const [archivedKontakte, setArchivedKontakte] = useState<ArchivedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<{ type: string; id: string } | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -92,6 +96,28 @@ export function ArchivView() {
       } finally {
         setLoading(false);
       }
+
+      // Load archived kontakte from localStorage
+      try {
+        if (typeof window !== "undefined") {
+          const stored = localStorage.getItem(KONTAKTE_STORAGE_KEY);
+          if (stored) {
+            const all: Kontakt[] = JSON.parse(stored);
+            const archived = all
+              .filter((k) => !!k.archived_at)
+              .map((k) => ({
+                id: k.id,
+                name: k.name,
+                archived_at: k.archived_at!,
+                archive_reason: k.archive_reason ?? null,
+              }))
+              .sort((a, b) => b.archived_at.localeCompare(a.archived_at));
+            setArchivedKontakte(archived);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading archived kontakte:", error);
+      }
     };
 
     loadArchivedEntries();
@@ -100,6 +126,22 @@ export function ArchivView() {
   const handleRestore = async (type: string, id: string) => {
     setRestoreInProgress(true);
     try {
+      if (type === "kontakt") {
+        // Restore from localStorage
+        if (typeof window !== "undefined") {
+          const stored = localStorage.getItem(KONTAKTE_STORAGE_KEY);
+          if (stored) {
+            const all: Kontakt[] = JSON.parse(stored);
+            const updated = all.map((k) =>
+              k.id === id ? { ...k, archived_at: undefined, archive_reason: undefined } : k
+            );
+            localStorage.setItem(KONTAKTE_STORAGE_KEY, JSON.stringify(updated));
+          }
+        }
+        setArchivedKontakte((prev) => prev.filter((k) => k.id !== id));
+        toast({ title: "Erfolg", description: "Kontakt wurde wiederhergestellt." });
+        return;
+      }
       if (supabase) {
         const { error } = await supabase
           .from(type === "mieter" ? "mieter" : type === "wohnung" ? "wohnungen" : "objekte")
@@ -136,6 +178,22 @@ export function ArchivView() {
     if (!selectedItem) return;
 
     try {
+      if (selectedItem.type === "kontakt") {
+        // Delete from localStorage
+        if (typeof window !== "undefined") {
+          const stored = localStorage.getItem(KONTAKTE_STORAGE_KEY);
+          if (stored) {
+            const all: Kontakt[] = JSON.parse(stored);
+            const updated = all.filter((k) => k.id !== selectedItem.id);
+            localStorage.setItem(KONTAKTE_STORAGE_KEY, JSON.stringify(updated));
+          }
+        }
+        setArchivedKontakte((prev) => prev.filter((k) => k.id !== selectedItem.id));
+        toast({ title: "Erfolg", description: "Kontakt wurde endgültig gelöscht." });
+        setDeleteConfirmOpen(false);
+        setSelectedItem(null);
+        return;
+      }
       if (supabase) {
         const { error } = await supabase
           .from(selectedItem.type === "mieter" ? "mieter" : selectedItem.type === "wohnung" ? "wohnungen" : "objekte")
@@ -241,10 +299,11 @@ export function ArchivView() {
           </CardHeader>
           <CardContent>
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="mieter">Mieter</TabsTrigger>
                 <TabsTrigger value="wohnung">Wohnungen</TabsTrigger>
                 <TabsTrigger value="objektdaten">Objekte</TabsTrigger>
+                <TabsTrigger value="kontakt">Kontakte</TabsTrigger>
               </TabsList>
 
               <TabsContent value="mieter" className="space-y-4">
@@ -275,6 +334,10 @@ export function ArchivView() {
                 ) : (
                   renderArchivedList(archivedObjekte)
                 )}
+              </TabsContent>
+
+              <TabsContent value="kontakt" className="space-y-4">
+                {renderArchivedList(archivedKontakte)}
               </TabsContent>
             </Tabs>
           </CardContent>
