@@ -49,6 +49,7 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
     addObjekt,
     updateObjekt,
     deleteObjekt,
+    archiveObjekt,
     selectedObjektId,
     setSelectedObjektId,
   } = useAppData();
@@ -235,33 +236,19 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
 
     setArchiveProcessing(true);
     try {
-      const supabase = createClient();
-      if (!supabase) throw new Error("Supabase client not available");
-
-      // Update objekt: set archived_at=now(), archive_reason="Archiviert"
-      const now = new Date().toISOString();
-      const { error } = await supabase
-        .from("objekte")
-        .update({
-          archived_at: now,
-          archive_reason: "Archiviert",
-        })
-        .eq("id", objektToArchive.id);
-
-      if (error) throw error;
+      await archiveObjekt(objektToArchive.id, "Archiviert");
 
       toast({
         title: "Archiviert",
         description: `Objekt "${objektToArchive.name}" wurde archiviert.`,
       });
 
-      setObjektToArchive(null);
-      setArchiveConfirmOpen(false);
-      
       // Deselect the archived objekt
       if (selectedObjektId === objektToArchive.id) {
         setSelectedObjektId(objekte.find((o) => o.id !== objektToArchive.id)?.id ?? null);
       }
+      setObjektToArchive(null);
+      setArchiveConfirmOpen(false);
     } catch (error: any) {
       console.error("Error archiving objekt:", error);
       toast({
@@ -404,9 +391,10 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
       {selectedObjekt && (
         <Tabs defaultValue="stammdaten" className="space-y-4">
           <div className="flex flex-col gap-3">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
+            <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 h-auto">
               <TabsTrigger value="stammdaten" className="text-xs sm:text-sm py-2">Stammdaten</TabsTrigger>
               <TabsTrigger value="eigentuemer" className="text-xs sm:text-sm py-2">Eigentümer</TabsTrigger>
+              <TabsTrigger value="steuern" className="text-xs sm:text-sm py-2">Steuern &amp; Abgaben</TabsTrigger>
               <TabsTrigger value="liegenschaft" className="text-xs sm:text-sm py-2">Liegenschaft</TabsTrigger>
               <TabsTrigger value="energieausweis" className="text-xs sm:text-sm py-2">Energieausweis</TabsTrigger>
             </TabsList>
@@ -912,7 +900,244 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
 
           </TabsContent>
 
-          {/* TAB 3: Liegenschaft */}
+          {/* TAB 3: Steuern & Abgaben */}
+          <TabsContent value="steuern" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Finanzamt</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="fa-name">Finanzamt Name</Label>
+                    <Input
+                      id="fa-name"
+                      value={selectedObjekt.steuern?.finanzamtName || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          steuern: {
+                            ...selectedObjekt.steuern,
+                            finanzamtName: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fa-steuernummer">Steuernummer</Label>
+                    <Input
+                      id="fa-steuernummer"
+                      value={selectedObjekt.steuern?.finanzamtSteuernummer || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          steuern: {
+                            ...selectedObjekt.steuern,
+                            finanzamtSteuernummer: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="fa-ansprechpartner">Ansprechpartner</Label>
+                    <Input
+                      id="fa-ansprechpartner"
+                      value={selectedObjekt.steuern?.finanzamtAnsprechpartner || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          steuern: {
+                            ...selectedObjekt.steuern,
+                            finanzamtAnsprechpartner: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fa-telefon">Telefon</Label>
+                    <Input
+                      id="fa-telefon"
+                      value={selectedObjekt.steuern?.finanzamtTelefon || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          steuern: {
+                            ...selectedObjekt.steuern,
+                            finanzamtTelefon: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="fa-email">E-Mail</Label>
+                    <Input
+                      id="fa-email"
+                      type="email"
+                      value={selectedObjekt.steuern?.finanzamtEmail || ""}
+                      onChange={(e) =>
+                        updateObjekt(selectedObjekt.id, {
+                          steuern: {
+                            ...selectedObjekt.steuern,
+                            finanzamtEmail: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <div className="flex flex-col md:flex-row gap-4">
+              <Card className="flex-1">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Steuerberater</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="stb-name">Name</Label>
+                      <Input
+                        id="stb-name"
+                        value={selectedObjekt.steuern?.steuerberaterName || ""}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            steuern: {
+                              ...selectedObjekt.steuern,
+                              steuerberaterName: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="stb-telefon">Telefon</Label>
+                      <Input
+                        id="stb-telefon"
+                        value={selectedObjekt.steuern?.steuerberaterTelefon || ""}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            steuern: {
+                              ...selectedObjekt.steuern,
+                              steuerberaterTelefon: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="stb-email">E-Mail</Label>
+                      <Input
+                        id="stb-email"
+                        type="email"
+                        value={selectedObjekt.steuern?.steuerberaterEmail || ""}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            steuern: {
+                              ...selectedObjekt.steuern,
+                              steuerberaterEmail: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="stb-briefanrede">Briefanrede</Label>
+                      <Input
+                        id="stb-briefanrede"
+                        value={selectedObjekt.steuern?.steuerberaterBriefanrede || ""}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            steuern: {
+                              ...selectedObjekt.steuern,
+                              steuerberaterBriefanrede: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="flex-1">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Grundbesitz</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="grundsteuernr">Grundsteuernummer</Label>
+                      <Input
+                        id="grundsteuernr"
+                        value={selectedObjekt.steuern?.grundsteuernummer || ""}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            steuern: {
+                              ...selectedObjekt.steuern,
+                              grundsteuernummer: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="grundsteuerwert">Grundsteuerwert (€)</Label>
+                      <Input
+                        id="grundsteuerwert"
+                        value={selectedObjekt.steuern?.grundsteuerwert || ""}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            steuern: {
+                              ...selectedObjekt.steuern,
+                              grundsteuerwert: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="einheitswert">Einheitswert (€)</Label>
+                      <Input
+                        id="einheitswert"
+                        value={selectedObjekt.steuern?.einheitswert || ""}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            steuern: {
+                              ...selectedObjekt.steuern,
+                              einheitswert: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="steuer-aktenzeichen">Aktenzeichen</Label>
+                      <Input
+                        id="steuer-aktenzeichen"
+                        value={selectedObjekt.steuern?.aktenzeichen || ""}
+                        onChange={(e) =>
+                          updateObjekt(selectedObjekt.id, {
+                            steuern: {
+                              ...selectedObjekt.steuern,
+                              aktenzeichen: e.target.value,
+                            },
+                          })
+                        }
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* TAB 4: Liegenschaft */}
           <TabsContent value="liegenschaft" className="space-y-4">
             <div className="flex flex-col md:flex-row gap-4">
             <Card className="flex-1">
@@ -1296,7 +1521,7 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
           <DialogHeader>
             <DialogTitle>Objekt archivieren?</DialogTitle>
             <DialogDescription>
-              Möchten Sie das Objekt <span className="font-semibold">"{objektToArchive?.name}"</span> wirklich archivieren?
+              Möchten Sie das Objekt <span className="font-medium">"{objektToArchive?.name}"</span> wirklich archivieren?
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2 text-sm text-muted-foreground">

@@ -48,6 +48,9 @@ import {
   Gauge,
   Briefcase,
   Loader2,
+  Zap,
+  Star,
+  BadgeCheck,
 } from "lucide-react";
 
 interface LandingPageProps {
@@ -396,6 +399,12 @@ export function LandingPage({
             >
               FAQ
             </a>
+            <a
+              href="#pricing"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Preise
+            </a>
           </nav>
           <div className="flex items-center gap-2 md:gap-3">
             <Button
@@ -452,6 +461,12 @@ export function LandingPage({
               className="block text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
             >
               FAQ
+            </a>
+            <a
+              href="#pricing"
+              className="block text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+            >
+              Preise
             </a>
             <Button
               variant="outline"
@@ -1018,6 +1033,108 @@ export function LandingPage({
               </AccordionContent>
             </AccordionItem>
           </Accordion>
+        </div>
+      </section>
+
+      {/* Pricing */}
+      <section id="pricing" className="py-20">
+        <div className="container mx-auto px-4 max-w-5xl">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Einfache, transparente Preise</h2>
+            <p className="text-muted-foreground text-lg">
+              Wählen Sie das Modell, das zu Ihrem Portfolio passt. Kein verstecktes Kleingedrucktes.
+            </p>
+          </div>
+          <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+            {/* Starter */}
+            <Card className="relative border-2 border-border flex flex-col">
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary">
+                    <Zap className="h-5 w-5 text-foreground" />
+                  </div>
+                  <CardTitle className="text-xl">Starter</CardTitle>
+                </div>
+                <div className="mt-2">
+                  <span className="text-4xl font-bold">9,90 €</span>
+                  <span className="text-muted-foreground ml-1">/Monat</span>
+                </div>
+                <CardDescription className="mt-2">
+                  Ideal für private Vermieter mit bis zu 5 Einheiten.
+                </CardDescription>
+              </CardHeader>
+              <div className="px-6 pb-6 flex flex-col flex-1">
+                <ul className="space-y-3 mb-6 flex-1">
+                  {[
+                    "Bis zu 5 Wohneinheiten",
+                    "Mieter- & Objektverwaltung",
+                    "Nebenkostenabrechnung",
+                    "Einnahmen & Ausgaben",
+                    "PDF-Export",
+                  ].map((f) => (
+                    <li key={f} className="flex items-center gap-2 text-sm">
+                      <BadgeCheck className="h-4 w-4 text-success shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Button variant="outline" className="w-full" onClick={handleStartDemo}>
+                  Demo starten
+                </Button>
+              </div>
+            </Card>
+
+            {/* Pro */}
+            <Card className="relative border-2 border-success flex flex-col">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                <span className="bg-success text-success-foreground text-xs font-semibold px-3 py-1 rounded-full">
+                  Empfohlen
+                </span>
+              </div>
+              <CardHeader className="pb-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-success">
+                    <Star className="h-5 w-5 text-success-foreground" />
+                  </div>
+                  <CardTitle className="text-xl">Pro</CardTitle>
+                </div>
+                <div className="mt-2">
+                  <span className="text-4xl font-bold">24,90 €</span>
+                  <span className="text-muted-foreground ml-1">/Monat</span>
+                </div>
+                <CardDescription className="mt-2">
+                  Für Verwalter mit mehreren Objekten und Reporting-Bedarf.
+                </CardDescription>
+              </CardHeader>
+              <div className="px-6 pb-6 flex flex-col flex-1">
+                <ul className="space-y-3 mb-6 flex-1">
+                  {[
+                    "Unbegrenzte Wohneinheiten",
+                    "Alles aus Starter",
+                    "DATEV-Import & -Export",
+                    "Statistiken & Diagramme",
+                    "Dokumentenverwaltung",
+                    "Prioritäts-Support",
+                  ].map((f) => (
+                    <li key={f} className="flex items-center gap-2 text-sm">
+                      <BadgeCheck className="h-4 w-4 text-success shrink-0" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  className="w-full bg-success hover:bg-success/90 text-success-foreground"
+                  onClick={handleStartDemo}
+                >
+                  Kostenlos testen
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </Card>
+          </div>
+          <p className="text-center text-sm text-muted-foreground mt-6">
+            Alle Preise zzgl. MwSt.{" · "}Monatlich kündbar{" · "}14 Tage kostenlos testen
+          </p>
         </div>
       </section>
 

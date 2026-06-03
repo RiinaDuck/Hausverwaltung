@@ -106,6 +106,21 @@ export interface Objekt {
     ustIdNr?: string;
   };
   notizen: string;
+  steuern?: {
+    finanzamtName?: string;
+    finanzamtSteuernummer?: string;
+    finanzamtAnsprechpartner?: string;
+    finanzamtTelefon?: string;
+    finanzamtEmail?: string;
+    steuerberaterName?: string;
+    steuerberaterTelefon?: string;
+    steuerberaterEmail?: string;
+    steuerberaterBriefanrede?: string;
+    grundsteuernummer?: string;
+    grundsteuerwert?: string;
+    einheitswert?: string;
+    aktenzeichen?: string;
+  };
 }
 
 export interface Wohnung {
@@ -293,6 +308,12 @@ interface AppDataContextType {
   updateMieter: (id: string, mieter: Partial<Mieter>) => Promise<void>;
   deleteMieter: (id: string) => Promise<void>;
   archiviereMieter: (id: string) => Promise<void>;
+  archiveObjekt: (id: string, reason?: string) => Promise<void>;
+  archiveWohnung: (id: string, reason?: string) => Promise<void>;
+  archiveMieter: (id: string, reason?: string) => Promise<void>;
+  restoreObjekt: (id: string) => Promise<void>;
+  restoreWohnung: (id: string) => Promise<void>;
+  restoreMieter: (id: string) => Promise<void>;
   reaktiviereMieter: (
     ehemaligerMieterId: string,
     wohnungId: string,
@@ -376,6 +397,7 @@ const DEMO_OBJEKTE: Objekt[] = [
     },
     notizen:
       "Hausmeisterservice: Firma Schmidt, Tel. 030 9876543\nSchlüssel: 3x Haupteingang, 1x Keller\nNächste Wartung Heizung: März 2026",
+    steuern: {},
   },
 ];
 
@@ -525,6 +547,7 @@ const mapDBToObjekt = (dbObjekt: any): Objekt => ({
   bankverbindung: dbObjekt.bankverbindung,
   objektdaten: dbObjekt.objektdaten,
   notizen: dbObjekt.notizen || "",
+  steuern: dbObjekt.steuern || {},
 });
 
 const mapDBToWohnung = (dbWohnung: any): Wohnung => ({
@@ -1105,6 +1128,74 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // ---- Archive / Restore ----
+
+  const archiveObjekt = async (id: string, reason?: string) => {
+    const supabase = createSupabaseClient();
+    if (!supabase || !user || isAdmin) return;
+    const { error } = await supabase
+      .from("objekte")
+      .update({ archived_at: new Date().toISOString(), archive_reason: reason || "Manuell archiviert" })
+      .eq("id", id);
+    if (error) throw error;
+    setObjekte((prev) => prev.filter((o) => o.id !== id));
+  };
+
+  const archiveWohnung = async (id: string, reason?: string) => {
+    const supabase = createSupabaseClient();
+    if (!supabase || !user || isAdmin) return;
+    const { error } = await supabase
+      .from("wohnungen")
+      .update({ archived_at: new Date().toISOString(), archive_reason: reason || "Manuell archiviert" })
+      .eq("id", id);
+    if (error) throw error;
+    setWohnungen((prev) => prev.filter((w) => w.id !== id));
+  };
+
+  const archiveMieter = async (id: string, reason?: string) => {
+    const supabase = createSupabaseClient();
+    if (!supabase || !user || isAdmin) return;
+    const { error } = await supabase
+      .from("mieter")
+      .update({ archived_at: new Date().toISOString(), archive_reason: reason || "Manuell archiviert", isAktiv: false })
+      .eq("id", id);
+    if (error) throw error;
+    setMieter((prev) => prev.filter((m: Mieter) => m.id !== id));
+  };
+
+  const restoreObjekt = async (id: string) => {
+    const supabase = createSupabaseClient();
+    if (!supabase || !user || isAdmin) return;
+    const { error } = await supabase
+      .from("objekte")
+      .update({ archived_at: null, archive_reason: null })
+      .eq("id", id);
+    if (error) throw error;
+    await refreshData();
+  };
+
+  const restoreWohnung = async (id: string) => {
+    const supabase = createSupabaseClient();
+    if (!supabase || !user || isAdmin) return;
+    const { error } = await supabase
+      .from("wohnungen")
+      .update({ archived_at: null, archive_reason: null })
+      .eq("id", id);
+    if (error) throw error;
+    await refreshData();
+  };
+
+  const restoreMieter = async (id: string) => {
+    const supabase = createSupabaseClient();
+    if (!supabase || !user || isAdmin) return;
+    const { error } = await supabase
+      .from("mieter")
+      .update({ archived_at: null, archive_reason: null, isAktiv: true })
+      .eq("id", id);
+    if (error) throw error;
+    await refreshData();
+  };
+
   const reaktiviereMieter = async (
     ehemaligerMieterId: string,
     wohnungId: string,
@@ -1535,6 +1626,12 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       updateMieter,
       deleteMieter,
       archiviereMieter,
+      archiveObjekt,
+      archiveWohnung,
+      archiveMieter,
+      restoreObjekt,
+      restoreWohnung,
+      restoreMieter,
       reaktiviereMieter,
       addExpense,
       updateExpense,

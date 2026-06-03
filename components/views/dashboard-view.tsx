@@ -150,6 +150,19 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
     [wohnungen],
   );
 
+  // Count vermietet units without an active tenant, per objekt
+  const unitsOhneMieterByObjektId = useMemo(() => {
+    const wohnungenMitMieter = new Set(
+      mieter.filter((m) => m.isAktiv !== false).map((m) => m.wohnungId),
+    );
+    return wohnungen.reduce<Record<string, number>>((acc, w) => {
+      if (w.status === "vermietet" && !wohnungenMitMieter.has(w.id)) {
+        acc[w.objektId] = (acc[w.objektId] ?? 0) + 1;
+      }
+      return acc;
+    }, {});
+  }, [wohnungen, mieter]);
+
   // Berechne reale Dashboard-Statistiken (objektübergreifend)
   const dashboardStats = useMemo(() => {
     const relevantWohnungen = wohnungen;
@@ -350,12 +363,26 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                     <TableCell>{objekt.typ}</TableCell>
                     <TableCell>{wohnungenCountByObjektId[objekt.id] ?? 0}</TableCell>
                     <TableCell>
-                      <Badge
-                        variant="secondary"
-                        className="bg-success/10 text-success"
-                      >
-                        {objekt.status}
-                      </Badge>
+                      <div className="flex flex-wrap items-center gap-1">
+                        <Badge
+                          variant="secondary"
+                          className="bg-success/10 text-success"
+                        >
+                          {objekt.status}
+                        </Badge>
+                        {(unitsOhneMieterByObjektId[objekt.id] ?? 0) > 0 && (
+                          <Badge
+                            variant="outline"
+                            className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/20"
+                          >
+                            ⚠ {unitsOhneMieterByObjektId[objekt.id]}{" "}
+                            {unitsOhneMieterByObjektId[objekt.id] === 1
+                              ? "Einheit"
+                              : "Einheiten"}{" "}
+                            ohne Mieter
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
@@ -405,7 +432,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                   <span className="absolute top-2 right-3 text-[10px] text-muted-foreground">Anzeige</span>
                   <CardContent className="pt-4 pb-4">
                     <div className="flex gap-3">
-                      <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground shrink-0">
+                      <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center text-sm font-medium text-text-secondary shrink-0">
                         {partner.initials}
                       </div>
                       <div className="flex-1 min-w-0 space-y-1.5">

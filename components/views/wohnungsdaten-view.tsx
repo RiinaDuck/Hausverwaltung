@@ -384,6 +384,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     addWohnung,
     updateWohnung,
     deleteWohnung,
+    archiveWohnung,
     addZaehler,
     updateZaehler,
     deleteZaehler,
@@ -455,6 +456,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   const loadFotos = useCallback(async (wohnungId: string) => {
+    if (wohnungId.startsWith("demo-")) { setFotos([]); return; }
     const supabase = createClient();
     if (!supabase) return;
     setFotosLoading(true);
@@ -577,7 +579,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     miete: number;
     punkte: number;
     prozent: number;
-    status: "frei" | "vermietet";
+    status: "frei" | "vermietet" | "renovierung";
   } = {
     lage: "",
     wohnflaeche: 0,
@@ -730,7 +732,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     setCheckedItems((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const handleCreateUnit = () => {
+  const handleCreateUnit = async () => {
     if (!selectedObjektId) {
       toast({
         title: "Fehler",
@@ -751,25 +753,40 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
       return;
     }
 
-    addWohnung({
-      objektId: selectedObjektId,
-      bezeichnung: newUnit.lage || "Neue Einheit",
-      etage: newUnit.lage?.split(" ")[0] || "EG",
-      flaeche: newUnit.wohnflaeche || 0,
-      zimmer: newUnit.raeume || 2,
-      miete: newUnit.miete || 0,
-      nebenkosten: 150,
-      status: newUnit.status === "frei" ? "leer" : "vermietet",
-    });
+    const dbStatus: "leer" | "vermietet" | "eigennutzung" =
+      newUnit.status === "frei"
+        ? "leer"
+        : newUnit.status === "renovierung"
+          ? "eigennutzung"
+          : "vermietet";
 
-    setIsNewUnitOpen(false);
-    setNewUnit(initialNewUnit);
-    toast({
-      title: "Einheit erstellt",
-      description: `Wohneinheit "${
-        newUnit.lage || "Neue Einheit"
-      }" wurde erfolgreich angelegt.`,
-    });
+    try {
+      await addWohnung({
+        objektId: selectedObjektId,
+        bezeichnung: newUnit.lage || "Neue Einheit",
+        etage: newUnit.lage?.split(" ")[0] || "EG",
+        flaeche: newUnit.wohnflaeche || 0,
+        zimmer: newUnit.raeume || 2,
+        miete: newUnit.miete || 0,
+        nebenkosten: 150,
+        status: dbStatus,
+      });
+
+      setIsNewUnitOpen(false);
+      setNewUnit(initialNewUnit);
+      toast({
+        title: "Einheit erstellt",
+        description: `Wohneinheit "${
+          newUnit.lage || "Neue Einheit"
+        }" wurde erfolgreich angelegt.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Fehler beim Anlegen",
+        description: error?.message ?? "Die Einheit konnte nicht gespeichert werden.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDeleteUnit = () => {
@@ -881,6 +898,27 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     updateEditedUnit("status", archiveDialogData.newStatus);
     setArchiveDialogOpen(false);
     setArchiveDialogData(null);
+  };
+
+  // Archive Wohnung
+  const [archiveWohnungOpen, setArchiveWohnungOpen] = useState(false);
+  const [archiveWohnungReason, setArchiveWohnungReason] = useState("");
+  const [archiveWohnungProcessing, setArchiveWohnungProcessing] = useState(false);
+
+  const handleArchiveWohnung = async () => {
+    if (!selectedUnit) return;
+    setArchiveWohnungProcessing(true);
+    try {
+      await archiveWohnung(selectedUnit.id, archiveWohnungReason || undefined);
+      toast({ title: "Archiviert", description: `Wohnung "${selectedUnit.lage}" wurde archiviert.` });
+      setArchiveWohnungOpen(false);
+      setArchiveWohnungReason("");
+      setSelectedUnit(null);
+    } catch (error: any) {
+      toast({ title: "Fehler beim Archivieren", description: error?.message ?? "Die Wohnung konnte nicht archiviert werden.", variant: "destructive" });
+    } finally {
+      setArchiveWohnungProcessing(false);
+    }
   };
 
   // Zähler handlers
@@ -1030,7 +1068,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
       <div className="flex items-center justify-center h-[calc(100vh-12rem)]">
         <Card className="p-8 text-center">
           <Home className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-          <h2 className="text-lg font-semibold mb-2">Kein Objekt ausgewählt</h2>
+          <h2 className="text-[15px] font-medium mb-2">Kein Objekt ausgewählt</h2>
           <p className="text-muted-foreground">
             Bitte wählen Sie oben ein Objekt aus, um die Wohnungen anzuzeigen.
           </p>
@@ -1044,7 +1082,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     <div className="flex items-center justify-center h-[calc(100vh-12rem)]">
       <Card className="p-8 text-center">
         <Home className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-        <h2 className="text-lg font-semibold mb-2">Keine Wohnungen</h2>
+        <h2 className="text-[15px] font-medium mb-2">Keine Wohnungen</h2>
         <p className="text-muted-foreground mb-4">
           Für &quot;{currentObjekt?.name}&quot; sind noch keine Wohnungen
           angelegt.
@@ -1097,6 +1135,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       wohnflaeche: Number.parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
               <div className="space-y-2">
@@ -1112,6 +1151,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       nutzflaeche: Number.parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
             </div>
@@ -1128,6 +1168,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       raeume: Number.parseInt(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
               <div className="space-y-2">
@@ -1142,18 +1183,19 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       miete: Number.parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="new-status-empty">Status</Label>
                 <Select
                   value={newUnit.status}
-                  onValueChange={(value) =>
+                  onValueChange={(value) => {
                     setNewUnit((prev) => ({
                       ...prev,
-                      status: value as "frei" | "vermietet",
-                    }))
-                  }
+                      status: value as "frei" | "vermietet" | "renovierung",
+                    }));
+                  }}
                 >
                   <SelectTrigger id="new-status-empty">
                     <SelectValue />
@@ -1161,10 +1203,12 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                   <SelectContent>
                     <SelectItem value="frei">Frei</SelectItem>
                     <SelectItem value="vermietet">Vermietet</SelectItem>
+                    <SelectItem value="renovierung">Renovierung</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsNewUnitOpen(false)}>
@@ -1249,6 +1293,15 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                           {statusConfig[unit.status].label}
                         </Badge>
                       )}
+                      {unit.status === "vermietet" && !mieter.some((m) => m.wohnungId === unit.id && m.isAktiv !== false) && (
+                        <Badge
+                          variant="outline"
+                          className="text-xs bg-amber-500/10 text-amber-600 border-amber-500/20 flex items-center gap-1"
+                        >
+                          <AlertCircle className="h-3 w-3" />
+                          Kein Mieter
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1282,7 +1335,10 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       <Copy className="h-4 w-4 mr-2" />
                       Duplizieren
                     </DropdownMenuItem>
-                    <DropdownMenuItem disabled>
+                    <DropdownMenuItem
+                      onClick={() => { setArchiveWohnungReason(""); setArchiveWohnungOpen(true); }}
+                      className="text-amber-600 focus:text-amber-600"
+                    >
                       <Archive className="h-4 w-4 mr-2" />
                       Archivieren
                     </DropdownMenuItem>
@@ -1344,6 +1400,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             parseFloat(e.target.value) || 0,
                           )
                         }
+                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                       />
                     </div>
                     <div className="space-y-2">
@@ -1359,6 +1416,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             parseFloat(e.target.value) || 0,
                           )
                         }
+                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                       />
                     </div>
                     <div className="space-y-2">
@@ -1373,6 +1431,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             parseInt(e.target.value) || 0,
                           )
                         }
+                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                       />
                     </div>
                     <div className="space-y-2">
@@ -1387,6 +1446,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             parseInt(e.target.value) || 0,
                           )
                         }
+                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                       />
                     </div>
                     <div className="space-y-2">
@@ -1402,6 +1462,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             parseFloat(e.target.value) || 0,
                           )
                         }
+                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                       />
                     </div>
                     <div className="space-y-2">
@@ -1439,6 +1500,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             parseFloat(e.target.value) || 0,
                           )
                         }
+                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                       />
                     </div>
                   </div>
@@ -1450,21 +1512,41 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                 const unitMieter = mieter.filter(
                   (m) => m.wohnungId === selectedUnit.id && m.isAktiv !== false
                 );
-                if (unitMieter.length === 0) return (
-                  <Card className="border-dashed">
-                    <CardContent className="py-4 flex items-center gap-3 text-muted-foreground">
-                      <Users className="h-5 w-5" />
-                      <span className="text-sm">Kein Mieter zugeordnet</span>
-                    </CardContent>
-                  </Card>
-                );
+                if (unitMieter.length === 0) {
+                  if (selectedUnit.status !== "vermietet") return null;
+                  return (
+                    <Card className="border-amber-200 bg-amber-50 rounded-lg">
+                      <CardContent className="p-5 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
+                            <AlertCircle className="h-4 w-4 text-amber-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-amber-900">Kein Mieter zugeordnet</p>
+                            <p className="text-xs text-amber-700">Wohnung ist als vermietet markiert</p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-amber-500 text-amber-700 hover:bg-amber-100 shrink-0"
+                          onClick={() => onNavigate?.("mieter")}
+                        >
+                          {mieter.some((m) => units.some((u) => u.id === m.wohnungId))
+                            ? "Mieter zuordnen →"
+                            : "Mieter anlegen →"}
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  );
+                }
                 return unitMieter.map((m) => (
                   <Card
                     key={m.id}
-                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    className="cursor-pointer hover:bg-accent/50 transition-colors rounded-lg"
                     onClick={() => onNavigate?.("mieter", { mieterId: m.id })}
                   >
-                    <CardContent className="py-4 flex items-center justify-between">
+                    <CardContent className="p-5 flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                           <Users className="h-4 w-4 text-primary" />
@@ -1655,6 +1737,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             onChange={(e) =>
                               setZaehlerForm((prev) => ({ ...prev, aktuellerStand: parseFloat(e.target.value) || 0 }))
                             }
+                            onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                           />
                         </div>
                         <div className="space-y-2">
@@ -1707,7 +1790,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             <TableRow key={z.id}>
                               <TableCell>{z.montageort}</TableCell>
                               <TableCell className="text-sm">{z.geraeteart}</TableCell>
-                              <TableCell className="hidden md:table-cell font-mono text-xs">{z.geraetnummer}</TableCell>
+                              <TableCell className="hidden md:table-cell text-sm">{z.geraetnummer}</TableCell>
                               <TableCell>{formatDateGerman(z.geeichtBis)}</TableCell>
                               <TableCell>
                                 <div className="flex gap-1">
@@ -1937,7 +2020,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             <TableRow key={r.id}>
                               <TableCell>{r.montageort}</TableCell>
                               <TableCell className="text-sm">{r.geraeteart}</TableCell>
-                              <TableCell className="hidden md:table-cell font-mono text-xs">{r.geraetnummer}</TableCell>
+                              <TableCell className="hidden md:table-cell text-sm">{r.geraetnummer}</TableCell>
                               <TableCell>{formatDateGerman(r.naechsteWartung) !== "-" ? formatDateGerman(r.naechsteWartung) : formatDateGerman(r.lebensdauerBis)}</TableCell>
                               <TableCell>
                                 <div className="flex gap-1">
@@ -2307,6 +2390,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       wohnflaeche: Number.parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
               <div className="space-y-2">
@@ -2322,6 +2406,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       nutzflaeche: Number.parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
             </div>
@@ -2338,6 +2423,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       raeume: Number.parseInt(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
               <div className="space-y-2">
@@ -2352,18 +2438,19 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       miete: Number.parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="new-status">Status</Label>
                 <Select
                   value={newUnit.status}
-                  onValueChange={(value) =>
+                  onValueChange={(value) => {
                     setNewUnit((prev) => ({
                       ...prev,
-                      status: value as "frei" | "vermietet",
-                    }))
-                  }
+                      status: value as "frei" | "vermietet" | "renovierung",
+                    }));
+                  }}
                 >
                   <SelectTrigger id="new-status">
                     <SelectValue />
@@ -2371,10 +2458,12 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                   <SelectContent>
                     <SelectItem value="frei">Frei</SelectItem>
                     <SelectItem value="vermietet">Vermietet</SelectItem>
+                    <SelectItem value="renovierung">Renovierung</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsNewUnitOpen(false)}>
@@ -2397,7 +2486,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
             <DialogTitle>Mieter archivieren?</DialogTitle>
             <DialogDescription>
               Diese Wohnung ist aktuell von{" "}
-              <span className="font-semibold">{archiveDialogData?.activeMieter?.name}</span>{" "}
+              <span className="font-medium">{archiveDialogData?.activeMieter?.name}</span>{" "}
               bewohnt. Was soll mit dem Mietverhältnis passieren?
             </DialogDescription>
           </DialogHeader>
@@ -2450,6 +2539,49 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
         </DialogContent>
       </Dialog>
 
+      {/* Archive Wohnung Dialog */}
+      <Dialog open={archiveWohnungOpen} onOpenChange={setArchiveWohnungOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Wohnung archivieren?</DialogTitle>
+            <DialogDescription>
+              Diese Wohnung wird archiviert und aus der aktiven Ansicht entfernt. Sie kann im Archiv wiederhergestellt werden.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="archive-wohnung-reason">Grund (optional)</Label>
+            <Input
+              id="archive-wohnung-reason"
+              placeholder="z.B. Wohnung aufgelöst"
+              value={archiveWohnungReason}
+              onChange={(e) => setArchiveWohnungReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setArchiveWohnungOpen(false)} disabled={archiveWohnungProcessing}>
+              Abbrechen
+            </Button>
+            <Button
+              onClick={handleArchiveWohnung}
+              disabled={archiveWohnungProcessing}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {archiveWohnungProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Wird archiviert...
+                </>
+              ) : (
+                <>
+                  <Archive className="mr-2 h-4 w-4" />
+                  Archivieren
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Zähler Partner Dialog */}
       <Dialog open={zaehlerPartnerDialogOpen} onOpenChange={setZaehlerPartnerDialogOpen}>
         <DialogContent className="max-w-2xl">
@@ -2493,7 +2625,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                 <CardContent className="pt-4 pb-4">
                   <div className="flex gap-3">
                     <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs font-semibold text-primary">{partner.initials}</span>
+                      <span className="text-xs font-medium text-primary">{partner.initials}</span>
                     </div>
                     <div className="flex-1">
                       <h3 className="font-medium text-sm">{partner.name}</h3>
@@ -2578,7 +2710,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                 <CardContent className="pt-4 pb-4">
                   <div className="flex gap-3">
                     <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <span className="text-xs font-semibold text-primary">{partner.initials}</span>
+                      <span className="text-xs font-medium text-primary">{partner.initials}</span>
                     </div>
                     <div className="flex-1">
                       <h3 className="font-medium text-sm">{partner.name}</h3>

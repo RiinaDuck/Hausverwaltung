@@ -16,7 +16,7 @@ import {
   DoorOpen,
   Users,
   Gauge,
-  Landmark,
+  BookUser,
   LogOut,
   BarChart3,
   ChevronLeft,
@@ -50,7 +50,7 @@ const navItemsBefore = [
 const navItemsAfter = [
   { id: "zaehler" as const, label: "Zähler", icon: Gauge },
   { id: "statistiken" as const, label: "Statistiken", icon: BarChart3 },
-  { id: "hausmanager" as const, label: "Hausmanager", icon: Landmark },
+  { id: "kontakte" as const, label: "Kontakte", icon: BookUser },
   { id: "archiv" as const, label: "Archiv", icon: Archive, dividerBefore: true },
 ];
 

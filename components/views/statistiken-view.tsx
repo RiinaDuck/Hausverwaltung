@@ -913,7 +913,7 @@ export function StatistikenView() {
       {/* Header mit Filtern */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">
+          <h1 className="text-2xl font-medium text-text-primary">
             Statistiken & Auswertungen
           </h1>
           <p className="text-muted-foreground">
@@ -965,7 +965,7 @@ export function StatistikenView() {
             <TrendingUp className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">
+            <div className="text-2xl font-medium text-success">
               {kpiStats.gesamteinnahmenYTD.toLocaleString("de-DE", {
                 style: "currency",
                 currency: "EUR",
@@ -997,7 +997,7 @@ export function StatistikenView() {
             <AlertCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">
+            <div className="text-2xl font-medium text-destructive">
               {kpiStats.offeneForderungen.toLocaleString("de-DE", {
                 style: "currency",
                 currency: "EUR",
@@ -1018,7 +1018,7 @@ export function StatistikenView() {
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-medium">
               {kpiStats.leerstehendeWohnungen} Einheit
               {kpiStats.leerstehendeWohnungen !== 1 ? "en" : ""}
             </div>
@@ -1279,7 +1279,7 @@ export function StatistikenView() {
                             />
                             {objekt.name}
                           </span>
-                          <span className="text-sm font-semibold">
+                          <span className="text-sm font-medium">
                             {objekt.einnahmen.toLocaleString("de-DE")} €
                           </span>
                         </div>
@@ -1603,7 +1603,7 @@ export function StatistikenView() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">
+                        <p className="font-medium">
                           {forderung.betrag.toLocaleString("de-DE")} €
                         </p>
                         <p className="text-sm text-muted-foreground">
@@ -1858,7 +1858,7 @@ export function StatistikenView() {
                           {pos.datum}
                         </p>
                       </div>
-                      <p className="font-semibold">
+                      <p className="font-medium">
                         {pos.betrag.toLocaleString("de-DE")} €
                       </p>
                     </div>
@@ -2065,7 +2065,7 @@ export function StatistikenView() {
                   ].map((energie, i) => (
                     <div key={i} className="p-4 rounded-lg bg-muted/50">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-semibold">{energie.typ}</span>
+                        <span className="font-medium">{energie.typ}</span>
                         <div className="flex items-center gap-1">
                           {energie.trend < 0 ? (
                             <TrendingDown className="h-4 w-4 text-success" />
@@ -2093,7 +2093,7 @@ export function StatistikenView() {
                     </div>
                   ))}
                   <div className="pt-4 border-t">
-                    <div className="flex items-center justify-between font-semibold">
+                    <div className="flex items-center justify-between font-medium">
                       <span>Gesamt Energiekosten</span>
                       <span>26.235 €</span>
                     </div>
