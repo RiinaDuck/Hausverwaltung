@@ -384,6 +384,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     addWohnung,
     updateWohnung,
     deleteWohnung,
+    archiveWohnung,
     addZaehler,
     updateZaehler,
     deleteZaehler,
@@ -899,6 +900,27 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
     setArchiveDialogData(null);
   };
 
+  // Archive Wohnung
+  const [archiveWohnungOpen, setArchiveWohnungOpen] = useState(false);
+  const [archiveWohnungReason, setArchiveWohnungReason] = useState("");
+  const [archiveWohnungProcessing, setArchiveWohnungProcessing] = useState(false);
+
+  const handleArchiveWohnung = async () => {
+    if (!selectedUnit) return;
+    setArchiveWohnungProcessing(true);
+    try {
+      await archiveWohnung(selectedUnit.id, archiveWohnungReason || undefined);
+      toast({ title: "Archiviert", description: `Wohnung "${selectedUnit.lage}" wurde archiviert.` });
+      setArchiveWohnungOpen(false);
+      setArchiveWohnungReason("");
+      setSelectedUnit(null);
+    } catch (error: any) {
+      toast({ title: "Fehler beim Archivieren", description: error?.message ?? "Die Wohnung konnte nicht archiviert werden.", variant: "destructive" });
+    } finally {
+      setArchiveWohnungProcessing(false);
+    }
+  };
+
   // Zähler handlers
   const handleZaehlerSave = async () => {
     if (!selectedUnit) return;
@@ -1113,6 +1135,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       wohnflaeche: Number.parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
               <div className="space-y-2">
@@ -1128,6 +1151,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       nutzflaeche: Number.parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
             </div>
@@ -1144,6 +1168,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       raeume: Number.parseInt(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
               <div className="space-y-2">
@@ -1158,6 +1183,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       miete: Number.parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
               <div className="space-y-2">
@@ -1309,7 +1335,10 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       <Copy className="h-4 w-4 mr-2" />
                       Duplizieren
                     </DropdownMenuItem>
-                    <DropdownMenuItem disabled>
+                    <DropdownMenuItem
+                      onClick={() => { setArchiveWohnungReason(""); setArchiveWohnungOpen(true); }}
+                      className="text-amber-600 focus:text-amber-600"
+                    >
                       <Archive className="h-4 w-4 mr-2" />
                       Archivieren
                     </DropdownMenuItem>
@@ -1371,6 +1400,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             parseFloat(e.target.value) || 0,
                           )
                         }
+                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                       />
                     </div>
                     <div className="space-y-2">
@@ -1386,6 +1416,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             parseFloat(e.target.value) || 0,
                           )
                         }
+                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                       />
                     </div>
                     <div className="space-y-2">
@@ -1400,6 +1431,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             parseInt(e.target.value) || 0,
                           )
                         }
+                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                       />
                     </div>
                     <div className="space-y-2">
@@ -1414,6 +1446,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             parseInt(e.target.value) || 0,
                           )
                         }
+                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                       />
                     </div>
                     <div className="space-y-2">
@@ -1429,6 +1462,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             parseFloat(e.target.value) || 0,
                           )
                         }
+                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                       />
                     </div>
                     <div className="space-y-2">
@@ -1466,6 +1500,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             parseFloat(e.target.value) || 0,
                           )
                         }
+                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                       />
                     </div>
                   </div>
@@ -1702,6 +1737,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                             onChange={(e) =>
                               setZaehlerForm((prev) => ({ ...prev, aktuellerStand: parseFloat(e.target.value) || 0 }))
                             }
+                            onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                           />
                         </div>
                         <div className="space-y-2">
@@ -2354,6 +2390,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       wohnflaeche: Number.parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
               <div className="space-y-2">
@@ -2369,6 +2406,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       nutzflaeche: Number.parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
             </div>
@@ -2385,6 +2423,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       raeume: Number.parseInt(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
               <div className="space-y-2">
@@ -2399,6 +2438,7 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                       miete: Number.parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
               <div className="space-y-2">
@@ -2492,6 +2532,49 @@ export function WohnungsdatenView({ onNavigate }: { onNavigate?: (view: AppView,
                 <>
                   <Archive className="mr-2 h-4 w-4" />
                   Ja, archivieren
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Archive Wohnung Dialog */}
+      <Dialog open={archiveWohnungOpen} onOpenChange={setArchiveWohnungOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Wohnung archivieren?</DialogTitle>
+            <DialogDescription>
+              Diese Wohnung wird archiviert und aus der aktiven Ansicht entfernt. Sie kann im Archiv wiederhergestellt werden.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="archive-wohnung-reason">Grund (optional)</Label>
+            <Input
+              id="archive-wohnung-reason"
+              placeholder="z.B. Wohnung aufgelöst"
+              value={archiveWohnungReason}
+              onChange={(e) => setArchiveWohnungReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setArchiveWohnungOpen(false)} disabled={archiveWohnungProcessing}>
+              Abbrechen
+            </Button>
+            <Button
+              onClick={handleArchiveWohnung}
+              disabled={archiveWohnungProcessing}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {archiveWohnungProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Wird archiviert...
+                </>
+              ) : (
+                <>
+                  <Archive className="mr-2 h-4 w-4" />
+                  Archivieren
                 </>
               )}
             </Button>

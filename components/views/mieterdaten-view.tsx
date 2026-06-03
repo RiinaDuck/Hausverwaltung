@@ -149,6 +149,7 @@ export function MieterdatenView({ initialMieterId }: { initialMieterId?: string 
     deleteMieter,
     archiviereMieter,
     reaktiviereMieter,
+    archiveMieter,
     zahlungen,
     setZahlungen,
   } = useAppData();
@@ -1013,6 +1014,27 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
     }
   };
 
+  // Archive Mieter
+  const [archiveMieterOpen, setArchiveMieterOpen] = useState(false);
+  const [archiveMieterReason, setArchiveMieterReason] = useState("");
+  const [archiveMieterProcessing, setArchiveMieterProcessing] = useState(false);
+
+  const handleArchiveMieter = async () => {
+    if (!selectedMieter) return;
+    setArchiveMieterProcessing(true);
+    try {
+      await archiveMieter(selectedMieter.id, archiveMieterReason || undefined);
+      toast({ title: "Archiviert", description: `${selectedMieter.name} wurde archiviert.` });
+      setArchiveMieterOpen(false);
+      setArchiveMieterReason("");
+      setSelectedMieter(null);
+    } catch (error: any) {
+      toast({ title: "Fehler beim Archivieren", description: error?.message ?? "Der Mieter konnte nicht archiviert werden.", variant: "destructive" });
+    } finally {
+      setArchiveMieterProcessing(false);
+    }
+  };
+
   const handleDeleteMieter = () => {
     if (!selectedMieter || mieterData.length <= 1) return;
 
@@ -1572,6 +1594,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                         kaltmiete: parseFloat(e.target.value) || 0,
                       }))
                     }
+                    onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                   />
                 </div>
               </div>
@@ -1588,6 +1611,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                         nebenkosten: parseFloat(e.target.value) || 0,
                       }))
                     }
+                    onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                   />
                 </div>
                 <div className="space-y-2">
@@ -1602,6 +1626,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                         kaution: parseFloat(e.target.value) || 0,
                       }))
                     }
+                    onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                   />
                 </div>
               </div>
@@ -1760,7 +1785,10 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                       <FileDown className="h-4 w-4 mr-2" />
                       In PDF Exportieren
                     </DropdownMenuItem>
-                    <DropdownMenuItem disabled>
+                    <DropdownMenuItem
+                      onClick={() => { setArchiveMieterReason(""); setArchiveMieterOpen(true); }}
+                      className="text-amber-600 focus:text-amber-600"
+                    >
                       <Archive className="h-4 w-4 mr-2" />
                       Archivieren
                     </DropdownMenuItem>
@@ -1982,6 +2010,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                             parseFloat(e.target.value) || 0,
                           )
                         }
+                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -1996,6 +2025,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                             parseFloat(e.target.value) || 0,
                           )
                         }
+                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                       />
                     </div>
                   </div>
@@ -2012,6 +2042,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                             parseFloat(e.target.value) || 0,
                           )
                         }
+                        onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -2695,6 +2726,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                                 type="number"
                                 value={cz.istBetrag}
                                 className={isUeberfaellig ? "border-destructive" : ""}
+                                onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                                 onChange={(e) => {
                                   const ist = parseFloat(e.target.value) || 0;
                                   const diff = cz.sollBetrag - ist;
@@ -3102,6 +3134,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                       kaltmiete: parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
             </div>
@@ -3118,6 +3151,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                       nebenkosten: parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
               <div className="space-y-2">
@@ -3132,6 +3166,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                       kaution: parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
             </div>
@@ -3327,6 +3362,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                       kaltmiete: parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
               <div className="space-y-2">
@@ -3341,6 +3377,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                       nebenkosten: parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
             </div>
@@ -3358,6 +3395,7 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                       prozentanteil: parseFloat(e.target.value) || 0,
                     }))
                   }
+                  onFocus={(e) => { if (e.target.value === "0") e.target.select(); }}
                 />
               </div>
               <div className="space-y-2 flex items-end pb-2">
@@ -3507,15 +3545,15 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="v-kaltmiete" className="text-xs">Kaltmiete (€)</Label>
-                    <Input id="v-kaltmiete" type="number" value={vertragForm.kaltmiete} onChange={(e) => setVertragForm((p) => ({ ...p, kaltmiete: e.target.value }))} />
+                    <Input id="v-kaltmiete" type="number" value={vertragForm.kaltmiete} onChange={(e) => setVertragForm((p) => ({ ...p, kaltmiete: e.target.value }))} onFocus={(e) => { if (e.target.value === "0") e.target.select(); }} />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="v-nebenkosten" className="text-xs">NK-Vorauszahlung (€)</Label>
-                    <Input id="v-nebenkosten" type="number" value={vertragForm.nebenkosten} onChange={(e) => setVertragForm((p) => ({ ...p, nebenkosten: e.target.value }))} />
+                    <Input id="v-nebenkosten" type="number" value={vertragForm.nebenkosten} onChange={(e) => setVertragForm((p) => ({ ...p, nebenkosten: e.target.value }))} onFocus={(e) => { if (e.target.value === "0") e.target.select(); }} />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="v-kaution" className="text-xs">Kaution (€)</Label>
-                    <Input id="v-kaution" type="number" value={vertragForm.kaution} onChange={(e) => setVertragForm((p) => ({ ...p, kaution: e.target.value }))} />
+                    <Input id="v-kaution" type="number" value={vertragForm.kaution} onChange={(e) => setVertragForm((p) => ({ ...p, kaution: e.target.value }))} onFocus={(e) => { if (e.target.value === "0") e.target.select(); }} />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="v-faelligkeit" className="text-xs">Fälligkeitstag</Label>
@@ -3748,6 +3786,49 @@ Ort, Datum, Vermieter                          Ort, Datum, Mieter`;
               }}
             >
               Speichern
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Archive Mieter Dialog */}
+      <Dialog open={archiveMieterOpen} onOpenChange={setArchiveMieterOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mieter archivieren?</DialogTitle>
+            <DialogDescription>
+              Dieser Mieter wird archiviert und aus der aktiven Ansicht entfernt. Er kann im Archiv wiederhergestellt werden.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Label htmlFor="archive-mieter-reason">Grund (optional)</Label>
+            <Input
+              id="archive-mieter-reason"
+              placeholder="z.B. Mietverhältnis beendet"
+              value={archiveMieterReason}
+              onChange={(e) => setArchiveMieterReason(e.target.value)}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setArchiveMieterOpen(false)} disabled={archiveMieterProcessing}>
+              Abbrechen
+            </Button>
+            <Button
+              onClick={handleArchiveMieter}
+              disabled={archiveMieterProcessing}
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+            >
+              {archiveMieterProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Wird archiviert...
+                </>
+              ) : (
+                <>
+                  <Archive className="mr-2 h-4 w-4" />
+                  Archivieren
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

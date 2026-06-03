@@ -11,6 +11,7 @@ export async function getObjekte(userId: string) {
     .from("objekte")
     .select("*")
     .eq("user_id", userId)
+    .is("archived_at", null)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
@@ -55,7 +56,7 @@ export async function deleteObjekt(id: string) {
 
 export async function getWohnungen(userId: string, objektId?: string) {
   const supabase = createClient();
-  let query = supabase.from("wohnungen").select("*").eq("user_id", userId);
+  let query = supabase.from("wohnungen").select("*").eq("user_id", userId).is("archived_at", null);
 
   if (objektId) {
     query = query.eq("objekt_id", objektId);
@@ -105,7 +106,7 @@ export async function deleteWohnung(id: string) {
 
 export async function getMieter(userId: string, wohnungId?: string) {
   const supabase = createClient();
-  let query = supabase.from("mieter").select("*").eq("user_id", userId);
+  let query = supabase.from("mieter").select("*").eq("user_id", userId).is("archived_at", null);
 
   if (wohnungId) {
     query = query.eq("wohnung_id", wohnungId);

@@ -49,6 +49,7 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
     addObjekt,
     updateObjekt,
     deleteObjekt,
+    archiveObjekt,
     selectedObjektId,
     setSelectedObjektId,
   } = useAppData();
@@ -235,33 +236,19 @@ export function ObjektdatenView({ onNavigate }: ObjektdatenViewProps) {
 
     setArchiveProcessing(true);
     try {
-      const supabase = createClient();
-      if (!supabase) throw new Error("Supabase client not available");
-
-      // Update objekt: set archived_at=now(), archive_reason="Archiviert"
-      const now = new Date().toISOString();
-      const { error } = await supabase
-        .from("objekte")
-        .update({
-          archived_at: now,
-          archive_reason: "Archiviert",
-        })
-        .eq("id", objektToArchive.id);
-
-      if (error) throw error;
+      await archiveObjekt(objektToArchive.id, "Archiviert");
 
       toast({
         title: "Archiviert",
         description: `Objekt "${objektToArchive.name}" wurde archiviert.`,
       });
 
-      setObjektToArchive(null);
-      setArchiveConfirmOpen(false);
-      
       // Deselect the archived objekt
       if (selectedObjektId === objektToArchive.id) {
         setSelectedObjektId(objekte.find((o) => o.id !== objektToArchive.id)?.id ?? null);
       }
+      setObjektToArchive(null);
+      setArchiveConfirmOpen(false);
     } catch (error: any) {
       console.error("Error archiving objekt:", error);
       toast({

@@ -26,12 +26,15 @@ create table if not exists public.archive_log (
 alter table public.archive_log enable row level security;
 
 -- RLS Policies for archive_log
-create policy "Authenticated users can read archive_log"
-  on public.archive_log for select
-  to authenticated
-  using (true);
-
-create policy "Authenticated users can insert archive_log"
-  on public.archive_log for insert
-  to authenticated
-  with check (true);
+do $$ begin
+  if not exists (
+    select 1 from pg_policies where tablename = 'archive_log' and policyname = 'Authenticated users can read archive_log'
+  ) then
+    execute 'create policy "Authenticated users can read archive_log" on public.archive_log for select to authenticated using (true)';
+  end if;
+  if not exists (
+    select 1 from pg_policies where tablename = 'archive_log' and policyname = 'Authenticated users can insert archive_log'
+  ) then
+    execute 'create policy "Authenticated users can insert archive_log" on public.archive_log for insert to authenticated with check (true)';
+  end if;
+end $$;
